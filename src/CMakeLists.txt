@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(includeguard)
+project(includeguardian)
 
 SET(CMAKE_CXX_STANDARD 17)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,4 +17,4 @@ conan_cmake_run(CONANFILE conanfile.txt
                 BASIC_SETUP CMAKE_TARGETS
                 BUILD missing)
 
-add_executable(includeguard main.m.cpp)
+add_executable(includeguardian main.m.cpp)

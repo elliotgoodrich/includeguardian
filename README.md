@@ -1,4 +1,4 @@
-# IncludeGuard
+# IncludeGuardian
 
 ## Getting Started
 
@@ -9,7 +9,7 @@
 
 ## Aim
 
-IncludeGuard will sort all of the include directives in your project by the
+IncludeGuardian will sort all of the include directives in your project by the
 total number of bytes of code that would need to be compiled by your
 application.  This will give developers a targetted list of include
 directives to attempt to remove in order to reduce compilation time.
@@ -58,10 +58,10 @@ headers are small in comparison.
 Some of these suggestion are probably not feasible, for example removing
 `#include <foo.hpp>` from `foo.cpp`.
 
-Additionally, IncludeGuard will warn developers when they open a pull request
-that they are adding in an include directive that is particularly expensive.
-This should be configurable by the user, for example warn if an include
-directive is in the top decile of expensive directives.
+Additionally, IncludeGuardian will warn developers when they open a pull
+request that they are adding in an include directive that is particularly
+expensive.  This should be configurable by the user, for example warn if
+an include directive is in the top decile of expensive directives.
 
 Although creating the initial list may be expensive, IncludeGuard should
 strive to have a quick response on new pull requests.
