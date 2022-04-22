@@ -176,3 +176,27 @@ std::vector<result> include_costs_of(
 
 }
 ```
+
+## Alternative Ideas
+
+### Rebuild Warning
+
+We can look at the history of the repository to figure out what the chances
+are that a particular header file is modified and then look at how many
+files would need to be rebuilt if this was changed.  This would give us a list
+of header files that cause the most rebuilding when developers are working on
+changes.  This would continue to be useful even if an application moved to
+modules.
+
+### Editor plugin
+
+Create an editor plugin that will highlight include directives in different
+shades dependending on the cost (most likely total file size) of that include.
+It may not be entirely accurate as removing one large include may have little
+effect if there are other includes in the same file that have a significant
+overlap.  However, if you have one "red" (i.e. very large) include and the
+others are "orange" or "green", then you can be reasonably confident that
+removing this "red" include will have an improvement, if we use a logarithmic
+scale for colouring.  For example, "green" files are <1K lines, orange are
+1-10K lines, and red are 10-100K lines.
+
