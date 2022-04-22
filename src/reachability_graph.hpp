@@ -55,10 +55,6 @@ public:
     // that this will include `start` in the range.
     auto reachable_from(handle start) const;
 
-    // Return a range of all nodes that can reach `destinatation` and
-    // do not have any edges pointing to them.
-    auto sources_that_can_reach(handle destination) const;
-    
     // Return the number of unique paths between the `from` handle to the `to` handle.
     std::size_t number_of_paths(handle from, handle to) const;
 };
@@ -89,13 +85,6 @@ template <typename NODE>
 auto reachability_graph<NODE>::reachable_from(handle start) const
 {
     return m_reachable[start];
-}
-
-template <typename NODE>
-auto reachability_graph<NODE>::sources_that_can_reach(handle destination) const
-{
-    // TODO
-    return;
 }
 
 template <typename NODE>

@@ -132,14 +132,17 @@ struct result {
 };
 
 std::vector<result> include_costs_of(
-    const std::span<std::filesystem::path>& files,
-    const reachability_matrix<node>& graph
+    const std::span<handle>& translation_units,
+    const reachability_matrix<node>& graph,
 ) {
     std::vector<result> results;
-    for (const handle file : files) {
+    for (const handle file : graph.vertices()) {
         // Get a list of all source files that directly or indirectly
         // include `file`.
-        range<node> sources = graph.sources_that_can_reach(file);
+        range<handle> sources = translation_units
+            | std::views::filter([&](const std::filesystem::path& tu){
+                return graph.number_of_paths(tu, file) != 0;
+            });
 
         // For each include directive in `file`, we want to calculate the
         // benefit of removing it.
@@ -152,7 +155,7 @@ std::vector<result> include_costs_of(
             // Get the total size of `include` transitively included.
             const std::size_t cost_in_bytes = total_file_size_of(include);
 
-            for (const node source : sources) {
+            for (const handle source : sources) {
                 // Find the sum of the file sizes for `include` and all its
                 // includes that are now not reachable if we removed it.
                 for (const node i : transitive_includes) {
