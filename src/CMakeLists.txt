@@ -19,12 +19,13 @@ conan_cmake_run(CONANFILE conanfile.txt
                 BUILD missing)
 
 find_package(LLVM CONFIG REQUIRED)
-message("hello ${LLVM_CMAKE_DIR}")
+message("found LLVM ${LLVM_CMAKE_DIR}")
+
+find_package(Clang CONFIG REQUIRED)
 
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 include(HandleLLVMOptions)
 add_definitions(${LLVM_DEFINITIONS})
-
 
 add_executable(
     includeguardian
@@ -32,10 +33,11 @@ add_executable(
     reachability_graph.hpp reachability_graph.cpp
 )
 target_link_libraries(includeguardian CONAN_PKG::boost)
+target_link_libraries(includeguardian clangTooling)
 
 # Find the libraries that correspond to the LLVM components
 # that we wish to use
-llvm_map_components_to_libnames(llvm_libs Support Core IRReader)
+llvm_map_components_to_libnames(llvm_libs Support)
 
 target_include_directories(includeguardian PRIVATE ${LLVM_INCLUDE_DIRS})
 
@@ -43,6 +45,5 @@ target_include_directories(includeguardian PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_libraries(includeguardian ${llvm_libs})
 
 if(WIN32)
-    target_compile_definitions(includeguardian PRIVATE _ITERATOR_DEBUG_LEVEL=0)
     target_compile_options(includeguardian PRIVATE /EHsc)
 endif()

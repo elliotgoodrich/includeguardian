@@ -1,11 +1,22 @@
 #include "reachability_graph.hpp"
+
+#include <clang/Tooling/CommonOptionsParser.h>
+
+#include <llvm/Support/CommandLine.h>
+
 #include <boost/graph/adjacency_list.hpp>
+
 #include <iostream>
 #include <string>
 
 using namespace IncludeGuardian;
 
-int main() {
+static llvm::cl::OptionCategory MyToolCategory("my-tool options");
+
+int main(int argc, const char** argv) {
+	llvm::Expected<clang::tooling::CommonOptionsParser> parser =
+        clang::tooling::CommonOptionsParser::create(argc, argv, MyToolCategory);
+
     boost::adjacency_list<
         boost::vecS,
         boost::vecS,
