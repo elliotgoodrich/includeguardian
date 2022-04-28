@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.13.4)
 project(includeguardian)
 
 SET(CMAKE_CXX_STANDARD 20)
@@ -11,11 +11,20 @@ message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-c
                 "${CMAKE_BINARY_DIR}/conan.cmake")
 endif()
 
+
 include(${CMAKE_BINARY_DIR}/conan.cmake)
 
 conan_cmake_run(CONANFILE conanfile.txt
                 BASIC_SETUP CMAKE_TARGETS
                 BUILD missing)
+
+find_package(LLVM CONFIG REQUIRED)
+message("hello ${LLVM_CMAKE_DIR}")
+
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+include(HandleLLVMOptions)
+add_definitions(${LLVM_DEFINITIONS})
+
 
 add_executable(
     includeguardian
@@ -23,6 +32,17 @@ add_executable(
     reachability_graph.hpp reachability_graph.cpp
 )
 target_link_libraries(includeguardian CONAN_PKG::boost)
+
+# Find the libraries that correspond to the LLVM components
+# that we wish to use
+llvm_map_components_to_libnames(llvm_libs Support Core IRReader)
+
+target_include_directories(includeguardian PRIVATE ${LLVM_INCLUDE_DIRS})
+
+# Link against LLVM libraries
+target_link_libraries(includeguardian ${llvm_libs})
+
 if(WIN32)
     target_compile_definitions(includeguardian PRIVATE _ITERATOR_DEBUG_LEVEL=0)
+    target_compile_options(includeguardian PRIVATE /EHsc)
 endif()

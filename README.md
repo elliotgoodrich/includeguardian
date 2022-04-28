@@ -1,11 +1,19 @@
 # IncludeGuardian
 
-## Getting Started
+## Initial Setup
 
   1. Install Microsoft Visual Studio
   2. Install Python 3
   3. `pip install conan`
-  4. Open `src` folder with Microsoft Visual Studio
+  4. Install [ninja](https://ninja-build.org/) and add to PATH
+  5. Install [CMake](https://cmake.org/download/) and add to PATH
+  6. Install [vcpkg](https://vcpkg.io/en/getting-started.html)
+  7. Open `cmd` as admin
+  8. vcpkg install llvm[tools,target-x86]:x64-windows
+
+## Building
+  1. Open `src` folder with Microsoft Visual Studio
+  2. Ctrl + Shift + B
 
 ## Aim
 
