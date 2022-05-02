@@ -2,7 +2,7 @@
 
 ## Initial Setup
 
-  1. Install Microsoft Visual Studio
+  1. Install Microsoft Visual Studio 2019
   2. Install Python 3
   3. `pip install conan`
   4. Install [ninja](https://ninja-build.org/) and add to PATH
@@ -10,9 +10,13 @@
   6. Install [vcpkg](https://vcpkg.io/en/getting-started.html)
   7. Open `cmd` as admin
   8. vcpkg install llvm[tools,target-x86]:x64-windows
+  9. Open CMake GUI to `src`, set build directory to be `../out` and set the `LLVM_DIR`/`Clang_DIR` `${VCPKG_DIR}/installed/x64-windows/share/clang`/`llvm`
+  10. Set `ZLIB_ROOT` to the `C:/Users/Elliot/.conan/data/zlib/1.2.12/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab` (use the conan output path)
+  11. Select the Visual Studio 2019 generator
+  12. Click generate
 
 ## Building
-  1. Open `src` folder with Microsoft Visual Studio
+  1. Open `out\includeguardian.sln` with Microsoft Visual Studio
   2. Ctrl + Shift + B
 
 ## Aim
