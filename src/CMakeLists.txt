@@ -45,5 +45,5 @@ target_include_directories(includeguardian PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_libraries(includeguardian ${llvm_libs})
 
 if(WIN32)
-    target_compile_options(includeguardian PRIVATE /EHsc)
+    target_compile_options(includeguardian PRIVATE /EHsc /FS)
 endif()

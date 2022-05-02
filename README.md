@@ -19,6 +19,13 @@
   1. Open `out\includeguardian.sln` with Microsoft Visual Studio
   2. Ctrl + Shift + B
 
+## Testing
+  1. Run `includeguardian.exe -p path/to/db source.cpp` where `path/to/db` contains a `compile_commands.json` file containing a [compilation database](https://clang.llvm.org/docs/JSONCompilationDatabase.html) and `source.cpp` is the source file you want to operate on
+
+## People to thank
+  * https://reversed.top/2015-04-23/detecting-wrong-first-include/
+    * For helping with the proper behaviour of `ExecuteAction` to avoid "PP is null" assertions
+
 ## Aim
 
 IncludeGuardian will sort all of the include directives in your project by the
@@ -127,7 +134,7 @@ public:
     // Return a range of all nodes that can reach `destinatation` and
     // do not have any edges pointing to them.
     range<handle> sources_that_can_reach(handle destination) const;
-    
+
     // Return the number of unique paths between the `from` handle to the `to` handle.
     std::size_t number_of_paths(handle from, handle to) const;
 };

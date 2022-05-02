@@ -1,49 +1,104 @@
-#include "reachability_graph.hpp"
-
+#include <clang/AST/ASTConsumer.h>
+#include <clang/ASTMatchers/ASTMatchFinder.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/FrontendActions.h>
+#include <clang/Lex/PPCallbacks.h>
 #include <clang/Tooling/CommonOptionsParser.h>
+#include <clang/Tooling/Tooling.h>
 
+#include <llvm/ADT/StringRef.h>
 #include <llvm/Support/CommandLine.h>
-
-#include <boost/graph/adjacency_list.hpp>
+#include <llvm/Support/Error.h>
 
 #include <iostream>
 #include <string>
 
-using namespace IncludeGuardian;
+class IncludeScanner : public clang::PPCallbacks {
+	int m_indent = -1;
+public:
+	IncludeScanner() = default;
 
-static llvm::cl::OptionCategory MyToolCategory("my-tool options");
+	void FileChanged(
+		clang::SourceLocation Loc,
+		FileChangeReason Reason,
+		clang::SrcMgr::CharacteristicKind FileType,
+		clang::FileID PrevFID) final
+	{
+	    switch (Reason) {
+	    case clang::PPCallbacks::EnterFile:
+		    ++m_indent;
+		    break;
+	    case clang::PPCallbacks::ExitFile:
+		    --m_indent;
+		    break;
+	    case clang::PPCallbacks::SystemHeaderPragma:
+		    break;
+	    case clang::PPCallbacks::RenameFile:
+		    break;
+	    }
+	}
+
+	void InclusionDirective(
+		clang::SourceLocation HashLoc,
+		const clang::Token& IncludeTok,
+		clang::StringRef FileName,
+		bool IsAngled,
+		clang::CharSourceRange FilenameRange,
+		const clang::FileEntry* File,
+		clang::StringRef SearchPath,
+		clang::StringRef RelativePath,
+		const clang::Module* Imported,
+		clang::SrcMgr::CharacteristicKind FileType) final
+	{
+		std::cout << std::string(m_indent * 2, ' ')
+			      << "Found #include <"
+			      << std::string_view(FileName)
+			      << ">\n";
+	}
+
+	void EndOfMainFile() final {
+		std::cout << "Done!\n";
+	}
+};
+
+class Action : public clang::PreprocessOnlyAction {
+	clang::ast_matchers::MatchFinder m_f;
+
+public:
+	Action() = default;
+
+	bool BeginInvocation(clang::CompilerInstance& ci) final
+	{
+		return true;
+	}
+
+	std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
+		clang::CompilerInstance& CI,
+		clang::StringRef InFile) final
+	{
+		return m_f.newASTConsumer();
+	}
+
+	void ExecuteAction() final
+	{
+		getCompilerInstance().getPreprocessor().addPPCallbacks(
+			std::make_unique<IncludeScanner>()
+		);
+
+		clang::PreprocessOnlyAction::ExecuteAction();
+	}
+};
 
 int main(int argc, const char** argv) {
-	llvm::Expected<clang::tooling::CommonOptionsParser> parser =
-        clang::tooling::CommonOptionsParser::create(argc, argv, MyToolCategory);
+	llvm::cl::OptionCategory MyToolCategory("my-tool options");
 
-    boost::adjacency_list<
-        boost::vecS,
-        boost::vecS,
-        boost::directedS,
-        std::string> dag;
-    const auto a = boost::add_vertex("a", dag);
-    const auto b = boost::add_vertex("b", dag);
-    const auto c = boost::add_vertex("c", dag);
-    const auto d = boost::add_vertex("d", dag);
-    const auto e = boost::add_vertex("e", dag);
-    const auto f = boost::add_vertex("f", dag);
-    const auto g = boost::add_vertex("g", dag);
-    const auto h = boost::add_vertex("h", dag);
-    const auto z = boost::add_vertex("i", dag);
-    boost::add_edge(a, c, dag);
-    boost::add_edge(a, d, dag);
-    boost::add_edge(b, d, dag);
-    boost::add_edge(b, e, dag);
-    boost::add_edge(c, h, dag);
-    boost::add_edge(d, f, dag);
-    boost::add_edge(e, g, dag);
-    boost::add_edge(g, h, dag);
-    boost::add_edge(f, h, dag);
-
-    reachability_graph reach(dag);
-
-    std::cout << "There are " << reach.number_of_paths(a, h)
-        << " paths from A to H";
-    return 0;
+	llvm::Expected<clang::tooling::CommonOptionsParser> optionsParser =
+		clang::tooling::CommonOptionsParser::create(argc, argv, MyToolCategory);
+	if (!optionsParser) {
+		std::cerr << toString(optionsParser.takeError());
+		return 1;
+	}
+	clang::tooling::ClangTool Tool(optionsParser->getCompilations(),
+		optionsParser->getSourcePathList());
+	return Tool.run(clang::tooling::newFrontendActionFactory<Action>().get());
 }
