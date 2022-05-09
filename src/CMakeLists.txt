@@ -31,6 +31,7 @@ add_executable(
     includeguardian
     main.m.cpp
     reachability_graph.hpp reachability_graph.cpp
+    print_graph_factory.hpp print_graph_factory.cpp
 )
 target_link_libraries(includeguardian CONAN_PKG::boost)
 target_link_libraries(includeguardian clangTooling)

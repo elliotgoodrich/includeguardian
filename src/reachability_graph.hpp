@@ -26,7 +26,7 @@ void traverse_all_paths(const IncidenceGraph& g,
     }
 }
 
-}
+} // close unnamed namespace
 
 template <typename NODE>
 class reachability_graph {
@@ -43,7 +43,7 @@ private:
 
 public:
     // Create a `reachability_matrix`.
-    reachability_graph(const boost::adjacency_list<
+    explicit reachability_graph(const boost::adjacency_list<
         boost::vecS,
         boost::vecS,
         boost::directedS,
@@ -93,6 +93,6 @@ std::size_t reachability_graph<NODE>::number_of_paths(handle from, handle to) co
     return m_paths[from * m_reachable.size() + to];
 }
 
-}
+} // close IncludeGuardian namespace
 
 #endif
