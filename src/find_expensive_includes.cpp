@@ -1,4 +1,6 @@
-#include "print_graph_factory.hpp"
+#include "find_expensive_includes.hpp"
+
+#include "reachability_graph.hpp"
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
@@ -15,6 +17,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graphviz.hpp>
 
+#include <cassert>
 #include <filesystem>
 #include <iostream>
 #include <numeric>
@@ -24,45 +27,27 @@
 namespace IncludeGuardian {
 namespace {
 
-std::string to2Digit(int x)
-{
-	if (x < 10) {
-		return "0" + std::to_string(x);
-	}
-	else {
-		return std::to_string(x);
-	}
-}
-
-std::string colorForSize(off_t bytes)
-{
-	const double log_e = std::clamp(std::log(static_cast<double>(bytes)) / 6.0, 1.0, 2.0);
-	const double red = 99.0 * (log_e - 1.0);
-	const double green = 99.0 - red;
-	return "#" + to2Digit(red) + to2Digit(green) + "00";
-	return "#990000";
-}
-
-int fontSizeForFileSize(off_t bytes)
-{
-	return 7.0 + 3.0 * std::log(static_cast<double>(bytes));
-}
-
 class IncludeScanner : public clang::PPCallbacks {
 	struct Node {
 		std::string path;
 		off_t fileSizeInBytes = 0;
 	};
 
+	// Include name
+	using Edge = std::string;
+
 	using Graph = boost::adjacency_list<
 		boost::vecS,
 		boost::vecS,
 		boost::directedS,
-		Node>;
+		Node,
+	    Edge>;
 
 	Graph m_graph;
 	clang::SourceManager* m_sm;
 	std::unordered_map<unsigned, Graph::vertex_descriptor> m_lookup;
+	std::vector<include_directive>* m_out;
+	std::vector<Graph::vertex_descriptor> m_sources;
 
 	Graph::vertex_descriptor get_vertex_desc(const clang::FileEntry* file) {
 		const auto it = m_lookup.find(file->getUID());
@@ -78,10 +63,11 @@ class IncludeScanner : public clang::PPCallbacks {
 	}
 
 public:
-	IncludeScanner(clang::SourceManager& sm)
+	IncludeScanner(clang::SourceManager& sm, std::vector<include_directive>* out)
 		: m_graph()
 		, m_sm(&sm)
 		, m_lookup()
+		, m_out(out)
 	{
 	}
 
@@ -91,6 +77,18 @@ public:
 		clang::SrcMgr::CharacteristicKind FileType,
 		clang::FileID OptionalPrevFID) final
 	{
+		if (Reason == FileChangeReason::EnterFile) {
+			if (m_sm->isInMainFile(Loc)) {
+				// TODO: Avoid the extra lookup
+				const clang::FileID fileID = m_sm->getFileID(Loc);
+				if (const clang::FileEntry* file = m_sm->getFileEntryForID(fileID)) {
+					const auto it = m_lookup.find(file->getUID());
+					if (it == m_lookup.end()) {
+						m_sources.push_back(get_vertex_desc(file));
+					}
+				}
+			}
+		}
 	}
 
     void FileSkipped(const clang::FileEntryRef &SkippedFile,
@@ -115,31 +113,53 @@ public:
 		add_edge(
 			get_vertex_desc(m_sm->getFileEntryForID(fileID)),
 			get_vertex_desc(File),
+			FileName.str(),
 			m_graph);
 	}
 
 	void EndOfMainFile() final
 	{
-		write_graphviz(std::cout, m_graph, *this);
-	}
+		reachability_graph dag(m_graph);
+		for (const Graph::vertex_descriptor v : boost::make_iterator_range(vertices(m_graph))) {
+			for (const Graph::edge_descriptor directive : boost::make_iterator_range(out_edges(v, m_graph))) {
+				const Graph::vertex_descriptor include = target(directive, m_graph);
+				std::size_t bytes_saved = 0;
 
-	void operator()(std::ostream& out, Graph::vertex_descriptor v) const {
-		const Node& n = m_graph[v];
-		std::filesystem::path p(n.path);
-		out << "[label=\"" << p.filename().string() << "\"]"
-			"[style=\"filled\"]"
-			"[fontcolor=\"#ffffff\"]"
-			"[fillcolor=\"" << colorForSize(n.fileSizeInBytes) << "\"]"
-			"[fontsize=\"" << fontSizeForFileSize(n.fileSizeInBytes) << "pt\"]";
+				for (const Graph::vertex_descriptor source : m_sources) {
+					// Find the sum of the file sizes for `include` and all its
+					// includes that are now not reachable if we removed it.
+					for (const Graph::vertex_descriptor i : dag.reachable_from(v)) {
+						// `i` is reachable from `source` only through `include` if the
+						// number of paths between `source` and `i` is exactly the product
+						// of the number of paths between `source` and `include`, and the
+						// number of paths between `include` and `i`.
+						if (dag.number_of_paths(source, include) *
+							dag.number_of_paths(include, i) ==
+							dag.number_of_paths(source, i)) {
+							bytes_saved += m_graph[include].fileSizeInBytes;
+						}
+					}
+				}
+
+				m_out->emplace_back(
+					std::filesystem::path(m_graph[v].path),
+					m_graph[directive],
+					bytes_saved);
+			}
+		}
 	}
 };
 
-class GraphAction : public clang::PreprocessOnlyAction {
+class ExpensiveAction : public clang::PreprocessOnlyAction {
 	clang::ast_matchers::MatchFinder m_f;
 	clang::CompilerInstance* m_ci = nullptr;
+	std::vector<include_directive>* m_out;
 
 public:
-	GraphAction() = default;
+	ExpensiveAction(std::vector<include_directive>* out)
+	: m_out(out)
+	{
+	}
 
 	bool BeginInvocation(clang::CompilerInstance& ci) final
 	{
@@ -157,7 +177,7 @@ public:
 	void ExecuteAction() final
 	{
 		getCompilerInstance().getPreprocessor().addPPCallbacks(
-			std::make_unique<IncludeScanner>(m_ci->getSourceManager())
+			std::make_unique<IncludeScanner>(m_ci->getSourceManager(), m_out)
 		);
 
 		clang::PreprocessOnlyAction::ExecuteAction();
@@ -166,11 +186,15 @@ public:
 
 } // close unnamed namespace
 
-print_graph_factory::print_graph_factory() = default;
-
-std::unique_ptr<clang::FrontendAction> print_graph_factory::create()
+find_expensive_includes::find_expensive_includes(std::vector<include_directive>& out)
+: m_out(&out)
 {
-	return std::make_unique<GraphAction>();
+	assert(out.empty());
+}
+
+std::unique_ptr<clang::FrontendAction> find_expensive_includes::create()
+{
+	return std::make_unique<ExpensiveAction>(m_out);
 }
 
 } // close IncludeGuardian namespace

@@ -32,6 +32,7 @@ add_executable(
     main.m.cpp
     reachability_graph.hpp reachability_graph.cpp
     print_graph_factory.hpp print_graph_factory.cpp
+    find_expensive_includes.hpp find_expensive_includes.cpp
 )
 target_link_libraries(includeguardian CONAN_PKG::boost)
 target_link_libraries(includeguardian clangTooling)

@@ -20,7 +20,9 @@
   2. Ctrl + Shift + B
 
 ## Testing
-  1. Run `includeguardian.exe -p path/to/db source.cpp` where `path/to/db` contains a `compile_commands.json` file containing a [compilation database](https://clang.llvm.org/docs/JSONCompilationDatabase.html) and `source.cpp` is the source file you want to operate on
+  1. Run `includeguardian.exe -p path/to/db source.cpp -output=X` where `path/to/db` contains a `compile_commands.json` file containing a [compilation database](https://clang.llvm.org/docs/JSONCompilationDatabase.html), `source.cpp` is the source file you want to operate on, and `X` is:
+    * `dot-graph` to create a DOT graph of include files
+    * `most-expensive` to list the include directives ordered by the file size saved if they were removed individually
 
 ## People to thank
   * https://reversed.top/2015-04-23/detecting-wrong-first-include/
@@ -170,9 +172,6 @@ std::vector<result> include_costs_of(
 
             std::unordered_set<node> transitive_includes =
                 graph.reachable_from(include);
-
-            // Get the total size of `include` transitively included.
-            const std::size_t cost_in_bytes = total_file_size_of(include);
 
             for (const handle source : sources) {
                 // Find the sum of the file sizes for `include` and all its

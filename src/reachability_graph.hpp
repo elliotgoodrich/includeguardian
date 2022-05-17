@@ -28,14 +28,14 @@ void traverse_all_paths(const IncidenceGraph& g,
 
 } // close unnamed namespace
 
-template <typename NODE>
+template <typename NODE, typename EDGE>
 class reachability_graph {
 public:
     using handle = boost::adjacency_list<
         boost::vecS,
         boost::vecS,
         boost::directedS,
-        NODE>::vertex_descriptor;
+        NODE, EDGE>::vertex_descriptor;
 
 private:
     std::vector<std::unordered_set<handle>> m_reachable;
@@ -47,7 +47,7 @@ public:
         boost::vecS,
         boost::vecS,
         boost::directedS,
-        NODE>& dag);
+        NODE, EDGE>& dag);
 
     reachability_graph(const reachability_graph&) = delete;
 
@@ -59,13 +59,13 @@ public:
     std::size_t number_of_paths(handle from, handle to) const;
 };
 
-template <typename NODE>
-reachability_graph<NODE>::reachability_graph(
+template <typename NODE, typename EDGE>
+reachability_graph<NODE, EDGE>::reachability_graph(
     const boost::adjacency_list<
 		boost::vecS,
 		boost::vecS,
 		boost::directedS,
-		NODE>& dag)
+		NODE, EDGE>& dag)
 : m_reachable(boost::num_vertices(dag))
 , m_paths(boost::num_vertices(dag) * boost::num_vertices(dag))
 {
@@ -81,14 +81,14 @@ reachability_graph<NODE>::reachability_graph(
     }
 }
 
-template <typename NODE>
-auto reachability_graph<NODE>::reachable_from(handle start) const
+template <typename NODE, typename EDGE>
+auto reachability_graph<NODE, EDGE>::reachable_from(handle start) const
 {
     return m_reachable[start];
 }
 
-template <typename NODE>
-std::size_t reachability_graph<NODE>::number_of_paths(handle from, handle to) const
+template <typename NODE, typename EDGE>
+std::size_t reachability_graph<NODE, EDGE>::number_of_paths(handle from, handle to) const
 {
     return m_paths[from * m_reachable.size() + to];
 }
