@@ -63,6 +63,7 @@ class IncludeScanner : public clang::PPCallbacks {
 	Graph m_graph;
 	clang::SourceManager* m_sm;
 	std::unordered_map<unsigned, Graph::vertex_descriptor> m_lookup;
+	std::ostream& m_out;
 
 	Graph::vertex_descriptor get_vertex_desc(const clang::FileEntry* file) {
 		const auto it = m_lookup.find(file->getUID());
@@ -78,10 +79,11 @@ class IncludeScanner : public clang::PPCallbacks {
 	}
 
 public:
-	IncludeScanner(clang::SourceManager& sm)
+	IncludeScanner(clang::SourceManager& sm, std::ostream& out)
 		: m_graph()
 		, m_sm(&sm)
 		, m_lookup()
+		, m_out(out)
 	{
 	}
 
@@ -120,7 +122,7 @@ public:
 
 	void EndOfMainFile() final
 	{
-		write_graphviz(std::cout, m_graph, *this);
+		write_graphviz(m_out, m_graph, *this);
 	}
 
 	void operator()(std::ostream& out, Graph::vertex_descriptor v) const {
@@ -137,9 +139,13 @@ public:
 class GraphAction : public clang::PreprocessOnlyAction {
 	clang::ast_matchers::MatchFinder m_f;
 	clang::CompilerInstance* m_ci = nullptr;
+	std::ostream& m_out;
 
 public:
-	GraphAction() = default;
+	GraphAction(std::ostream& out)
+	: m_out(out)
+	{
+	}
 
 	bool BeginInvocation(clang::CompilerInstance& ci) final
 	{
@@ -157,7 +163,7 @@ public:
 	void ExecuteAction() final
 	{
 		getCompilerInstance().getPreprocessor().addPPCallbacks(
-			std::make_unique<IncludeScanner>(m_ci->getSourceManager())
+			std::make_unique<IncludeScanner>(m_ci->getSourceManager(), m_out)
 		);
 
 		clang::PreprocessOnlyAction::ExecuteAction();
@@ -166,11 +172,14 @@ public:
 
 } // close unnamed namespace
 
-print_graph_factory::print_graph_factory() = default;
+print_graph_factory::print_graph_factory(std::ostream& out)
+: m_out(out)
+{
+}
 
 std::unique_ptr<clang::FrontendAction> print_graph_factory::create()
 {
-	return std::make_unique<GraphAction>();
+	return std::make_unique<GraphAction>(m_out);
 }
 
 } // close IncludeGuardian namespace

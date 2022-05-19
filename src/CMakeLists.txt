@@ -27,25 +27,41 @@ list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 include(HandleLLVMOptions)
 add_definitions(${LLVM_DEFINITIONS})
 
-add_executable(
-    includeguardian
-    main.m.cpp
+add_library(
+    common
+    STATIC
     reachability_graph.hpp reachability_graph.cpp
     print_graph_factory.hpp print_graph_factory.cpp
     find_expensive_includes.hpp find_expensive_includes.cpp
 )
-target_link_libraries(includeguardian CONAN_PKG::boost)
-target_link_libraries(includeguardian clangTooling)
+target_link_libraries(common CONAN_PKG::boost)
+target_link_libraries(common clangTooling)
 
 # Find the libraries that correspond to the LLVM components
 # that we wish to use
 llvm_map_components_to_libnames(llvm_libs Support)
 
-target_include_directories(includeguardian PRIVATE ${LLVM_INCLUDE_DIRS})
+target_include_directories(common PUBLIC ${LLVM_INCLUDE_DIRS})
 
 # Link against LLVM libraries
-target_link_libraries(includeguardian ${llvm_libs})
+target_link_libraries(common ${llvm_libs})
 
 if(WIN32)
-    target_compile_options(includeguardian PRIVATE /EHsc /FS)
+    target_compile_options(common PRIVATE /EHsc /FS)
 endif()
+
+find_package(GTest)
+include(GoogleTest)
+add_executable(tests print_graph_factory.test.cpp)
+target_link_libraries(tests CONAN_PKG::gtest)
+target_link_libraries(tests common)
+gtest_add_tests(TARGET      tests
+                TEST_SUFFIX .noArgs
+                TEST_LIST   noArgsTests
+)
+
+add_executable(
+    includeguardian
+    main.m.cpp
+)
+target_link_libraries(includeguardian common)
