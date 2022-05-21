@@ -30,9 +30,10 @@ add_definitions(${LLVM_DEFINITIONS})
 add_library(
     common
     STATIC
-    reachability_graph.hpp reachability_graph.cpp
-    print_graph_factory.hpp print_graph_factory.cpp
+    reachability_graph.hpp
+    dot_graph.hpp dot_graph.cpp
     find_expensive_includes.hpp find_expensive_includes.cpp
+    build_graph.hpp build_graph.cpp
 )
 target_link_libraries(common CONAN_PKG::boost)
 target_link_libraries(common clangTooling)
@@ -52,7 +53,11 @@ endif()
 
 find_package(GTest)
 include(GoogleTest)
-add_executable(tests print_graph_factory.test.cpp)
+add_executable(
+    tests
+    build_graph.test.cpp
+    dot_graph.test.cpp
+)
 target_link_libraries(tests CONAN_PKG::gtest)
 target_link_libraries(tests common)
 gtest_add_tests(TARGET      tests

@@ -1,32 +1,28 @@
 #ifndef INCLUDE_GUARD_0DC4C9E1_CE28_4D0C_9771_86480E7D991D
 #define INCLUDE_GUARD_0DC4C9E1_CE28_4D0C_9771_86480E7D991D
 
-#include <clang/Tooling/Tooling.h>
+#include "build_graph.hpp"
 
 #include <filesystem>
+#include <span>
+#include <string>
 #include <vector>
 
 namespace IncludeGuardian {
 
-struct include_directive {
-	std::filesystem::path file;
-	std::string include;
-	std::size_t savingInBytes;
+struct include_directive_and_cost {
+  std::filesystem::path file;
+  std::string include;
+  std::size_t savingInBytes;
 };
 
-/// This component is a concrete implementation of a `FrontEndActionFactory`
-/// that will output the include directives along with the total file size
-/// that would be saved if it was deleted.
-class find_expensive_includes : public clang::tooling::FrontendActionFactory {
-	std::vector<include_directive>* m_out;
-public:
-	/// Create a `print_graph_factory`.
-	explicit find_expensive_includes(std::vector<include_directive>& out);
-
-	/// Returns a new `clang::FrontendAction`.
-	std::unique_ptr<clang::FrontendAction> create() final;
+/// This component will output the include directives along with the total file
+/// size that would be saved if it was deleted.
+struct find_expensive_includes {
+  static std::vector<include_directive_and_cost>
+  from_graph(const Graph &graph, std::span<const Graph::vertex_descriptor> sources);
 };
 
-} // close IncludeGuardian namespace
+} // namespace IncludeGuardian
 
 #endif

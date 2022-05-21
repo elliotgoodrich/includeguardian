@@ -1,62 +1,75 @@
-#include "print_graph_factory.hpp"
+#include "build_graph.hpp"
+#include "dot_graph.hpp"
 #include "find_expensive_includes.hpp"
 
-#include <clang/Tooling/Tooling.h>
 #include <clang/Tooling/CommonOptionsParser.h>
+#include <clang/Tooling/Tooling.h>
 
 #include <iostream>
+#include <string>
 
 namespace {
 
 enum class output {
-	dot_graph,
-	most_expensive,
+  dot_graph,
+  most_expensive,
 };
 
-} // close unnamed namespace
+} // namespace
 
-int main(int argc, const char** argv) {
-	using namespace IncludeGuardian;
+int main(int argc, const char **argv) {
+  using namespace IncludeGuardian;
 
-	llvm::cl::OptionCategory MyToolCategory("my-tool options");
+  llvm::cl::OptionCategory MyToolCategory("my-tool options");
 
-	llvm::cl::opt<output> output("output", llvm::cl::desc("Choose the output"),
-		llvm::cl::values(
-			llvm::cl::OptionEnumValue(
-				"dot-graph",
-				static_cast<int>(output::dot_graph),
-				"DOT graph"),
-			llvm::cl::OptionEnumValue(
-				"most-expensive",
-				static_cast<int>(output::most_expensive),
-				"List of most expensive include directives")));
+  llvm::cl::opt<output> output(
+      "output", llvm::cl::desc("Choose the output"),
+      llvm::cl::values(
+          llvm::cl::OptionEnumValue(
+              "dot-graph", static_cast<int>(output::dot_graph), "DOT graph"),
+          llvm::cl::OptionEnumValue(
+              "most-expensive", static_cast<int>(output::most_expensive),
+              "List of most expensive include directives")));
 
-	llvm::Expected<clang::tooling::CommonOptionsParser> optionsParser =
-		clang::tooling::CommonOptionsParser::create(argc, argv, MyToolCategory);
-	if (!optionsParser) {
-		std::cerr << toString(optionsParser.takeError());
-		return 1;
-	}
-	clang::tooling::ClangTool Tool(optionsParser->getCompilations(),
-		optionsParser->getSourcePathList());
+  llvm::Expected<clang::tooling::CommonOptionsParser> optionsParser =
+      clang::tooling::CommonOptionsParser::create(argc, argv, MyToolCategory);
+  if (!optionsParser) {
+    std::cerr << toString(optionsParser.takeError());
+    return 1;
+  }
 
-	switch (output) {
-		case output::dot_graph: {
-			print_graph_factory f;
-			return Tool.run(&f);
-		}
-		case output::most_expensive: {
-			print_graph_factory f;
-			std::vector<include_directive> results;
-			find_expensive_includes g(results);
-			const int rc = Tool.run(&g);
-			std::sort(results.begin(), results.end(), [](auto&& l, auto&& r) {
-				return l.savingInBytes > r.savingInBytes;
-				});
-			for (const include_directive& i : results) {
-				std::cout << "(" << i.savingInBytes << " bytes) " << i.file.filename().string() << " #include <" << i.include << ">\n";
-			}
-			return rc;
-		}
-	}
+  llvm::Expected<std::pair<Graph, std::vector<Graph::vertex_descriptor>>>
+      result =
+          build_graph::from_compilation_db(optionsParser->getCompilations(),
+                                           optionsParser->getSourcePathList(),
+                                           llvm::vfs::getRealFileSystem());
+  if (!result) {
+    // TODO: error message
+    std::cerr << "Error";
+    return 1;
+  }
+
+  auto &[graph, sources] = *result;
+
+  switch (output) {
+  case output::dot_graph: {
+    dot_graph::print(graph, std::cout);
+    return 0;
+  }
+  case output::most_expensive: {
+    std::vector<include_directive_and_cost> results =
+        find_expensive_includes::from_graph(graph, sources);
+    std::sort(results.begin(), results.end(),
+              [](const include_directive_and_cost &l,
+                 const include_directive_and_cost &r) {
+                return l.savingInBytes > r.savingInBytes;
+              });
+    for (const include_directive_and_cost &i : results) {
+      std::cout << "(" << i.savingInBytes << " bytes) "
+                << i.file.filename().string() << " #include <" << i.include
+                << ">\n";
+    }
+    return 0;
+  }
+  }
 }
