@@ -4,6 +4,7 @@
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
+#include <clang/Lex/Lexer.h>
 #include <clang/Lex/PPCallbacks.h>
 #include <clang/Tooling/Tooling.h>
 
@@ -12,6 +13,7 @@
 
 #include <boost/graph/graphviz.hpp>
 
+#include <charconv>
 #include <numeric>
 #include <string>
 #include <utility>
@@ -25,6 +27,7 @@ class IncludeScanner : public clang::PPCallbacks {
   std::unordered_map<unsigned, Graph::vertex_descriptor> m_lookup;
   Graph &m_graph;
   std::vector<Graph::vertex_descriptor> &m_out;
+  const clang::LangOptions &m_options;
 
   Graph::vertex_descriptor get_vertex_desc(const clang::FileEntry *file) {
     const auto it = m_lookup.find(file->getUID());
@@ -40,9 +43,9 @@ class IncludeScanner : public clang::PPCallbacks {
   }
 
 public:
-  IncludeScanner(clang::SourceManager &sm, Graph &graph,
-                 std::vector<Graph::vertex_descriptor> &out)
-      : m_graph(graph), m_sm(&sm), m_lookup(), m_out(out) {}
+  IncludeScanner(clang::SourceManager &sm, const clang::LangOptions &options,
+                 Graph &graph, std::vector<Graph::vertex_descriptor> &out)
+      : m_graph(graph), m_sm(&sm), m_lookup(), m_out(out), m_options(options) {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
                    clang::SrcMgr::CharacteristicKind FileType,
@@ -79,6 +82,33 @@ public:
              get_vertex_desc(File), {FileName.str()}, m_graph);
   }
 
+  /// Callback invoked when start reading any pragma directive.
+  void PragmaDirective(clang::SourceLocation Loc,
+                       clang::PragmaIntroducerKind Introducer) final {
+    clang::SmallVector<char> buffer;
+    const clang::StringRef pragma_text =
+        clang::Lexer::getSpelling(Loc, buffer, *m_sm, m_options);
+    const std::string_view prefix = "#pragma override_file_size(";
+
+    // FIXME: There must be a better way to do this.  We are assuming that
+    // `pragma_text` is null terminated.  I vaguely remember reading that
+    // it is, but it's still ugly.
+    if (std::equal(prefix.cbegin(), prefix.cend(), pragma_text.data())) {
+      std::size_t file_size;
+      const char *start = pragma_text.data() + prefix.size();
+      const char *end = std::strchr(start, ')');
+      const auto [ptr, ec] = std::from_chars(start, end, file_size);
+      if (ec == std::errc()) {
+        const clang::FileID fileID = m_sm->getFileID(Loc);
+        if (const clang::FileEntry *file = m_sm->getFileEntryForID(fileID)) {
+          const Graph::vertex_descriptor v =
+              m_lookup.find(file->getUID())->second;
+          m_graph[v].fileSizeInBytes = file_size;
+        }
+      }
+    }
+  }
+
   void EndOfMainFile() final {}
 };
 
@@ -105,8 +135,8 @@ public:
 
   void ExecuteAction() final {
     getCompilerInstance().getPreprocessor().addPPCallbacks(
-        std::make_unique<IncludeScanner>(m_ci->getSourceManager(), m_graph,
-                                         m_out));
+        std::make_unique<IncludeScanner>(m_ci->getSourceManager(),
+                                         m_ci->getLangOpts(), m_graph, m_out));
 
     clang::PreprocessOnlyAction::ExecuteAction();
   }

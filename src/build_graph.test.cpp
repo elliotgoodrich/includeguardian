@@ -50,7 +50,8 @@ TEST(BuildGraphTest, Snapshot) {
   fs->addFile("/tests/header.hpp", 0,
               llvm::MemoryBuffer::getMemBuffer("// hi"));
   fs->addFile("/tests/main.cpp", 0,
-              llvm::MemoryBuffer::getMemBuffer("#include \"header.hpp\""));
+              llvm::MemoryBuffer::getMemBuffer("#include \"header.hpp\"\n"
+              "#pragma override_file_size(1024)\n"));
   TestCompilationDatabase db;
   std::string sources[] = {"main.cpp"};
   llvm::Expected<std::pair<Graph, std::vector<Graph::vertex_descriptor>>>
