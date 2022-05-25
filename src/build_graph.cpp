@@ -14,6 +14,7 @@
 #include <boost/graph/graphviz.hpp>
 
 #include <charconv>
+#include <filesystem>
 #include <numeric>
 #include <string>
 #include <utility>
@@ -34,10 +35,12 @@ class IncludeScanner : public clang::PPCallbacks {
     if (it != m_lookup.end()) {
       return it->second;
     } else {
+      // Strip leading "./" from filenames that we get from clang
+      const std::filesystem::path p =
+          std::filesystem::path(file->getName().str()).lexically_relative("./");
       return m_lookup
-          .emplace(
-              file->getUID(),
-              add_vertex({file->getName().str(), file->getSize()}, m_graph))
+          .emplace(file->getUID(),
+                   add_vertex({p.string(), file->getSize()}, m_graph))
           .first->second;
     }
   }
@@ -78,8 +81,13 @@ public:
                           const clang::Module *Imported,
                           clang::SrcMgr::CharacteristicKind FileType) final {
     const clang::FileID fileID = m_sm->getFileID(HashLoc);
+    const char open = IsAngled ? '<' : '"';
+    std::string include(&open, 1);
+    include.insert(include.cend(), FileName.begin(), FileName.end());
+    const char close = IsAngled ? '>' : '"';
+    include.insert(include.cend(), &close, &close + 1);
     add_edge(get_vertex_desc(m_sm->getFileEntryForID(fileID)),
-             get_vertex_desc(File), {FileName.str()}, m_graph);
+             get_vertex_desc(File), {include}, m_graph);
   }
 
   /// Callback invoked when start reading any pragma directive.
