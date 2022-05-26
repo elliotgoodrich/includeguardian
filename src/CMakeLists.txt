@@ -57,6 +57,7 @@ add_executable(
     tests
     build_graph.test.cpp
     dot_graph.test.cpp
+    reachability_graph.test.cpp
 )
 target_link_libraries(tests CONAN_PKG::gtest)
 target_link_libraries(tests common)
