@@ -40,7 +40,7 @@ class IncludeScanner : public clang::PPCallbacks {
           std::filesystem::path(file->getName().str()).lexically_relative("./");
       return m_lookup
           .emplace(file->getUID(),
-                   add_vertex({p.string(), file->getSize()}, m_graph))
+                   add_vertex({p.string(), static_cast<std::size_t>(file->getSize())}, m_graph))
           .first->second;
     }
   }

@@ -18,7 +18,7 @@ namespace IncludeGuardian {
 class file_node {
 public:
   std::string path;
-  off_t fileSizeInBytes = 0;
+  std::size_t fileSizeInBytes = 0;
 };
 
 class include_edge {

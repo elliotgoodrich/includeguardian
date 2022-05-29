@@ -4,6 +4,8 @@
 #include "build_graph.hpp"
 
 #include <filesystem>
+#include <initializer_list>
+#include <iosfwd>
 #include <span>
 #include <string>
 #include <vector>
@@ -16,11 +18,22 @@ struct include_directive_and_cost {
   std::size_t savingInBytes;
 };
 
+bool operator==(const include_directive_and_cost &lhs,
+                const include_directive_and_cost &rhs);
+bool operator!=(const include_directive_and_cost &lhs,
+                const include_directive_and_cost &rhs);
+std::ostream &operator<<(std::ostream &out,
+                         const include_directive_and_cost &v);
+
 /// This component will output the include directives along with the total file
 /// size that would be saved if it was deleted.
 struct find_expensive_includes {
   static std::vector<include_directive_and_cost>
-  from_graph(const Graph &graph, std::span<const Graph::vertex_descriptor> sources);
+  from_graph(const Graph &graph,
+             std::span<const Graph::vertex_descriptor> sources);
+  static std::vector<include_directive_and_cost>
+  from_graph(const Graph &graph,
+             std::initializer_list<Graph::vertex_descriptor> sources);
 };
 
 } // namespace IncludeGuardian
