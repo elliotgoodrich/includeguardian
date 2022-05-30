@@ -65,9 +65,9 @@ int main(int argc, const char **argv) {
                 return l.savingInBytes > r.savingInBytes;
               });
     for (const include_directive_and_cost &i : results) {
-      std::cout << "(" << i.savingInBytes << " bytes) "
-                << i.file.filename().string() << " #include <" << i.include
-                << ">\n";
+      std::cout << "(" << i.savingInBytes << " bytes) from "
+                << i.file.filename().string() << " remove #include " << i.include
+                << "\n";
     }
     return 0;
   }
