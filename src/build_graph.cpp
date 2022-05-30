@@ -35,12 +35,17 @@ class IncludeScanner : public clang::PPCallbacks {
     if (it != m_lookup.end()) {
       return it->second;
     } else {
-      // Strip leading "./" from filenames that we get from clang
-      const std::filesystem::path p =
-          std::filesystem::path(file->getName().str()).lexically_relative("./");
+      clang::StringRef path = file->getName();
+      if (path.startswith("./")) {
+        // Clang gives us paths prefixed with "./" (even on Windows) so we
+        // remove it
+        path = path.substr(2);
+      }
       return m_lookup
           .emplace(file->getUID(),
-                   add_vertex({p.string(), static_cast<std::size_t>(file->getSize())}, m_graph))
+                   add_vertex(
+                       {path.str(), static_cast<std::size_t>(file->getSize())},
+                       m_graph))
           .first->second;
     }
   }
