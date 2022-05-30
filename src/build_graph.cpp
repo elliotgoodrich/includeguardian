@@ -11,8 +11,6 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/Error.h>
 
-#include <boost/graph/graphviz.hpp>
-
 #include <charconv>
 #include <filesystem>
 #include <numeric>

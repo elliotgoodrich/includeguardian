@@ -3,7 +3,6 @@
 #include "find_expensive_includes.hpp"
 
 #include <clang/Tooling/CommonOptionsParser.h>
-#include <clang/Tooling/Tooling.h>
 
 #include <iostream>
 #include <string>

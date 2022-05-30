@@ -1,6 +1,5 @@
 #include "find_expensive_includes.hpp"
 
-#include <boost/graph/depth_first_search.hpp>
 #include <boost/scope_exit.hpp>
 
 #include <algorithm>
