@@ -35,7 +35,7 @@ TEST(FindExpensiveIncludesTest, DiamondIncludes) {
   add_edge(c, d, {"c->d"}, graph);
 
   std::vector<include_directive_and_cost> actual =
-      find_expensive_includes::from_graph(graph, {a});
+      find_expensive_includes::from_graph(graph, {a}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<include_directive_and_cost> expected = {
       {"a", "a->b", graph[b].fileSizeInBytes},
@@ -74,7 +74,7 @@ TEST(FindExpensiveIncludesTest, MultiLevel) {
   add_edge(g, h, {"g->h"}, graph);
 
   std::vector<include_directive_and_cost> actual =
-      find_expensive_includes::from_graph(graph, {a, b});
+      find_expensive_includes::from_graph(graph, {a, b}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<include_directive_and_cost> expected = {
       {"a", "a->c", graph[c].fileSizeInBytes},
@@ -129,7 +129,7 @@ TEST(FindExpensiveIncludesTest, LongChain) {
   add_edge(i, j, {"i->j"}, graph);
 
   std::vector<include_directive_and_cost> actual =
-      find_expensive_includes::from_graph(graph, {a});
+      find_expensive_includes::from_graph(graph, {a}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<include_directive_and_cost> expected = {
       {"a", "a->b", graph[b].fileSizeInBytes},

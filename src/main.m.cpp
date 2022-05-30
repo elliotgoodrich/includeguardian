@@ -57,7 +57,7 @@ int main(int argc, const char **argv) {
   }
   case output::most_expensive: {
     std::vector<include_directive_and_cost> results =
-        find_expensive_includes::from_graph(graph, sources);
+        find_expensive_includes::from_graph(graph, sources, 10000u);
     std::sort(results.begin(), results.end(),
               [](const include_directive_and_cost &l,
                  const include_directive_and_cost &r) {

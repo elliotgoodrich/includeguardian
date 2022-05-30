@@ -30,10 +30,12 @@ std::ostream &operator<<(std::ostream &out,
 struct find_expensive_includes {
   static std::vector<include_directive_and_cost>
   from_graph(const Graph &graph,
-             std::span<const Graph::vertex_descriptor> sources);
+             std::span<const Graph::vertex_descriptor> sources,
+             std::size_t minimum_size_cut_off = 0u);
   static std::vector<include_directive_and_cost>
   from_graph(const Graph &graph,
-             std::initializer_list<Graph::vertex_descriptor> sources);
+             std::initializer_list<Graph::vertex_descriptor> sources,
+             std::size_t minimum_size_cut_off = 0u);
 };
 
 } // namespace IncludeGuardian

@@ -125,6 +125,7 @@ bool operator==(const include_directive_and_cost &lhs,
   return lhs.file == rhs.file && lhs.include == rhs.include &&
          lhs.savingInBytes == rhs.savingInBytes;
 }
+
 bool operator!=(const include_directive_and_cost &lhs,
                 const include_directive_and_cost &rhs) {
   return !(lhs == rhs);
@@ -137,7 +138,8 @@ std::ostream &operator<<(std::ostream &out,
 }
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
-    const Graph &graph, std::span<const Graph::vertex_descriptor> sources) {
+    const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
+    const std::size_t minimum_size_cut_off) {
 
   DFSHelper helper(graph);
   std::vector<include_directive_and_cost> results;
@@ -148,7 +150,7 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
       bytes_saved += helper.total_file_size_of_unreachable(source, include);
     }
 
-    if (bytes_saved > 0u) {
+    if (bytes_saved >= minimum_size_cut_off) {
       results.emplace_back(
           std::filesystem::path(graph[source(include, graph)].path),
           graph[include].code, bytes_saved);
@@ -158,9 +160,10 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
 }
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
-    const Graph &graph,
-    std::initializer_list<Graph::vertex_descriptor> sources) {
-  return from_graph(graph, std::span(sources.begin(), sources.end()));
+    const Graph &graph, std::initializer_list<Graph::vertex_descriptor> sources,
+    const std::size_t minimum_size_cut_off) {
+  return from_graph(graph, std::span(sources.begin(), sources.end()),
+                    minimum_size_cut_off);
 }
 
 } // namespace IncludeGuardian
