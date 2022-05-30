@@ -101,12 +101,9 @@ public:
     clang::SmallVector<char> buffer;
     const clang::StringRef pragma_text =
         clang::Lexer::getSpelling(Loc, buffer, *m_sm, m_options);
-    const std::string_view prefix = "#pragma override_file_size(";
 
-    // FIXME: There must be a better way to do this.  We are assuming that
-    // `pragma_text` is null terminated.  I vaguely remember reading that
-    // it is, but it's still ugly.
-    if (std::equal(prefix.cbegin(), prefix.cend(), pragma_text.data())) {
+    const clang::StringRef prefix = "#pragma override_file_size(";
+    if (pragma_text.startswith(prefix)) {
       std::size_t file_size;
       const char *start = pragma_text.data() + prefix.size();
       const char *end = std::strchr(start, ')');
