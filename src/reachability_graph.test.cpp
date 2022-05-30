@@ -1,6 +1,6 @@
 #include "reachability_graph.hpp"
 
-#include "build_graph.hpp"
+#include "graph.hpp"
 
 #include <gtest/gtest.h>
 

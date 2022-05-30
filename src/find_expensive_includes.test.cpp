@@ -1,6 +1,6 @@
 #include "find_expensive_includes.hpp"
 
-#include "build_graph.hpp"
+#include "graph.hpp"
 
 #include <gtest/gtest.h>
 

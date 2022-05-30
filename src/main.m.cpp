@@ -1,6 +1,7 @@
 #include "build_graph.hpp"
 #include "dot_graph.hpp"
 #include "find_expensive_includes.hpp"
+#include "graph.hpp"
 
 #include <clang/Tooling/CommonOptionsParser.h>
 

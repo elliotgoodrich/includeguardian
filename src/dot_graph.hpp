@@ -1,7 +1,7 @@
 #ifndef INCLUDE_GUARD_9E4C7C9E_6B70_4EF5_B47D_6B12DDDA7316
 #define INCLUDE_GUARD_9E4C7C9E_6B70_4EF5_B47D_6B12DDDA7316
 
-#include "build_graph.hpp"
+#include "graph.hpp"
 
 #include <iosfwd>
 

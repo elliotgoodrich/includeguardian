@@ -1,7 +1,7 @@
 #ifndef INCLUDE_GUARD_0DC4C9E1_CE28_4D0C_9771_86480E7D991D
 #define INCLUDE_GUARD_0DC4C9E1_CE28_4D0C_9771_86480E7D991D
 
-#include "build_graph.hpp"
+#include "graph.hpp"
 
 #include <filesystem>
 #include <initializer_list>
