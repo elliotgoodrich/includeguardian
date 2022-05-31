@@ -31,10 +31,11 @@ add_library(
     common
     STATIC
     graph.hpp
-    reachability_graph.hpp
+    build_graph.hpp build_graph.cpp
     dot_graph.hpp dot_graph.cpp
     find_expensive_includes.hpp find_expensive_includes.cpp
-    build_graph.hpp build_graph.cpp
+    get_total_cost.hpp get_total_cost.cpp
+    reachability_graph.hpp
 )
 target_link_libraries(common CONAN_PKG::boost)
 target_link_libraries(common clangTooling)
@@ -59,6 +60,7 @@ add_executable(
     build_graph.test.cpp
     dot_graph.test.cpp
     find_expensive_includes.test.cpp
+    get_total_cost.test.cpp
     reachability_graph.test.cpp
 )
 target_link_libraries(tests CONAN_PKG::gtest)
