@@ -10,6 +10,12 @@
 #include <iostream>
 #include <mutex>
 
+// Future improvements:
+//  * We could avoid calling `fill_n` in `total_file_size_of_unreachable` for
+//    the most part as we could store use `N`, `N+1`, `N+2` for the states
+//    the first time round, then `N+3`, `N+4`, `N+5` for the next etc. Resetting
+//    only when we run out of numbers.
+
 namespace IncludeGuardian {
 
 namespace {
@@ -27,7 +33,8 @@ class DFSHelper {
 
 public:
   explicit DFSHelper(const Graph &graph)
-      : m_graph(graph), m_state(std::make_unique_for_overwrite<search_state[]>(num_vertices(m_graph))),
+      : m_graph(graph), m_state(std::make_unique_for_overwrite<search_state[]>(
+                            num_vertices(m_graph))),
         m_stack() {
     // Note that it's fine to leave `m_state` uninitialized since it's the first
     // thing we do in `total_file_size_of_unreachable`.
