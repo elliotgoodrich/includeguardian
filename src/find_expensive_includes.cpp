@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <cassert>
+#include <execution>
 #include <iostream>
+#include <mutex>
 
 namespace IncludeGuardian {
 
@@ -141,21 +143,30 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
     const std::size_t minimum_size_cut_off) {
 
-  DFSHelper helper(graph);
+  std::mutex m;
   std::vector<include_directive_and_cost> results;
-  for (const Graph::edge_descriptor &include :
-       boost::make_iterator_range(edges(graph))) {
-    std::size_t bytes_saved = 0u;
-    for (const Graph::vertex_descriptor source : sources) {
-      bytes_saved += helper.total_file_size_of_unreachable(source, include);
-    }
+  const auto [begin, end] = edges(graph);
+  std::for_each(
+      std::execution::par, begin, end,
+      [&](const Graph::edge_descriptor &include) {
+        DFSHelper helper(graph);
+        const std::size_t bytes_saved = std::accumulate(
+            sources.begin(), sources.end(), static_cast<std::size_t>(0),
+            [&](std::size_t acc, Graph::vertex_descriptor source) {
+              return acc +
+                     helper.total_file_size_of_unreachable(source, include);
+            });
 
-    if (bytes_saved >= minimum_size_cut_off) {
-      results.emplace_back(
-          std::filesystem::path(graph[source(include, graph)].path),
-          graph[include].code, bytes_saved);
-    }
-  }
+        if (bytes_saved >= minimum_size_cut_off) {
+          // There are ways to avoid this mutex, but if the
+          // `minimum_size_cut_off` is large enough, it's relatively rare to
+          // enter this if statement
+          std::lock_guard g(m);
+          results.emplace_back(
+              std::filesystem::path(graph[source(include, graph)].path),
+              graph[include].code, bytes_saved);
+        }
+      });
   return results;
 }
 
