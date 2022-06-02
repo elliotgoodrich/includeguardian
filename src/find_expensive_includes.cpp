@@ -1,6 +1,8 @@
 #include "find_expensive_includes.hpp"
 
+#ifdef NDEBUG
 #include <boost/scope_exit.hpp>
+#endif
 
 #include <algorithm>
 #include <cassert>
@@ -20,27 +22,32 @@ class DFSHelper {
   };
 
   const Graph &m_graph;
-  std::vector<search_state> m_state;
+  std::unique_ptr<search_state[]> m_state;
   std::vector<Graph::vertex_descriptor> m_stack;
 
 public:
   explicit DFSHelper(const Graph &graph)
-      : m_graph(graph), m_state(num_vertices(graph), search_state::not_seen),
-        m_stack() {}
+      : m_graph(graph), m_state(std::make_unique_for_overwrite<search_state[]>(num_vertices(m_graph))),
+        m_stack() {
+    // Note that it's fine to leave `m_state` uninitialized since it's the first
+    // thing we do in `total_file_size_of_unreachable`.
+  }
 
   // Return the total file size for all vertices that are unreachable from
   // `source` through `removed_edge` in the graph specified at constructon.
   std::size_t
   total_file_size_of_unreachable(Graph::vertex_descriptor from,
                                  Graph::edge_descriptor removed_edge) {
+    std::fill(m_state.get(), m_state.get() + num_vertices(m_graph),
+              search_state::not_seen);
+
     const Graph::vertex_descriptor includee = target(removed_edge, m_graph);
 
-    // Make sure that we reset our temporary variables
-    BOOST_SCOPE_EXIT(&m_state, &m_stack) {
-      std::fill(m_state.begin(), m_state.end(), search_state::not_seen);
-      m_stack.clear();
-    }
+#ifdef NDEBUG
+    // Make sure that we reset our temporary variable
+    BOOST_SCOPE_EXIT(&m_stack) { assert(m_stack.empty()); }
     BOOST_SCOPE_EXIT_END
+#endif
 
     // Do a DFS from `source`, skipping the `removed_edge`, and add all vertices
     // found to `marked`.
@@ -75,6 +82,7 @@ public:
         // to this file and we won't get anything by removing it
         const Graph::vertex_descriptor w = target(e, m_graph);
         if (w == includee) {
+          m_stack.clear();
           return 0u;
         }
 
