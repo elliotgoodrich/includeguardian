@@ -180,6 +180,11 @@ build_graph::from_compilation_db(
       compilation_db,
       llvm::ArrayRef<std::string>(source_paths.data(), source_paths.size()),
       std::make_shared<clang::PCHContainerOperations>(), fs);
+
+  // Continue no matter how many errors we get for things like missing defines
+  tool.appendArgumentsAdjuster(
+      clang::tooling::getInsertArgumentAdjuster("-ferror-limit=0"));
+
   std::pair<Graph, std::vector<Graph::vertex_descriptor>> result;
   find_graph_factory f(result.first, result.second);
   const int rc = tool.run(&f);
