@@ -68,6 +68,7 @@ int main(int argc, const char **argv) {
   std::cout << "Graph built in " << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
 
   auto &[graph, sources] = *result;
+  std::cout << "Found " << num_vertices(graph) << " files and " << num_edges(graph) << " include directives\n.";
 
   switch (output) {
   case output::dot_graph: {
