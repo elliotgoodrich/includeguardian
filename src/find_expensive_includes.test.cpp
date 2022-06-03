@@ -17,7 +17,6 @@ bool test_sort(const include_directive_and_cost &lhs,
 }
 
 TEST(FindExpensiveIncludesTest, DiamondIncludes) {
-  return;
   Graph graph;
   const Graph::vertex_descriptor a = add_vertex({"a", 0b1000}, graph);
   const Graph::vertex_descriptor b = add_vertex({"b", 0b0100}, graph);
