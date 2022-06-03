@@ -14,8 +14,8 @@ namespace IncludeGuardian {
 
 struct include_directive_and_cost {
   std::filesystem::path file;
-  std::string include;
   std::size_t savingInBytes;
+  const include_edge *include;
 };
 
 bool operator==(const include_directive_and_cost &lhs,

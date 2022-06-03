@@ -65,26 +65,35 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
-  std::cout << "Graph built in " << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
+  std::cout << "Graph built in "
+            << duration_cast<std::chrono::milliseconds>(timer.restart())
+            << "\n";
 
   auto &[graph, sources] = *result;
-  std::cout << "Found " << num_vertices(graph) << " files and " << num_edges(graph) << " include directives\n.";
+  std::cout << "Found " << num_vertices(graph) << " files and "
+            << num_edges(graph) << " include directives.\n";
 
   switch (output) {
   case output::dot_graph: {
     dot_graph::print(graph, std::cout);
-    std::cout << "Graph printed in " << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
+    std::cout << "Graph printed in "
+              << duration_cast<std::chrono::milliseconds>(timer.restart())
+              << "\n";
     return 0;
   }
   case output::most_expensive: {
     const std::size_t total_project_cost =
         get_total_cost::from_graph(graph, sources);
-    std::cout << "Total size found (" << total_project_cost << " bytes) in " << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
+    std::cout << "Total size found (" << total_project_cost << " bytes) in "
+              << duration_cast<std::chrono::milliseconds>(timer.restart())
+              << "\n";
     const double percent_cut_off = 0.005;
     std::vector<include_directive_and_cost> results =
         find_expensive_includes::from_graph(
             graph, sources, total_project_cost * percent_cut_off);
-    std::cout << "Includes found in " << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
+    std::cout << "Includes found in "
+              << duration_cast<std::chrono::milliseconds>(timer.restart())
+              << "\n";
     std::sort(results.begin(), results.end(),
               [](const include_directive_and_cost &l,
                  const include_directive_and_cost &r) {
@@ -93,8 +102,8 @@ int main(int argc, const char **argv) {
     for (const include_directive_and_cost &i : results) {
       const double percentage = (100.0 * i.savingInBytes) / total_project_cost;
       std::cout << i.savingInBytes << " bytes (" << percentage << "%) from "
-                << i.file.filename().string() << " remove #include "
-                << i.include << "\n";
+                << i.file.filename().string() << "L#" << i.include->lineNumber
+                << " remove #include " << i.include->code << "\n";
     }
     return 0;
   }

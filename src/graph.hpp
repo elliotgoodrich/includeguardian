@@ -16,6 +16,7 @@ public:
 class include_edge {
 public:
   std::string code;
+  unsigned lineNumber = 0;
 };
 
 using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,

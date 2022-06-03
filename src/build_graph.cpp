@@ -90,7 +90,8 @@ public:
     const char close = IsAngled ? '>' : '"';
     include.insert(include.cend(), &close, &close + 1);
     add_edge(get_vertex_desc(m_sm->getFileEntryForID(fileID)),
-             get_vertex_desc(File), {include}, m_graph);
+             get_vertex_desc(File),
+             {include, m_sm->getSpellingLineNumber(HashLoc)}, m_graph);
   }
 
   /// Callback invoked when start reading any pragma directive.

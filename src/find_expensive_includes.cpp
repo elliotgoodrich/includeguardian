@@ -150,8 +150,8 @@ bool operator!=(const include_directive_and_cost &lhs,
 
 std::ostream &operator<<(std::ostream &out,
                          const include_directive_and_cost &v) {
-  return out << "[" << v.file << ", " << v.include << ", " << v.savingInBytes
-             << ']';
+  return out << "[" << v.file << "#L" << v.include->lineNumber << ", "
+             << v.include->code << ", " << v.savingInBytes << ']';
 }
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
@@ -179,7 +179,7 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
           std::lock_guard g(m);
           results.emplace_back(
               std::filesystem::path(graph[source(include, graph)].path),
-              graph[include].code, bytes_saved);
+              bytes_saved, &graph[include]);
         }
       });
   return results;
