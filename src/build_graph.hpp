@@ -18,7 +18,13 @@ namespace llvm::vfs { class FileSystem; }
 namespace IncludeGuardian {
 
 struct build_graph {
-  static llvm::Expected<std::pair<Graph, std::vector<Graph::vertex_descriptor>>>
+  struct result {
+      Graph graph;
+      std::vector<Graph::vertex_descriptor> sources;
+      std::vector<std::string> missing_files;
+
+  };
+  static llvm::Expected<result>
   from_compilation_db(const clang::tooling::CompilationDatabase &compilation_db,
                       std::span<const std::string> source_paths,
                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);

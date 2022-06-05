@@ -119,9 +119,9 @@ TEST(BuildGraphTest, SimpleGraph) {
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
   std::string sources[] = {"main.cpp"};
-  llvm::Expected<std::pair<Graph, std::vector<Graph::vertex_descriptor>>>
-      results = build_graph::from_compilation_db(db, sources, fs);
-  check_equal(g, results->first);
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_compilation_db(db, sources, fs);
+  check_equal(g, results->graph);
 }
 
 TEST(BuildGraphTest, MultipleChildren) {
@@ -137,9 +137,9 @@ TEST(BuildGraphTest, MultipleChildren) {
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
   std::string sources[] = {"main.cpp"};
-  llvm::Expected<std::pair<Graph, std::vector<Graph::vertex_descriptor>>>
-      results = build_graph::from_compilation_db(db, sources, fs);
-  check_equal(g, results->first);
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_compilation_db(db, sources, fs);
+  check_equal(g, results->graph);
 }
 
 TEST(BuildGraphTest, DiamondIncludes) {
@@ -161,8 +161,8 @@ TEST(BuildGraphTest, DiamondIncludes) {
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
   std::string sources[] = {"main.cpp"};
-  llvm::Expected<std::pair<Graph, std::vector<Graph::vertex_descriptor>>>
-      results = build_graph::from_compilation_db(db, sources, fs);
-  check_equal(g, results->first);
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_compilation_db(db, sources, fs);
+  check_equal(g, results->graph);
 }
 } // namespace

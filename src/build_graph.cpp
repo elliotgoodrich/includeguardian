@@ -2,6 +2,7 @@
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
+#include <clang/Basic/Diagnostic.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Lex/Lexer.h>
@@ -24,8 +25,7 @@ namespace {
 class IncludeScanner : public clang::PPCallbacks {
   clang::SourceManager *m_sm;
   std::unordered_map<unsigned, Graph::vertex_descriptor> m_lookup;
-  Graph &m_graph;
-  std::vector<Graph::vertex_descriptor> &m_out;
+  build_graph::result &m_r;
   const clang::LangOptions &m_options;
 
   Graph::vertex_descriptor get_vertex_desc(const clang::FileEntry *file) {
@@ -43,15 +43,15 @@ class IncludeScanner : public clang::PPCallbacks {
           .emplace(file->getUID(),
                    add_vertex(
                        {path.str(), static_cast<std::size_t>(file->getSize())},
-                       m_graph))
+                       m_r.graph))
           .first->second;
     }
   }
 
 public:
   IncludeScanner(clang::SourceManager &sm, const clang::LangOptions &options,
-                 Graph &graph, std::vector<Graph::vertex_descriptor> &out)
-      : m_graph(graph), m_sm(&sm), m_lookup(), m_out(out), m_options(options) {}
+                 build_graph::result &r)
+      : m_r(r), m_sm(&sm), m_lookup(), m_options(options) {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
                    clang::SrcMgr::CharacteristicKind FileType,
@@ -63,7 +63,7 @@ public:
         if (const clang::FileEntry *file = m_sm->getFileEntryForID(fileID)) {
           const auto it = m_lookup.find(file->getUID());
           if (it == m_lookup.end()) {
-            m_out.push_back(get_vertex_desc(file));
+            m_r.sources.push_back(get_vertex_desc(file));
           }
         }
       }
@@ -89,9 +89,14 @@ public:
     include.insert(include.cend(), FileName.begin(), FileName.end());
     const char close = IsAngled ? '>' : '"';
     include.insert(include.cend(), &close, &close + 1);
-    add_edge(get_vertex_desc(m_sm->getFileEntryForID(fileID)),
-             get_vertex_desc(File),
-             {include, m_sm->getSpellingLineNumber(HashLoc)}, m_graph);
+    const clang::FileEntry *from = m_sm->getFileEntryForID(fileID);
+    if (File) {
+      add_edge(get_vertex_desc(from), get_vertex_desc(File),
+               {include, m_sm->getSpellingLineNumber(HashLoc)}, m_r.graph);
+    } else {
+      // File does not exist
+      m_r.missing_files.emplace_back(FileName);
+    }
   }
 
   /// Callback invoked when start reading any pragma directive.
@@ -112,7 +117,7 @@ public:
         if (const clang::FileEntry *file = m_sm->getFileEntryForID(fileID)) {
           const Graph::vertex_descriptor v =
               m_lookup.find(file->getUID())->second;
-          m_graph[v].fileSizeInBytes = file_size;
+          m_r.graph[v].fileSizeInBytes = file_size;
         }
       }
     }
@@ -123,15 +128,17 @@ public:
 
 class ExpensiveAction : public clang::PreprocessOnlyAction {
   clang::ast_matchers::MatchFinder m_f;
-  clang::CompilerInstance *m_ci = nullptr;
-  std::vector<Graph::vertex_descriptor> &m_out;
-  Graph &m_graph;
+  clang::CompilerInstance *m_ci;
+  build_graph::result &m_r;
+  clang::IgnoringDiagConsumer m_ignore;
 
 public:
-  ExpensiveAction(Graph &graph, std::vector<Graph::vertex_descriptor> &out)
-      : m_out(out), m_graph(graph) {}
+  ExpensiveAction(build_graph::result &r)
+      : m_f(), m_ci(nullptr), m_r(r), m_ignore() {}
 
   bool BeginInvocation(clang::CompilerInstance &ci) final {
+    ci.getDiagnostics().setClient(&m_ignore, /*TakeOwnership=*/false);
+    ci.getDiagnostics().setErrorLimit(0u);
     m_ci = &ci;
     return true;
   }
@@ -145,7 +152,7 @@ public:
   void ExecuteAction() final {
     getCompilerInstance().getPreprocessor().addPPCallbacks(
         std::make_unique<IncludeScanner>(m_ci->getSourceManager(),
-                                         m_ci->getLangOpts(), m_graph, m_out));
+                                         m_ci->getLangOpts(), m_r));
 
     clang::PreprocessOnlyAction::ExecuteAction();
   }
@@ -155,24 +162,21 @@ public:
 /// that will output the include directives along with the total file size
 /// that would be saved if it was deleted.
 class find_graph_factory : public clang::tooling::FrontendActionFactory {
-  Graph &m_graph;
-  std::vector<Graph::vertex_descriptor> &m_out;
+  build_graph::result &m_r;
 
 public:
   /// Create a `print_graph_factory`.
-  find_graph_factory(Graph &graph, std::vector<Graph::vertex_descriptor> &out)
-      : m_graph(graph), m_out(out) {}
+  find_graph_factory(build_graph::result &r) : m_r(r) {}
 
   /// Returns a new `clang::FrontendAction`.
   std::unique_ptr<clang::FrontendAction> create() final {
-    return std::make_unique<ExpensiveAction>(m_graph, m_out);
+    return std::make_unique<ExpensiveAction>(m_r);
   }
 };
 
 } // namespace
 
-llvm::Expected<std::pair<Graph, std::vector<Graph::vertex_descriptor>>>
-build_graph::from_compilation_db(
+llvm::Expected<build_graph::result> build_graph::from_compilation_db(
     const clang::tooling::CompilationDatabase &compilation_db,
     std::span<const std::string> source_paths,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs) {
@@ -181,18 +185,14 @@ build_graph::from_compilation_db(
       llvm::ArrayRef<std::string>(source_paths.data(), source_paths.size()),
       std::make_shared<clang::PCHContainerOperations>(), fs);
 
-  // Continue no matter how many errors we get for things like missing defines
-  tool.appendArgumentsAdjuster(
-      clang::tooling::getInsertArgumentAdjuster("-ferror-limit=0"));
-
-  std::pair<Graph, std::vector<Graph::vertex_descriptor>> result;
-  find_graph_factory f(result.first, result.second);
+  result r;
+  find_graph_factory f(r);
   const int rc = tool.run(&f);
   if (rc != 0) {
     return llvm::createStringError(std::error_code(rc, std::generic_category()),
                                    "oops");
   }
-  return result;
+  return r;
 }
 
 } // namespace IncludeGuardian

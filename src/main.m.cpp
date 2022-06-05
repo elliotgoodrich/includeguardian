@@ -54,11 +54,10 @@ int main(int argc, const char **argv) {
   }
 
   stopwatch timer;
-  llvm::Expected<std::pair<Graph, std::vector<Graph::vertex_descriptor>>>
-      result =
-          build_graph::from_compilation_db(optionsParser->getCompilations(),
-                                           optionsParser->getSourcePathList(),
-                                           llvm::vfs::getRealFileSystem());
+
+  llvm::Expected<build_graph::result> result = build_graph::from_compilation_db(
+      optionsParser->getCompilations(), optionsParser->getSourcePathList(),
+      llvm::vfs::getRealFileSystem());
   if (!result) {
     // TODO: error message
     std::cerr << "Error";
@@ -69,9 +68,19 @@ int main(int argc, const char **argv) {
             << duration_cast<std::chrono::milliseconds>(timer.restart())
             << "\n";
 
-  auto &[graph, sources] = *result;
+  const auto &graph = result->graph;
+  const auto &sources = result->sources;
+  const auto &missing = result->missing_files;
   std::cout << "Found " << num_vertices(graph) << " files and "
             << num_edges(graph) << " include directives.\n";
+  if (!missing.empty()) {
+    std::cout << "There are " << missing.size() << " missing files\n  ";
+    std::copy(missing.begin(), missing.end(),
+              std::ostream_iterator<std::string>(std::cout, "  \n  "));
+  } else {
+    std::cout << "All includes found :)";
+  }
+  std::cout << "\n";
 
   switch (output) {
   case output::dot_graph: {
