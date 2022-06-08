@@ -30,7 +30,7 @@ add_definitions(${LLVM_DEFINITIONS})
 add_library(
     common
     STATIC
-    graph.hpp
+    graph.hpp graph.cpp
     build_graph.hpp build_graph.cpp
     dot_graph.hpp dot_graph.cpp
     find_expensive_includes.hpp find_expensive_includes.cpp

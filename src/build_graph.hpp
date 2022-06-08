@@ -6,23 +6,23 @@
 #include <llvm/ADT/IntrusiveRefCntPtr.h>
 #include <llvm/Support/Error.h>
 
-#include <boost/graph/adjacency_list.hpp>
-
 #include <span>
-#include <utility>
 #include <vector>
 
-namespace clang::tooling { class CompilationDatabase; }
-namespace llvm::vfs { class FileSystem; }
+namespace clang::tooling {
+class CompilationDatabase;
+}
+namespace llvm::vfs {
+class FileSystem;
+}
 
 namespace IncludeGuardian {
 
 struct build_graph {
   struct result {
-      Graph graph;
-      std::vector<Graph::vertex_descriptor> sources;
-      std::vector<std::string> missing_files;
-
+    Graph graph;
+    std::vector<Graph::vertex_descriptor> sources;
+    std::vector<std::string> missing_files;
   };
   static llvm::Expected<result>
   from_compilation_db(const clang::tooling::CompilationDatabase &compilation_db,

@@ -78,8 +78,10 @@ TEST(FindExpensiveIncludesTest, MultiLevel) {
   const std::vector<include_directive_and_cost> expected = {
       {"a", graph[c].fileSizeInBytes, &graph[a_to_c]},
       {"a", graph[d].fileSizeInBytes, &graph[a_to_d]},
-      {"b", graph[d].fileSizeInBytes + graph[f].fileSizeInBytes, &graph[b_to_d]},
-      {"b", graph[e].fileSizeInBytes + graph[g].fileSizeInBytes, &graph[b_to_e]},
+      {"b", graph[d].fileSizeInBytes + graph[f].fileSizeInBytes,
+       &graph[b_to_d]},
+      {"b", graph[e].fileSizeInBytes + graph[g].fileSizeInBytes,
+       &graph[b_to_e]},
       {"d", graph[f].fileSizeInBytes, &graph[d_to_f]},
       {"e", graph[g].fileSizeInBytes, &graph[e_to_g]},
       {"f", graph[h].fileSizeInBytes, &graph[f_to_h]},

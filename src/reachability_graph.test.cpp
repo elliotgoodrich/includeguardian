@@ -66,7 +66,7 @@ TEST(ReachabilityGraphTest, MultiLevel) {
   //     \ /  / \
   //      f  g  /
   //       \ | /
-  //         h  
+  //         h
   add_edge(a, c, {"a->c"}, graph);
   add_edge(a, d, {"a->d"}, graph);
   add_edge(b, d, {"b->d"}, graph);

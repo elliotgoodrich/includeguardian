@@ -7,8 +7,8 @@
 #include <algorithm>
 #include <cassert>
 #include <execution>
-#include <iostream>
 #include <mutex>
+#include <ostream>
 
 // Future improvements:
 //  * We could avoid calling `fill_n` in `total_file_size_of_unreachable` for

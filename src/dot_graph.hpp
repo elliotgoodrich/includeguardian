@@ -11,9 +11,9 @@ namespace IncludeGuardian {
 /// that will print out a DOT file representing a DAG of the include
 /// directives.
 struct dot_graph {
-	static void print(const Graph& graph, std::ostream& stream);
+  static void print(const Graph &graph, std::ostream &stream);
 };
 
-} // close IncludeGuardian namespace
+} // namespace IncludeGuardian
 
 #endif

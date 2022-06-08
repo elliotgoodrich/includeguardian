@@ -1,7 +1,7 @@
 #include "dot_graph.hpp"
 
-#include <clang/Tooling/Tooling.h>
 #include <clang/Tooling/CommonOptionsParser.h>
+#include <clang/Tooling/Tooling.h>
 
 #include <llvm/Support/VirtualFileSystem.h>
 
@@ -11,7 +11,6 @@
 
 namespace {
 
-TEST(Foo, Bar) {
-}
+TEST(Foo, Bar) {}
 
-} // close unnamed namespace
+} // namespace
