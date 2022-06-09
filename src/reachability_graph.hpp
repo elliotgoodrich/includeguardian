@@ -2,7 +2,6 @@
 #define INCLUDE_GUARD_E31B79D8_2464_4823_BDE1_37F760251C13
 
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/depth_first_search.hpp>
 #include <boost/range/iterator_range.hpp>
 #include <unordered_set>
 #include <utility>
