@@ -16,17 +16,18 @@ std::string to2Digit(int x) {
   }
 }
 
-std::string colorForSize(off_t bytes) {
-  const double log_e =
-      std::clamp(std::log(static_cast<double>(bytes)) / 6.0, 1.0, 2.0);
+std::string
+colorForSize(boost::units::quantity<boost::units::information::info> size) {
+  const double log_e = std::clamp(std::log(size.value()) / 6.0, 1.0, 2.0);
   const double red = 99.0 * (log_e - 1.0);
   const double green = 99.0 - red;
   return "#" + to2Digit(red) + to2Digit(green) + "00";
   return "#990000";
 }
 
-int fontSizeForFileSize(off_t bytes) {
-  return 7.0 + 3.0 * std::log(static_cast<double>(bytes));
+int fontSizeForFileSize(
+    boost::units::quantity<boost::units::information::info> size) {
+  return 7.0 + 3.0 * std::log(size.value());
 }
 
 } // namespace
@@ -42,10 +43,10 @@ void dot_graph::print(const Graph &graph, std::ostream &stream) {
              "[style=\"filled\"]"
              "[fontcolor=\"#ffffff\"]"
              "[fillcolor=\""
-          << colorForSize(n.fileSizeInBytes)
+          << colorForSize(n.file_size)
           << "\"]"
              "[fontsize=\""
-          << fontSizeForFileSize(n.fileSizeInBytes) << "pt\"]";
+          << fontSizeForFileSize(n.file_size) << "pt\"]";
     }
   } visitor{graph};
   write_graphviz(stream, graph, visitor);

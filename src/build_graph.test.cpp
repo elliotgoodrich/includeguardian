@@ -14,6 +14,8 @@ using namespace IncludeGuardian;
 
 namespace {
 
+const auto B = boost::units::information::byte;
+
 // Needs to be fixed on non-window's systems
 static const std::filesystem::path root = "C:\\";
 
@@ -71,7 +73,7 @@ make_file_system(const Graph &graph,
       file_contents += '\n';
     }
     file_contents += "#pragma override_file_size(";
-    file_contents += std::to_string(file.fileSizeInBytes);
+    file_contents += std::to_string(file.file_size.value());
     file_contents += ")\n";
     const std::filesystem::path p = working_directory / file.path;
     fs->addFile(p.string(), 0,
@@ -115,7 +117,7 @@ void check_equal(const Graph &actual, const Graph &expected) {
 
 TEST(BuildGraphTest, SimpleGraph) {
   Graph g;
-  add_vertex({"main.cpp", 100}, g);
+  add_vertex({"main.cpp", 100 * B}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   TestCompilationDatabase db(working_directory, {"main.cpp"});
@@ -128,9 +130,10 @@ TEST(BuildGraphTest, SimpleGraph) {
 
 TEST(BuildGraphTest, MultipleChildren) {
   Graph g;
-  const Graph::vertex_descriptor main_cpp = add_vertex({"main.cpp", 100}, g);
-  const Graph::vertex_descriptor a_hpp = add_vertex({"a.hpp", 1000}, g);
-  const Graph::vertex_descriptor b_hpp = add_vertex({"b.hpp", 2000}, g);
+  const Graph::vertex_descriptor main_cpp =
+      add_vertex({"main.cpp", 100 * B}, g);
+  const Graph::vertex_descriptor a_hpp = add_vertex({"a.hpp", 1000 * B}, g);
+  const Graph::vertex_descriptor b_hpp = add_vertex({"b.hpp", 2000 * B}, g);
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
   add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 2}, g);
 
@@ -145,13 +148,14 @@ TEST(BuildGraphTest, MultipleChildren) {
 
 TEST(BuildGraphTest, DiamondIncludes) {
   Graph g;
-  const Graph::vertex_descriptor main_cpp = add_vertex({"main.cpp", 100}, g);
-  const Graph::vertex_descriptor a_hpp = add_vertex({"a.hpp", 1000}, g);
-  const Graph::vertex_descriptor b_hpp = add_vertex({"b.hpp", 2000}, g);
+  const Graph::vertex_descriptor main_cpp =
+      add_vertex({"main.cpp", 100 * B}, g);
+  const Graph::vertex_descriptor a_hpp = add_vertex({"a.hpp", 1000 * B}, g);
+  const Graph::vertex_descriptor b_hpp = add_vertex({"b.hpp", 2000 * B}, g);
 
   const std::string c_path =
       (std::filesystem::path("common") / "c.hpp").string();
-  const Graph::vertex_descriptor c_hpp = add_vertex({c_path, 30000}, g);
+  const Graph::vertex_descriptor c_hpp = add_vertex({c_path, 30000 * B}, g);
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
   add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 2}, g);
   add_edge(a_hpp, c_hpp, {"\"" + c_path + "\"", 1}, g);
@@ -168,10 +172,12 @@ TEST(BuildGraphTest, DiamondIncludes) {
 
 TEST(BuildGraphTest, MultipleSources) {
   Graph g;
-  const Graph::vertex_descriptor main1_cpp = add_vertex({"main1.cpp", 100}, g);
-  const Graph::vertex_descriptor main2_cpp = add_vertex({"main2.cpp", 150}, g);
-  const Graph::vertex_descriptor a_hpp = add_vertex({"a.hpp", 1000}, g);
-  const Graph::vertex_descriptor b_hpp = add_vertex({"b.hpp", 2000}, g);
+  const Graph::vertex_descriptor main1_cpp =
+      add_vertex({"main1.cpp", 100 * B}, g);
+  const Graph::vertex_descriptor main2_cpp =
+      add_vertex({"main2.cpp", 150 * B}, g);
+  const Graph::vertex_descriptor a_hpp = add_vertex({"a.hpp", 1000 * B}, g);
+  const Graph::vertex_descriptor b_hpp = add_vertex({"b.hpp", 2000 * B}, g);
 
   add_edge(main1_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
   add_edge(main2_cpp, a_hpp, {"\"a.hpp\"", 1}, g);

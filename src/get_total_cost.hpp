@@ -11,10 +11,10 @@ namespace IncludeGuardian {
 /// This component will output the total number of bytes if all the `source`
 /// were expanded after the preprocessing step.
 struct get_total_cost {
-  static std::size_t
+  static boost::units::quantity<boost::units::information::info>
   from_graph(const Graph &graph,
              std::span<const Graph::vertex_descriptor> sources);
-  static std::size_t
+  static boost::units::quantity<boost::units::information::info>
   from_graph(const Graph &graph,
              std::initializer_list<Graph::vertex_descriptor> sources);
 };

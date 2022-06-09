@@ -4,9 +4,12 @@
 #include <boost/scope_exit.hpp>
 #endif
 
+#include <boost/units/io.hpp>
+
 #include <algorithm>
 #include <cassert>
 #include <execution>
+#include <iomanip>
 #include <mutex>
 #include <ostream>
 
@@ -42,7 +45,7 @@ public:
 
   // Return the total file size for all vertices that are unreachable from
   // `source` through `removed_edge` in the graph specified at constructon.
-  std::size_t
+  boost::units::quantity<boost::units::information::info>
   total_file_size_of_unreachable(Graph::vertex_descriptor from,
                                  Graph::edge_descriptor removed_edge) {
     std::fill(m_state.get(), m_state.get() + num_vertices(m_graph),
@@ -104,7 +107,7 @@ public:
       return 0u;
     }
 
-    std::size_t savingsInBytes = 0u;
+    boost::units::quantity<boost::units::information::info> savings;
 
     // Once all found vertices are marked, we DFS from `target(removed_edge)`
     // only looking at unmarked vertices and summing up their file sizes
@@ -119,7 +122,7 @@ public:
       case search_state::not_seen:
         // If we didn't see this file when we skipped `removed_edge` then we
         // will get that saving
-        savingsInBytes += m_graph[v].fileSizeInBytes;
+        savings += m_graph[v].file_size;
         [[fallthrough]];
       case search_state::seen_initial:
         // If we already saw this file, we don't get a saving but need to
@@ -131,7 +134,7 @@ public:
       m_stack.insert(m_stack.end(), begin, end);
     }
 
-    return savingsInBytes;
+    return savings;
   }
 };
 
@@ -140,7 +143,7 @@ public:
 bool operator==(const include_directive_and_cost &lhs,
                 const include_directive_and_cost &rhs) {
   return lhs.file == rhs.file && lhs.include == rhs.include &&
-         lhs.savingInBytes == rhs.savingInBytes;
+         lhs.saving == rhs.saving;
 }
 
 bool operator!=(const include_directive_and_cost &lhs,
@@ -151,12 +154,14 @@ bool operator!=(const include_directive_and_cost &lhs,
 std::ostream &operator<<(std::ostream &out,
                          const include_directive_and_cost &v) {
   return out << "[" << v.file << "#L" << v.include->lineNumber << ", "
-             << v.include->code << ", " << v.savingInBytes << ']';
+             << v.include->code << ", " << std::setprecision(2) << std::fixed
+             << v.saving << ']';
 }
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
-    const std::size_t minimum_size_cut_off) {
+    const boost::units::quantity<boost::units::information::info>
+        minimum_size_cut_off) {
 
   std::mutex m;
   std::vector<include_directive_and_cost> results;
@@ -165,21 +170,24 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
       std::execution::par, begin, end,
       [&](const Graph::edge_descriptor &include) {
         DFSHelper helper(graph);
-        const std::size_t bytes_saved = std::accumulate(
-            sources.begin(), sources.end(), static_cast<std::size_t>(0),
-            [&](std::size_t acc, Graph::vertex_descriptor source) {
-              return acc +
-                     helper.total_file_size_of_unreachable(source, include);
-            });
+        const boost::units::quantity<boost::units::information::info> saved =
+            std::accumulate(
+                sources.begin(), sources.end(),
+                0 * boost::units::information::bytes,
+                [&](boost::units::quantity<boost::units::information::info> acc,
+                    Graph::vertex_descriptor source) {
+                  return acc +
+                         helper.total_file_size_of_unreachable(source, include);
+                });
 
-        if (bytes_saved >= minimum_size_cut_off) {
+        if (saved >= minimum_size_cut_off) {
           // There are ways to avoid this mutex, but if the
           // `minimum_size_cut_off` is large enough, it's relatively rare to
           // enter this if statement
           std::lock_guard g(m);
           results.emplace_back(
-              std::filesystem::path(graph[source(include, graph)].path),
-              bytes_saved, &graph[include]);
+              std::filesystem::path(graph[source(include, graph)].path), saved,
+              &graph[include]);
         }
       });
   return results;
@@ -187,7 +195,8 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::initializer_list<Graph::vertex_descriptor> sources,
-    const std::size_t minimum_size_cut_off) {
+    boost::units::quantity<boost::units::information::info>
+        minimum_size_cut_off) {
   return from_graph(graph, std::span(sources.begin(), sources.end()),
                     minimum_size_cut_off);
 }

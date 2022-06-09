@@ -5,11 +5,11 @@
 namespace IncludeGuardian {
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value) {
-  return stream << value.path << " (" << value << " bytes)";
+  return stream << value.path << " (" << value << ")";
 }
 
 bool operator==(const file_node &lhs, const file_node &rhs) {
-  return lhs.fileSizeInBytes == rhs.fileSizeInBytes && lhs.path == rhs.path;
+  return lhs.file_size == rhs.file_size && lhs.path == rhs.path;
 }
 
 bool operator!=(const file_node &lhs, const file_node &rhs) {

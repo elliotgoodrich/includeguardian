@@ -61,7 +61,8 @@ class IncludeScanner : public clang::PPCallbacks {
         path = path.substr(2);
       }
       it->second.v = add_vertex(
-          {path.str(), static_cast<std::size_t>(file->getSize())}, m_r.graph);
+          {path.str(), file->getSize() * boost::units::information::bytes},
+          m_r.graph);
     }
 
     return it;
@@ -179,7 +180,7 @@ public:
       const auto [ptr, ec] = std::from_chars(start, end, file_size);
       if (ec == std::errc()) {
         const Graph::vertex_descriptor v = m_stack.back()->second.v;
-        m_r.graph[v].fileSizeInBytes = file_size;
+        m_r.graph[v].file_size = file_size * boost::units::information::bytes;
       }
     }
   }

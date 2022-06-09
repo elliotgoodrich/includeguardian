@@ -3,6 +3,9 @@
 
 #include <boost/graph/adjacency_list.hpp>
 
+#include <boost/units/quantity.hpp>
+#include <boost/units/systems/information/byte.hpp>
+
 #include <iosfwd>
 #include <string>
 
@@ -11,7 +14,8 @@ namespace IncludeGuardian {
 class file_node {
 public:
   std::string path;
-  std::size_t fileSizeInBytes = 0;
+  boost::units::quantity<boost::units::information::info> file_size =
+      0 * boost::units::information::bytes;
 };
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value);

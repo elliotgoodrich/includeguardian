@@ -4,9 +4,12 @@
 #include "get_total_cost.hpp"
 #include "graph.hpp"
 
+#include <boost/units/io.hpp>
+
 #include <clang/Tooling/CommonOptionsParser.h>
 
 #include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -91,9 +94,10 @@ int main(int argc, const char **argv) {
     return 0;
   }
   case output::most_expensive: {
-    const std::size_t total_project_cost =
-        get_total_cost::from_graph(graph, sources);
-    std::cout << "Total size found (" << total_project_cost << " bytes) in "
+    const boost::units::quantity<boost::units::information::info>
+        total_project_cost = get_total_cost::from_graph(graph, sources);
+    std::cout << "Total size found " << std::setprecision(2) << std::fixed
+              << boost::units::binary_prefix << total_project_cost << " in "
               << duration_cast<std::chrono::milliseconds>(timer.restart())
               << "\n";
     const double percent_cut_off = 0.005;
@@ -106,13 +110,15 @@ int main(int argc, const char **argv) {
     std::sort(results.begin(), results.end(),
               [](const include_directive_and_cost &l,
                  const include_directive_and_cost &r) {
-                return l.savingInBytes > r.savingInBytes;
+                return l.saving > r.saving;
               });
     for (const include_directive_and_cost &i : results) {
-      const double percentage = (100.0 * i.savingInBytes) / total_project_cost;
-      std::cout << i.savingInBytes << " bytes (" << percentage << "%) from "
-                << i.file.filename().string() << "L#" << i.include->lineNumber
-                << " remove #include " << i.include->code << "\n";
+      const double percentage = (100.0 * i.saving) / total_project_cost;
+      std::cout << std::setprecision(2) << std::fixed
+                << boost::units::binary_prefix << i.saving << " (" << percentage
+                << "%) from " << i.file.filename().string() << "L#"
+                << i.include->lineNumber << " remove #include "
+                << i.include->code << "\n";
     }
     return 0;
   }
