@@ -1,5 +1,14 @@
 # IncludeGuardian
 
+## MVP Plan
+
+  1. [x] Implement functionality to list the most expensive includes
+  2. [x] Implement functionality to list the most expensive files
+  3. [ ] Add webhook that is called from changes to the remote and stores the results in S3
+  4. [ ] Create a website to view these results
+  5. [ ] Implement a PR check to see if we may cause a slowdown
+  6. [ ] Figure out third party library dependencies
+
 ## Initial Setup
 
   1. Install Microsoft Visual Studio 2019
