@@ -2,8 +2,9 @@
 #define INCLUDE_GUARD_E31B79D8_2464_4823_BDE1_37F760251C13
 
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/range/iterator_range.hpp>
-#include <unordered_set>
+
+#include <deque>
+#include <execution>
 #include <utility>
 #include <vector>
 
@@ -16,8 +17,8 @@ public:
                             EDGE>::vertex_descriptor;
 
 private:
-  std::vector<std::unordered_set<handle>> m_reachable;
-  std::vector<std::uint32_t> m_paths;
+  std::size_t m_size;
+  std::vector<char> m_paths;
 
   // For each unique path leading from `v` invoke `vis(vertex_descriptor)` for
   // each vertex in these paths.  Note that `vis` may visit the same vertext
@@ -25,11 +26,18 @@ private:
   template <class IncidenceGraph, class Visitor>
   static void traverse_all_paths(
       const IncidenceGraph &g,
-      typename boost::graph_traits<IncidenceGraph>::vertex_descriptor v,
+      const typename boost::graph_traits<IncidenceGraph>::vertex_descriptor v,
       Visitor vis) {
-    vis(v);
-    for (auto &&edge : boost::make_iterator_range(boost::out_edges(v, g))) {
-      traverse_all_paths(g, boost::target(edge, g), vis);
+    std::deque<typename boost::graph_traits<IncidenceGraph>::vertex_descriptor>
+        vs;
+    vs.push_back(v);
+    while (!vs.empty()) {
+      const auto v = vs.front();
+      vs.pop_front();
+      if (vis(v)) {
+		  const auto [begin, end] = adjacent_vertices(v, g);
+		  vs.insert(vs.end(), begin, end);
+	  }
     }
   }
 
@@ -41,42 +49,33 @@ public:
 
   reachability_graph(const reachability_graph &) = delete;
 
-  // Return a range of all handles that are reachable from `start`.  Note
-  // that this will include `start` in the range.
-  auto reachable_from(handle start) const;
-
-  // Return the number of unique paths between the `from` handle to the `to`
-  // handle.
-  std::size_t number_of_paths(handle from, handle to) const;
+  // Return whether there is a path `from` to `to`.
+  bool is_reachable(handle from, handle to) const;
 };
 
 template <typename NODE, typename EDGE>
 reachability_graph<NODE, EDGE>::reachability_graph(
     const boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
                                 NODE, EDGE> &dag)
-    : m_reachable(boost::num_vertices(dag)),
-      m_paths(boost::num_vertices(dag) * boost::num_vertices(dag)) {
-  for (const handle v : boost::make_iterator_range(boost::vertices(dag))) {
-    // THINKING: It would be very good if this could be parallelized and
-    // also whether we can reuse information from previous vertex searches
-    std::unordered_set<handle> &reachable = m_reachable[v];
-    const std::size_t offset = v * m_reachable.size();
-    traverse_all_paths(dag, v, [&](handle u) {
-      reachable.emplace(u);
-      ++m_paths[offset + u];
+    : m_size(num_vertices(dag))
+    , m_paths(m_size * m_size) {
+  const auto [begin, end] = vertices(dag);
+  std::for_each(std::execution::par, begin, end, [&](const handle v) {
+    // THINKING: It would be very good if we can reuse information
+    // from previous vertex searches
+    const std::size_t offset = v * m_size;
+    traverse_all_paths(dag, v, [=](handle u) {
+      const bool carry_on = !m_paths[offset + u];
+      m_paths[offset + u] = true;
+      return carry_on;
     });
-  }
+  });
 }
 
 template <typename NODE, typename EDGE>
-auto reachability_graph<NODE, EDGE>::reachable_from(handle start) const {
-  return m_reachable[start];
-}
-
-template <typename NODE, typename EDGE>
-std::size_t reachability_graph<NODE, EDGE>::number_of_paths(handle from,
+bool reachability_graph<NODE, EDGE>::is_reachable(handle from,
                                                             handle to) const {
-  return m_paths[from * m_reachable.size() + to];
+  return m_paths[from * m_size + to];
 }
 
 } // namespace IncludeGuardian

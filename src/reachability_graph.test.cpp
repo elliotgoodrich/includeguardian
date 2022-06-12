@@ -29,25 +29,25 @@ TEST(ReachabilityGraphTest, DiamondIncludes) {
   add_edge(c, d, {"c->d"}, g);
 
   reachability_graph dag(g);
-  EXPECT_EQ(dag.number_of_paths(a, a), 1);
-  EXPECT_EQ(dag.number_of_paths(a, b), 1);
-  EXPECT_EQ(dag.number_of_paths(a, c), 1);
-  EXPECT_EQ(dag.number_of_paths(a, d), 2);
+  EXPECT_EQ(dag.is_reachable(a, a), true);
+  EXPECT_EQ(dag.is_reachable(a, b), true);
+  EXPECT_EQ(dag.is_reachable(a, c), true);
+  EXPECT_EQ(dag.is_reachable(a, d), true);
 
-  EXPECT_EQ(dag.number_of_paths(b, a), 0);
-  EXPECT_EQ(dag.number_of_paths(b, b), 1);
-  EXPECT_EQ(dag.number_of_paths(b, c), 0);
-  EXPECT_EQ(dag.number_of_paths(b, d), 1);
+  EXPECT_EQ(dag.is_reachable(b, a), false);
+  EXPECT_EQ(dag.is_reachable(b, b), true);
+  EXPECT_EQ(dag.is_reachable(b, c), false);
+  EXPECT_EQ(dag.is_reachable(b, d), true);
 
-  EXPECT_EQ(dag.number_of_paths(c, a), 0);
-  EXPECT_EQ(dag.number_of_paths(c, b), 0);
-  EXPECT_EQ(dag.number_of_paths(c, c), 1);
-  EXPECT_EQ(dag.number_of_paths(c, d), 1);
+  EXPECT_EQ(dag.is_reachable(c, a), false);
+  EXPECT_EQ(dag.is_reachable(c, b), false);
+  EXPECT_EQ(dag.is_reachable(c, c), true);
+  EXPECT_EQ(dag.is_reachable(c, d), true);
 
-  EXPECT_EQ(dag.number_of_paths(d, a), 0);
-  EXPECT_EQ(dag.number_of_paths(d, b), 0);
-  EXPECT_EQ(dag.number_of_paths(d, c), 0);
-  EXPECT_EQ(dag.number_of_paths(d, d), 1);
+  EXPECT_EQ(dag.is_reachable(d, a), false);
+  EXPECT_EQ(dag.is_reachable(d, b), false);
+  EXPECT_EQ(dag.is_reachable(d, c), false);
+  EXPECT_EQ(dag.is_reachable(d, d), true);
 }
 
 TEST(ReachabilityGraphTest, MultiLevel) {
@@ -103,7 +103,7 @@ TEST(ReachabilityGraphTest, MultiLevel) {
   const char alphabet[SIZE + 1] = "abcdefgh";
   for (int from = 0; from != SIZE; ++from) {
     for (int to = 0; to != SIZE; ++to) {
-      EXPECT_EQ(dag.number_of_paths(vs[from], vs[to]), paths[from][to])
+      EXPECT_EQ(dag.is_reachable(vs[from], vs[to]), paths[from][to] > 0)
           << alphabet[from] << "->" << alphabet[to];
     }
   }
@@ -175,7 +175,7 @@ TEST(ReachabilityGraphTest, LongChain) {
   const char alphabet[SIZE + 1] = "abcdefghij";
   for (int from = 0; from != SIZE; ++from) {
     for (int to = 0; to != SIZE; ++to) {
-      EXPECT_EQ(dag.number_of_paths(vs[from], vs[to]), paths[from][to])
+      EXPECT_EQ(dag.is_reachable(vs[from], vs[to]), paths[from][to] > 0)
           << alphabet[from] << "->" << alphabet[to];
     }
   }

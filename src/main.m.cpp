@@ -1,5 +1,6 @@
 #include "build_graph.hpp"
 #include "dot_graph.hpp"
+#include "find_expensive_files.hpp"
 #include "find_expensive_includes.hpp"
 #include "get_total_cost.hpp"
 #include "graph.hpp"
@@ -101,24 +102,53 @@ int main(int argc, const char **argv) {
               << duration_cast<std::chrono::milliseconds>(timer.restart())
               << "\n";
     const double percent_cut_off = 0.005;
-    std::vector<include_directive_and_cost> results =
-        find_expensive_includes::from_graph(
-            graph, sources, total_project_cost * percent_cut_off);
-    std::cout << "Includes found in "
-              << duration_cast<std::chrono::milliseconds>(timer.restart())
-              << "\n";
-    std::sort(results.begin(), results.end(),
-              [](const include_directive_and_cost &l,
-                 const include_directive_and_cost &r) {
-                return l.saving > r.saving;
-              });
-    for (const include_directive_and_cost &i : results) {
-      const double percentage = (100.0 * i.saving) / total_project_cost;
-      std::cout << std::setprecision(2) << std::fixed
-                << boost::units::binary_prefix << i.saving << " (" << percentage
-                << "%) from " << i.file.filename().string() << "L#"
-                << i.include->lineNumber << " remove #include "
-                << i.include->code << "\n";
+    {
+      std::vector<include_directive_and_cost> results =
+          find_expensive_includes::from_graph(
+              graph, sources, total_project_cost * percent_cut_off);
+      std::cout << "Includes found in "
+                << duration_cast<std::chrono::milliseconds>(timer.restart())
+                << "\n";
+      std::sort(results.begin(), results.end(),
+                [](const include_directive_and_cost &l,
+                   const include_directive_and_cost &r) {
+                  return l.saving > r.saving;
+                });
+      for (const include_directive_and_cost &i : results) {
+        const double percentage = (100.0 * i.saving) / total_project_cost;
+        std::cout << std::setprecision(2) << std::fixed
+                  << boost::units::binary_prefix << i.saving << " ("
+                  << percentage << "%) from " << i.file.filename().string()
+                  << "L#" << i.include->lineNumber << " remove #include "
+                  << i.include->code << "\n";
+      }
+    }
+
+    {
+      // Assume that each "expensive" file could be reduced this much
+      const double assumed_reduction = 0.50;
+      std::vector<file_and_cost> results = find_expensive_files::from_graph(
+          graph, sources,
+          total_project_cost * percent_cut_off / assumed_reduction);
+      std::cout << "\nFiles analyzed in "
+                << duration_cast<std::chrono::milliseconds>(timer.restart())
+                << "\n";
+      std::sort(results.begin(), results.end(),
+                [](const file_and_cost &l, const file_and_cost &r) {
+                  return l.node->file_size * static_cast<double>(l.sources) >
+                         r.node->file_size * static_cast<double>(r.sources);
+                });
+      for (const file_and_cost &i : results) {
+        const boost::units::quantity<boost::units::information::info> saving =
+            i.sources * assumed_reduction * i.node->file_size;
+        const double percentage = (100.0 * saving) / total_project_cost;
+        std::cout << std::setprecision(2) << std::fixed
+                  << boost::units::binary_prefix << saving << " (" << percentage
+                  << "%) from "
+                  << std::filesystem::path(i.node->path).filename().string()
+                  << " by simplifing or splitting by "
+                  << 100 * assumed_reduction << "%\n";
+      }
     }
     return 0;
   }

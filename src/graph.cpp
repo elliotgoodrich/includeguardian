@@ -1,11 +1,13 @@
 #include "graph.hpp"
 
+#include <boost/units/io.hpp>
+
 #include <ostream>
 
 namespace IncludeGuardian {
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value) {
-  return stream << value.path << " (" << value << ")";
+  return stream << value.path << " (" << value.file_size << ")";
 }
 
 bool operator==(const file_node &lhs, const file_node &rhs) {
