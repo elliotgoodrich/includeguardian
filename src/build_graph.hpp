@@ -6,7 +6,11 @@
 #include <llvm/ADT/IntrusiveRefCntPtr.h>
 #include <llvm/Support/Error.h>
 
+#include <filesystem>
+#include <functional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace clang::tooling {
@@ -22,12 +26,24 @@ struct build_graph {
   struct result {
     Graph graph;
     std::vector<Graph::vertex_descriptor> sources;
-    std::vector<std::string> missing_files;
+    std::vector<std::filesystem::path> missing_files;
   };
+
+  enum class file_type {
+    source,
+    header,
+    ignore,
+  };
+
   static llvm::Expected<result>
   from_compilation_db(const clang::tooling::CompilationDatabase &compilation_db,
-                      std::span<const std::string> source_paths,
+                      std::span<const std::filesystem::path> source_paths,
                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
+
+  static llvm::Expected<result>
+  from_dir(const llvm::Twine &dir, std::span<const std::filesystem::path> include_dirs,
+           llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
+           std::function<file_type(std::string_view)> file_type);
 };
 
 } // namespace IncludeGuardian

@@ -7,6 +7,7 @@
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Lex/Lexer.h>
 #include <clang/Lex/PPCallbacks.h>
+#include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 
 #include <llvm/ADT/StringRef.h>
@@ -21,6 +22,52 @@
 namespace IncludeGuardian {
 
 namespace {
+
+class TestCompilationDatabase : public clang::tooling::CompilationDatabase {
+public:
+  std::filesystem::path m_working_directory;
+  std::vector<std::filesystem::path> m_sources;
+  std::span<const std::filesystem::path> m_include_dirs;
+
+  TestCompilationDatabase(const std::filesystem::path &working_directory)
+      : m_working_directory(working_directory), m_sources(), m_include_dirs() {}
+
+  /// Returns all compile commands in which the specified file was
+  /// compiled.
+  ///
+  /// This includes compile commands that span multiple source files.
+  /// For example, consider a project with the following compilations:
+  /// $ clang++ -o test a.cc b.cc t.cc
+  /// $ clang++ -o production a.cc b.cc -DPRODUCTION
+  /// A compilation database representing the project would return both command
+  /// lines for a.cc and b.cc and only the first command line for t.cc.
+  std::vector<clang::tooling::CompileCommand>
+  getCompileCommands(clang::StringRef FilePath) const final {
+    // Note for the preprocessor we do not need `-o` flags and it is
+    // specifically stripped out by an `ArgumentAdjuster`.
+    using namespace std::string_literals;
+
+    std::vector<std::string> things;
+    things.emplace_back("/usr/bin/clang++");
+    things.emplace_back(FilePath.str());
+    for (const std::filesystem::path &include : m_include_dirs) {
+      things.emplace_back("-I");
+      things.emplace_back(include.string());
+    }
+    return {{m_working_directory.string(), FilePath, std::move(things), "out"}};
+  }
+
+  /// Returns the list of all files available in the compilation database.
+  ///
+  /// By default, returns nothing. Implementations should override this if they
+  /// can enumerate their source files.
+  std::vector<std::string> getAllFiles() const final {
+    std::vector<std::string> result(m_sources.size());
+    std::transform(m_sources.cbegin(), m_sources.cend(), result.begin(),
+                   [](const std::filesystem::path &p) { return p.string(); });
+    return result;
+  }
+};
 
 clang::IgnoringDiagConsumer s_ignore;
 
@@ -54,15 +101,11 @@ class IncludeScanner : public clang::PPCallbacks {
         file ? file->getUniqueID() : llvm::sys::fs::UniqueID();
     auto const [it, inserted] = m_id_to_node.emplace(id, empty);
     if (file && inserted) {
-      clang::StringRef path = file->getName();
-      if (path.startswith("./")) {
-        // Clang gives us paths prefixed with "./" (even on Windows) so we
-        // remove it
-        path = path.substr(2);
-      }
-      it->second.v = add_vertex(
-          {path.str(), file->getSize() * boost::units::information::bytes},
-          m_r.graph);
+      const std::filesystem::path p = file->getName().str();
+      it->second.v =
+          add_vertex({p.lexically_normal(),
+                      file->getSize() * boost::units::information::bytes},
+                     m_r.graph);
     }
 
     return it;
@@ -161,7 +204,7 @@ public:
                {include, m_sm->getSpellingLineNumber(HashLoc)}, m_r.graph);
     } else {
       // File does not exist
-      m_r.missing_files.emplace_back(FileName);
+      m_r.missing_files.emplace_back(FileName.str());
     }
   }
 
@@ -242,11 +285,15 @@ public:
 
 llvm::Expected<build_graph::result> build_graph::from_compilation_db(
     const clang::tooling::CompilationDatabase &compilation_db,
-    std::span<const std::string> source_paths,
+    std::span<const std::filesystem::path> source_paths,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs) {
+
+  std::vector<std::string> source_path_strings(source_paths.size());
+  std::transform(source_paths.begin(), source_paths.end(),
+                 source_path_strings.begin(),
+                 [](const std::filesystem::path &p) { return p.string(); });
   clang::tooling::ClangTool tool(
-      compilation_db,
-      llvm::ArrayRef<std::string>(source_paths.data(), source_paths.size()),
+      compilation_db, source_path_strings,
       std::make_shared<clang::PCHContainerOperations>(), fs);
 
   UniqueIdToNode id_to_node;
@@ -258,6 +305,44 @@ llvm::Expected<build_graph::result> build_graph::from_compilation_db(
                                    "oops");
   }
   return r;
+}
+
+llvm::Expected<build_graph::result>
+build_graph::from_dir(const llvm::Twine &dir,
+                      std::span<const std::filesystem::path> include_dirs,
+                      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
+                      std::function<file_type(std::string_view)> file_type) {
+  const std::filesystem::path wd(dir.str());
+
+  TestCompilationDatabase db({dir.str()});
+  db.m_include_dirs = include_dirs;
+  std::error_code ec;
+  std::vector<std::string> directories;
+  directories.push_back(dir.str());
+  const llvm::vfs::directory_iterator end;
+  while (!directories.empty()) {
+    const std::string dir_copy = std::move(directories.back());
+    directories.pop_back();
+    llvm::vfs::directory_iterator it = fs->dir_begin(dir_copy, ec);
+    while (!ec && it != end) {
+      if (it->type() == llvm::sys::fs::file_type::directory_file) {
+        directories.push_back(it->path().str());
+      } else if (it->type() == llvm::sys::fs::file_type::regular_file &&
+                 file_type(it->path()) == file_type::source) {
+
+        // Make sure all filenames are relative.  This allows us to generate
+        // results that won't include any "private" information.  For example,
+        // if the user's name appears in the absolute path, they may be less
+        // inclined to share it.  It also means that results generated for the
+        // same project will be identical across computers.
+        std::filesystem::path path(it->path().str());
+        db.m_sources.emplace_back(path.lexically_relative(wd));
+      }
+      it.increment(ec);
+    }
+  }
+
+  return from_compilation_db(db, db.m_sources, fs);
 }
 
 } // namespace IncludeGuardian

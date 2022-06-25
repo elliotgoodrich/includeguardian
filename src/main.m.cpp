@@ -7,7 +7,8 @@
 
 #include <boost/units/io.hpp>
 
-#include <clang/Tooling/CommonOptionsParser.h>
+#include <llvm/Support/CommandLine.h.>
+#include <llvm/Support/VirtualFileSystem.h.>
 
 #include <chrono>
 #include <iomanip>
@@ -15,7 +16,33 @@
 #include <string>
 #include <utility>
 
+using namespace IncludeGuardian;
+
 namespace {
+
+const std::pair<std::string_view, build_graph::file_type> lookup[] = {
+    {"cpp", build_graph::file_type::source},
+    {"c", build_graph::file_type::source},
+    {"cc", build_graph::file_type::source},
+    {"C", build_graph::file_type::source},
+    {"cxx", build_graph::file_type::source},
+    {"c++", build_graph::file_type::source},
+    {"hpp", build_graph::file_type::header},
+    {"h", build_graph::file_type::header},
+    {"hh", build_graph::file_type::header},
+    {"H", build_graph::file_type::header},
+    {"hxx", build_graph::file_type::header},
+    {"h++", build_graph::file_type::header},
+    {"", build_graph::file_type::ignore},
+};
+build_graph::file_type map_ext(std::string_view file) {
+  const auto dot = std::find(file.rbegin(), file.rend(), '.').base();
+  const std::string_view ext(dot, file.end());
+  // Use end-1 because if we fail to find then the true last element is 'ignore'
+  return std::find_if(std::begin(lookup), std::end(lookup) - 1,
+                      [=](auto p) { return p.first == ext; })
+      ->second;
+}
 
 class stopwatch {
   std::chrono::steady_clock::time_point m_start;
@@ -37,8 +64,6 @@ enum class output {
 } // namespace
 
 int main(int argc, const char **argv) {
-  using namespace IncludeGuardian;
-
   llvm::cl::OptionCategory MyToolCategory("my-tool options");
 
   llvm::cl::opt<output> output(
@@ -50,18 +75,22 @@ int main(int argc, const char **argv) {
               "most-expensive", static_cast<int>(output::most_expensive),
               "List of most expensive include directives")));
 
-  llvm::Expected<clang::tooling::CommonOptionsParser> optionsParser =
-      clang::tooling::CommonOptionsParser::create(argc, argv, MyToolCategory);
-  if (!optionsParser) {
-    std::cerr << toString(optionsParser.takeError());
+  llvm::cl::opt<std::string> dir("dir", llvm::cl::desc("Choose the directory"));
+
+  llvm::cl::list<std::string> include_dirs(
+      "i", llvm::cl::desc("Additional include directories"),
+      llvm::cl::ZeroOrMore);
+  if (!llvm::cl::ParseCommandLineOptions(argc, argv)) {
     return 1;
   }
 
   stopwatch timer;
 
-  llvm::Expected<build_graph::result> result = build_graph::from_compilation_db(
-      optionsParser->getCompilations(), optionsParser->getSourcePathList(),
-      llvm::vfs::getRealFileSystem());
+  std::vector<std::filesystem::path> include_dir_paths(include_dirs.size());
+  std::copy(include_dirs.begin(), include_dirs.end(), include_dir_paths.begin());
+  llvm::Expected<build_graph::result> result = build_graph::from_dir(
+      dir, include_dir_paths, llvm::vfs::getRealFileSystem(), map_ext);
+
   if (!result) {
     // TODO: error message
     std::cerr << "Error";
@@ -80,7 +109,7 @@ int main(int argc, const char **argv) {
   if (!missing.empty()) {
     std::cout << "There are " << missing.size() << " missing files\n  ";
     std::copy(missing.begin(), missing.end(),
-              std::ostream_iterator<std::string>(std::cout, "  \n  "));
+              std::ostream_iterator<std::filesystem::path>(std::cout, "  \n  "));
   } else {
     std::cout << "All includes found :)";
   }

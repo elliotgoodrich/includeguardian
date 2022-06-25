@@ -16,46 +16,19 @@ namespace {
 
 const auto B = boost::units::information::byte;
 
+const std::function<build_graph::file_type(std::string_view)> get_file_type =
+    [](std::string_view file) {
+      if (file.ends_with(".cpp")) {
+        return build_graph::file_type::source;
+      } else if (file.ends_with(".hpp")) {
+        return build_graph::file_type::header;
+      } else {
+        return build_graph::file_type::ignore;
+      }
+    };
+
 // Needs to be fixed on non-window's systems
 static const std::filesystem::path root = "C:\\";
-
-class TestCompilationDatabase : public clang::tooling::CompilationDatabase {
-  std::filesystem::path m_working_directory;
-  std::vector<std::string> m_sources;
-
-public:
-  TestCompilationDatabase(const std::filesystem::path &working_directory,
-                          std::initializer_list<std::string_view> sources)
-      : m_working_directory(working_directory), m_sources(sources.size()) {
-    std::copy(sources.begin(), sources.end(), m_sources.begin());
-  }
-
-  /// Returns all compile commands in which the specified file was
-  /// compiled.
-  ///
-  /// This includes compile commands that span multiple source files.
-  /// For example, consider a project with the following compilations:
-  /// $ clang++ -o test a.cc b.cc t.cc
-  /// $ clang++ -o production a.cc b.cc -DPRODUCTION
-  /// A compilation database representing the project would return both command
-  /// lines for a.cc and b.cc and only the first command line for t.cc.
-  std::vector<clang::tooling::CompileCommand>
-  getCompileCommands(clang::StringRef FilePath) const final {
-    // Note for the preprocessor we do not need `-o` flags and it is
-    // specifically stripped out by an `ArgumentAdjuster`.
-    using namespace std::string_literals;
-    return {{m_working_directory.string(),
-             FilePath,
-             {"/usr/bin/clang++"s, FilePath.str()},
-             "out"}};
-  }
-
-  /// Returns the list of all files available in the compilation database.
-  ///
-  /// By default, returns nothing. Implementations should override this if they
-  /// can enumerate their source files.
-  std::vector<std::string> getAllFiles() const final { return m_sources; }
-};
 
 // Create an in-memory file system that would create the specified `graph`.
 llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>
@@ -96,19 +69,19 @@ void check_equal(const Graph &actual, const Graph &expected) {
 
   // We need to use an `unordered_map` as we may build up our graph in the wrong
   // order that we encounter files during our C++ preprocessor step.
-  std::unordered_map<std::string_view, Graph::vertex_descriptor> file_lookup(
+  std::unordered_map<std::string, Graph::vertex_descriptor> file_lookup(
       num_vertices(actual));
 
   for (const Graph::vertex_descriptor v :
        boost::make_iterator_range(vertices(actual))) {
-    const bool is_new = file_lookup.emplace(actual[v].path, v).second;
+    const bool is_new = file_lookup.emplace(actual[v].path.string(), v).second;
     EXPECT_TRUE(is_new);
   }
 
   for (const Graph::vertex_descriptor v :
        boost::make_iterator_range(vertices(expected))) {
-    const auto it = file_lookup.find(expected[v].path);
-    ASSERT_NE(it, file_lookup.end());
+    const auto it = file_lookup.find(expected[v].path.string());
+    ASSERT_NE(it, file_lookup.end()) << "Could not find " << expected[v].path;
 
     EXPECT_EQ(get_out_edges(it->second, actual), get_out_edges(v, expected))
         << "from " << expected[v].path;
@@ -120,11 +93,10 @@ TEST(BuildGraphTest, SimpleGraph) {
   add_vertex({"main.cpp", 100 * B}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
-  TestCompilationDatabase db(working_directory, {"main.cpp"});
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
   llvm::Expected<build_graph::result> results =
-      build_graph::from_compilation_db(db, db.getAllFiles(), fs);
+      build_graph::from_dir(working_directory.string(), {}, fs, get_file_type);
   check_equal(g, results->graph);
 }
 
@@ -138,11 +110,10 @@ TEST(BuildGraphTest, MultipleChildren) {
   add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 2}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
-  TestCompilationDatabase db(working_directory, {"main.cpp"});
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
   llvm::Expected<build_graph::result> results =
-      build_graph::from_compilation_db(db, db.getAllFiles(), fs);
+      build_graph::from_dir(working_directory.string(), {}, fs, get_file_type);
   check_equal(g, results->graph);
 }
 
@@ -162,11 +133,10 @@ TEST(BuildGraphTest, DiamondIncludes) {
   add_edge(b_hpp, c_hpp, {"\"" + c_path + "\"", 1}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
-  TestCompilationDatabase db(working_directory, {"main.cpp"});
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
   llvm::Expected<build_graph::result> results =
-      build_graph::from_compilation_db(db, db.getAllFiles(), fs);
+      build_graph::from_dir(working_directory.string(), {}, fs, get_file_type);
   check_equal(g, results->graph);
 }
 
@@ -184,11 +154,30 @@ TEST(BuildGraphTest, MultipleSources) {
   add_edge(a_hpp, b_hpp, {"\"b.hpp\"", 1}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
-  TestCompilationDatabase db(working_directory, {"main1.cpp", "main2.cpp"});
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
   llvm::Expected<build_graph::result> results =
-      build_graph::from_compilation_db(db, db.getAllFiles(), fs);
+      build_graph::from_dir(working_directory.string(), {}, fs, get_file_type);
+  check_equal(g, results->graph);
+}
+
+TEST(BuildGraphTest, DifferentDirectories) {
+  Graph g;
+  const std::filesystem::path dir1 = "dir1";
+  const Graph::vertex_descriptor main_cpp =
+      add_vertex({dir1 / "main1.cpp", 100 * B}, g);
+  const Graph::vertex_descriptor a_hpp =
+      add_vertex({dir1 / "a.hpp", 1000 * B}, g);
+  const Graph::vertex_descriptor b_hpp = add_vertex({"b.hpp", 2000 * B}, g);
+
+  add_edge(main_cpp, a_hpp, {"\"../dir1/a.hpp\"", 1}, g);
+  add_edge(main_cpp, a_hpp, {"\"../b.hpp\"", 2}, g);
+
+  const std::filesystem::path working_directory = root / "working_dir";
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
+      make_file_system(g, working_directory);
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_dir(working_directory.string(), {}, fs, get_file_type);
   check_equal(g, results->graph);
 }
 } // namespace

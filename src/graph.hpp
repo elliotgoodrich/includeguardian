@@ -7,13 +7,14 @@
 #include <boost/units/systems/information/byte.hpp>
 
 #include <iosfwd>
+#include <filesystem>
 #include <string>
 
 namespace IncludeGuardian {
 
 class file_node {
 public:
-  std::string path;
+  std::filesystem::path path;
   boost::units::quantity<boost::units::information::info> file_size =
       0 * boost::units::information::bytes;
 };
