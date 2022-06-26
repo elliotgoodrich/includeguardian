@@ -215,8 +215,9 @@ public:
     const clang::StringRef pragma_text =
         clang::Lexer::getSpelling(Loc, buffer, *m_sm, m_options);
 
+    // NOTE: Our files should all be null-terminated strings
     const clang::StringRef prefix = "#pragma override_file_size(";
-    if (pragma_text.startswith(prefix)) {
+    if (std::equal(prefix.begin(), prefix.end(), pragma_text.data())) {
       std::size_t file_size;
       const char *start = pragma_text.data() + prefix.size();
       const char *end = std::strchr(start, ')');

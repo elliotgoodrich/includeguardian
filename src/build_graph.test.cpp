@@ -1,7 +1,5 @@
 #include "build_graph.hpp"
 
-#include <clang/Tooling/CompilationDatabase.h>
-
 #include <llvm/Support/VirtualFileSystem.h>
 
 #include <gtest/gtest.h>
@@ -82,6 +80,7 @@ void check_equal(const Graph &actual, const Graph &expected) {
        boost::make_iterator_range(vertices(expected))) {
     const auto it = file_lookup.find(expected[v].path.string());
     ASSERT_NE(it, file_lookup.end()) << "Could not find " << expected[v].path;
+    EXPECT_EQ(actual[it->second], expected[v]);
 
     EXPECT_EQ(get_out_edges(it->second, actual), get_out_edges(v, expected))
         << "from " << expected[v].path;
