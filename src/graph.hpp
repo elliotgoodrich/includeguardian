@@ -6,15 +6,19 @@
 #include <boost/units/quantity.hpp>
 #include <boost/units/systems/information/byte.hpp>
 
-#include <iosfwd>
 #include <filesystem>
+#include <iosfwd>
 #include <string>
 
 namespace IncludeGuardian {
 
 class file_node {
 public:
-  std::filesystem::path path;
+  std::filesystem::path path; //< Note that this will most likely be
+                              //< a relative path (e.g. boost/foo.hpp) and
+                              //< it will be unknown and generally unnecessary
+                              //< as to what path it is relative to.
+  bool is_external = false; //< Whether this file comes from an external library
   boost::units::quantity<boost::units::information::info> file_size =
       0 * boost::units::information::bytes;
 };

@@ -12,6 +12,8 @@ namespace {
 
 const auto B = boost::units::information::byte;
 
+const bool not_external = false;
+
 bool test_sort(const include_directive_and_cost &lhs,
                const include_directive_and_cost &rhs) {
   return std::tie(lhs.file, lhs.include->code, lhs.saving) <
@@ -20,10 +22,14 @@ bool test_sort(const include_directive_and_cost &lhs,
 
 TEST(FindExpensiveIncludesTest, DiamondIncludes) {
   Graph graph;
-  const Graph::vertex_descriptor a = add_vertex({"a", 0b1000 * B}, graph);
-  const Graph::vertex_descriptor b = add_vertex({"b", 0b0100 * B}, graph);
-  const Graph::vertex_descriptor c = add_vertex({"c", 0b0010 * B}, graph);
-  const Graph::vertex_descriptor d = add_vertex({"d", 0b0001 * B}, graph);
+  const Graph::vertex_descriptor a =
+      add_vertex({"a", not_external, 0b1000 * B}, graph);
+  const Graph::vertex_descriptor b =
+      add_vertex({"b", not_external, 0b0100 * B}, graph);
+  const Graph::vertex_descriptor c =
+      add_vertex({"c", not_external, 0b0010 * B}, graph);
+  const Graph::vertex_descriptor d =
+      add_vertex({"d", not_external, 0b0001 * B}, graph);
 
   //      a
   //     / \
@@ -47,14 +53,22 @@ TEST(FindExpensiveIncludesTest, DiamondIncludes) {
 
 TEST(FindExpensiveIncludesTest, MultiLevel) {
   Graph graph;
-  const Graph::vertex_descriptor a = add_vertex({"a", 0b1000'0000 * B}, graph);
-  const Graph::vertex_descriptor b = add_vertex({"b", 0b0100'0000 * B}, graph);
-  const Graph::vertex_descriptor c = add_vertex({"c", 0b0010'0000 * B}, graph);
-  const Graph::vertex_descriptor d = add_vertex({"d", 0b0001'0000 * B}, graph);
-  const Graph::vertex_descriptor e = add_vertex({"e", 0b0000'1000 * B}, graph);
-  const Graph::vertex_descriptor f = add_vertex({"f", 0b0000'0100 * B}, graph);
-  const Graph::vertex_descriptor g = add_vertex({"g", 0b0000'0010 * B}, graph);
-  const Graph::vertex_descriptor h = add_vertex({"h", 0b0000'0001 * B}, graph);
+  const Graph::vertex_descriptor a =
+      add_vertex({"a", not_external, 0b1000'0000 * B}, graph);
+  const Graph::vertex_descriptor b =
+      add_vertex({"b", not_external, 0b0100'0000 * B}, graph);
+  const Graph::vertex_descriptor c =
+      add_vertex({"c", not_external, 0b0010'0000 * B}, graph);
+  const Graph::vertex_descriptor d =
+      add_vertex({"d", not_external, 0b0001'0000 * B}, graph);
+  const Graph::vertex_descriptor e =
+      add_vertex({"e", not_external, 0b0000'1000 * B}, graph);
+  const Graph::vertex_descriptor f =
+      add_vertex({"f", not_external, 0b0000'0100 * B}, graph);
+  const Graph::vertex_descriptor g =
+      add_vertex({"g", not_external, 0b0000'0010 * B}, graph);
+  const Graph::vertex_descriptor h =
+      add_vertex({"h", not_external, 0b0000'0001 * B}, graph);
 
   //      a   b
   //     / \ / \
@@ -92,25 +106,25 @@ TEST(FindExpensiveIncludesTest, MultiLevel) {
 TEST(FindExpensiveIncludesTest, LongChain) {
   Graph graph;
   const Graph::vertex_descriptor a =
-      add_vertex({"a", 0b10'0000'0000 * B}, graph);
+      add_vertex({"a", not_external, 0b10'0000'0000 * B}, graph);
   const Graph::vertex_descriptor b =
-      add_vertex({"b", 0b01'0000'0000 * B}, graph);
+      add_vertex({"b", not_external, 0b01'0000'0000 * B}, graph);
   const Graph::vertex_descriptor c =
-      add_vertex({"c", 0b00'1000'0000 * B}, graph);
+      add_vertex({"c", not_external, 0b00'1000'0000 * B}, graph);
   const Graph::vertex_descriptor d =
-      add_vertex({"d", 0b00'0100'0000 * B}, graph);
+      add_vertex({"d", not_external, 0b00'0100'0000 * B}, graph);
   const Graph::vertex_descriptor e =
-      add_vertex({"e", 0b00'0010'0000 * B}, graph);
+      add_vertex({"e", not_external, 0b00'0010'0000 * B}, graph);
   const Graph::vertex_descriptor f =
-      add_vertex({"f", 0b00'0001'0000 * B}, graph);
+      add_vertex({"f", not_external, 0b00'0001'0000 * B}, graph);
   const Graph::vertex_descriptor g =
-      add_vertex({"g", 0b00'0000'1000 * B}, graph);
+      add_vertex({"g", not_external, 0b00'0000'1000 * B}, graph);
   const Graph::vertex_descriptor h =
-      add_vertex({"h", 0b00'0000'0100 * B}, graph);
+      add_vertex({"h", not_external, 0b00'0000'0100 * B}, graph);
   const Graph::vertex_descriptor i =
-      add_vertex({"i", 0b00'0000'0010 * B}, graph);
+      add_vertex({"i", not_external, 0b00'0000'0010 * B}, graph);
   const Graph::vertex_descriptor j =
-      add_vertex({"j", 0b00'0000'0001 * B}, graph);
+      add_vertex({"j", not_external, 0b00'0000'0001 * B}, graph);
 
   //      a
   //     / \

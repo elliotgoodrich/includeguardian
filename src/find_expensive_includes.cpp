@@ -169,6 +169,10 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
   std::for_each(
       std::execution::par, begin, end,
       [&](const Graph::edge_descriptor &include) {
+        // Skip files that come from external libraries
+        if (graph[source(include, graph)].is_external) {
+          return;
+        }
         DFSHelper helper(graph);
         const boost::units::quantity<boost::units::information::info> saved =
             std::accumulate(

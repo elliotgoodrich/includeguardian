@@ -87,9 +87,14 @@ int main(int argc, const char **argv) {
   stopwatch timer;
 
   std::vector<std::filesystem::path> include_dir_paths(include_dirs.size());
-  std::copy(include_dirs.begin(), include_dirs.end(), include_dir_paths.begin());
+  std::transform(
+      include_dirs.begin(), include_dirs.end(), include_dir_paths.begin(),
+      [](const std::string &s) { return std::filesystem::path(s); });
+
   llvm::Expected<build_graph::result> result = build_graph::from_dir(
-      dir, include_dir_paths, llvm::vfs::getRealFileSystem(), map_ext);
+      dir.getValue(),
+      include_dir_paths,
+      llvm::vfs::getRealFileSystem(), map_ext);
 
   if (!result) {
     // TODO: error message
@@ -108,8 +113,9 @@ int main(int argc, const char **argv) {
             << num_edges(graph) << " include directives.\n";
   if (!missing.empty()) {
     std::cout << "There are " << missing.size() << " missing files\n  ";
-    std::copy(missing.begin(), missing.end(),
-              std::ostream_iterator<std::filesystem::path>(std::cout, "  \n  "));
+    std::copy(
+        missing.begin(), missing.end(),
+        std::ostream_iterator<std::filesystem::path>(std::cout, "  \n  "));
   } else {
     std::cout << "All includes found :)";
   }

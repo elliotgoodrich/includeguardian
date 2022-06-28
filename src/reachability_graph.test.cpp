@@ -11,12 +11,18 @@ using namespace IncludeGuardian;
 namespace {
 
 const auto B = boost::units::information::byte;
+
+const bool not_external = false;
 TEST(ReachabilityGraphTest, DiamondIncludes) {
   Graph g;
-  const Graph::vertex_descriptor a = add_vertex({"a", 100 * B}, g);
-  const Graph::vertex_descriptor b = add_vertex({"b", 1000 * B}, g);
-  const Graph::vertex_descriptor c = add_vertex({"c", 2000 * B}, g);
-  const Graph::vertex_descriptor d = add_vertex({"d", 30000 * B}, g);
+  const Graph::vertex_descriptor a =
+      add_vertex({"a", not_external, 100 * B}, g);
+  const Graph::vertex_descriptor b =
+      add_vertex({"b", not_external, 1000 * B}, g);
+  const Graph::vertex_descriptor c =
+      add_vertex({"c", not_external, 2000 * B}, g);
+  const Graph::vertex_descriptor d =
+      add_vertex({"d", not_external, 30000 * B}, g);
 
   //      a
   //     / \
@@ -52,14 +58,22 @@ TEST(ReachabilityGraphTest, DiamondIncludes) {
 
 TEST(ReachabilityGraphTest, MultiLevel) {
   Graph graph;
-  const Graph::vertex_descriptor a = add_vertex({"a", 0 * B}, graph);
-  const Graph::vertex_descriptor b = add_vertex({"b", 0 * B}, graph);
-  const Graph::vertex_descriptor c = add_vertex({"c", 0 * B}, graph);
-  const Graph::vertex_descriptor d = add_vertex({"d", 0 * B}, graph);
-  const Graph::vertex_descriptor e = add_vertex({"e", 0 * B}, graph);
-  const Graph::vertex_descriptor f = add_vertex({"f", 0 * B}, graph);
-  const Graph::vertex_descriptor g = add_vertex({"g", 0 * B}, graph);
-  const Graph::vertex_descriptor h = add_vertex({"h", 0 * B}, graph);
+  const Graph::vertex_descriptor a =
+      add_vertex({"a", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor b =
+      add_vertex({"b", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor c =
+      add_vertex({"c", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor d =
+      add_vertex({"d", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor e =
+      add_vertex({"e", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor f =
+      add_vertex({"f", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor g =
+      add_vertex({"g", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor h =
+      add_vertex({"h", not_external, 0 * B}, graph);
 
   //      a   b
   //     / \ / \
@@ -111,16 +125,26 @@ TEST(ReachabilityGraphTest, MultiLevel) {
 
 TEST(ReachabilityGraphTest, LongChain) {
   Graph graph;
-  const Graph::vertex_descriptor a = add_vertex({"a", 0 * B}, graph);
-  const Graph::vertex_descriptor b = add_vertex({"b", 0 * B}, graph);
-  const Graph::vertex_descriptor c = add_vertex({"c", 0 * B}, graph);
-  const Graph::vertex_descriptor d = add_vertex({"d", 0 * B}, graph);
-  const Graph::vertex_descriptor e = add_vertex({"e", 0 * B}, graph);
-  const Graph::vertex_descriptor f = add_vertex({"f", 0 * B}, graph);
-  const Graph::vertex_descriptor g = add_vertex({"g", 0 * B}, graph);
-  const Graph::vertex_descriptor h = add_vertex({"h", 0 * B}, graph);
-  const Graph::vertex_descriptor i = add_vertex({"i", 0 * B}, graph);
-  const Graph::vertex_descriptor j = add_vertex({"j", 0 * B}, graph);
+  const Graph::vertex_descriptor a =
+      add_vertex({"a", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor b =
+      add_vertex({"b", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor c =
+      add_vertex({"c", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor d =
+      add_vertex({"d", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor e =
+      add_vertex({"e", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor f =
+      add_vertex({"f", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor g =
+      add_vertex({"g", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor h =
+      add_vertex({"h", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor i =
+      add_vertex({"i", not_external, 0 * B}, graph);
+  const Graph::vertex_descriptor j =
+      add_vertex({"j", not_external, 0 * B}, graph);
 
   //      a
   //     / \
