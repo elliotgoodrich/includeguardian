@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -23,7 +24,7 @@ struct build_graph {
   struct result {
     Graph graph;
     std::vector<Graph::vertex_descriptor> sources;
-    std::vector<std::filesystem::path> missing_files;
+    std::set<std::string> missing_includes;
   };
 
   enum class file_type {

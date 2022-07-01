@@ -108,14 +108,14 @@ int main(int argc, const char **argv) {
 
   const auto &graph = result->graph;
   const auto &sources = result->sources;
-  const auto &missing = result->missing_files;
+  const auto &missing = result->missing_includes;
   std::cout << "Found " << num_vertices(graph) << " files and "
             << num_edges(graph) << " include directives.\n";
   if (!missing.empty()) {
     std::cout << "There are " << missing.size() << " missing files\n  ";
     std::copy(
         missing.begin(), missing.end(),
-        std::ostream_iterator<std::filesystem::path>(std::cout, "  \n  "));
+        std::ostream_iterator<std::string>(std::cout, "  \n  "));
   } else {
     std::cout << "All includes found :)";
   }

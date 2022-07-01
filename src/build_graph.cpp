@@ -248,7 +248,8 @@ build_graph::from_dir(std::filesystem::path source_dir,
                     {include, sm->getSpellingLineNumber(tok.getLocation())},
                     r.graph);
               } else {
-                r.missing_files.emplace_back(include_text);
+                r.missing_includes.emplace(tok.getLiteralData(),
+                                           tok.getLength());
               }
               ++include_count;
             }
