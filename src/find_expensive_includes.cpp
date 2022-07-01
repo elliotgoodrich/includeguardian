@@ -1,6 +1,6 @@
 #include "find_expensive_includes.hpp"
 
-#ifdef NDEBUG
+#ifndef NDEBUG
 #include <boost/scope_exit.hpp>
 #endif
 
@@ -53,7 +53,7 @@ public:
 
     const Graph::vertex_descriptor includee = target(removed_edge, m_graph);
 
-#ifdef NDEBUG
+#ifndef NDEBUG
     // Make sure that we reset our temporary variable
     BOOST_SCOPE_EXIT(&m_stack) { assert(m_stack.empty()); }
     BOOST_SCOPE_EXIT_END
