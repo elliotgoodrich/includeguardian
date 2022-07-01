@@ -50,7 +50,8 @@ struct Arguments {
       : source_dir(source_dir), id_to_node() {}
 };
 
-// Return `[finished, ?file_size]`
+// Return `[finished, ?file_size]`, the behavior is undefined
+// unless `tok.getRawIdentifier() == "pragma"`.
 std::pair<bool, std::optional<
                     boost::units::quantity<boost::units::information::info>>>
 parse_pragma(clang::Lexer &lex, clang::Token &tok, unsigned &token_count) {
@@ -157,7 +158,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
     if (dir_ref) {
       clang::DirectoryLookup dir(
           *dir_ref, clang::SrcMgr::CharacteristicKind::C_User, is_framework);
-      const bool is_angled = false;
+      const bool is_angled = true;
       header_search.AddSearchPath(dir, is_angled);
     }
   }
@@ -202,14 +203,11 @@ build_graph::from_dir(std::filesystem::path source_dir,
         }
         if (tok.is(clang::tok::raw_identifier)) {
           if (tok.getRawIdentifier() == "include") {
-            if (lex.LexFromRawLexer(tok)) {
-              ++token_count;
-              break;
-            }
-            if (tok.getKind() == clang::tok::string_literal) {
+            lex.LexIncludeFilename(tok);
+            if (tok.getKind() == clang::tok::header_name) {
               const std::string_view include_text(tok.getLiteralData() + 1,
                                                   tok.getLength() - 2);
-              bool is_angled = false;
+              const bool is_angled = *tok.getLiteralData() == '<';
               const clang::DirectoryLookup *current_directory = nullptr;
               llvm::Expected<clang::DirectoryEntryRef> current_dir_ref =
                   file_manager->getDirectoryRef(source.string());

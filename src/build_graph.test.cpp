@@ -201,7 +201,7 @@ TEST(BuildGraphTest, ExternalCode) {
   fs->addFile((working_directory / src / "main1.cpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
                   "#include \"a.hpp\"\n"
-                  "#include \"b.hpp\"\n"
+                  "#include <b.hpp>\n"
                   "#pragma override_file_size(123)\n"));
   fs->addFile((working_directory / other / "a.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
@@ -219,7 +219,7 @@ TEST(BuildGraphTest, ExternalCode) {
       add_vertex({"b.hpp", external, 4812 * B}, g);
 
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
-  add_edge(main_cpp, a_hpp, {"\"b.hpp\"", 2}, g);
+  add_edge(main_cpp, a_hpp, {"<b.hpp>", 2}, g);
 
   llvm::Expected<build_graph::result> results = build_graph::from_dir(
       working_directory / src,
