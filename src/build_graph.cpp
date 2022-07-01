@@ -213,14 +213,14 @@ build_graph::from_dir(std::filesystem::path source_dir,
                   file_manager->getDirectoryRef(source.string());
               const clang::DirectoryEntry *y =
                   *file_manager->getDirectory(source.parent_path().string());
-              llvm::ArrayRef<std::pair<const clang::FileEntry *,
-                                       const clang::DirectoryEntry *>>
-                  includers = {{file_entry, y}};
+              const std::pair<const clang::FileEntry *,
+                              const clang::DirectoryEntry *>
+                  includer(file_entry, y);
               llvm::Optional<clang::FileEntryRef> file_ref =
                   header_search.LookupFile(
                       include_text, tok.getLastLoc(), is_angled, nullptr,
-                      current_directory, includers, nullptr, nullptr, nullptr,
-                      nullptr, nullptr, nullptr);
+                      current_directory, llvm::ArrayRef(includer), nullptr,
+                      nullptr, nullptr, nullptr, nullptr, nullptr);
               if (file_ref) {
                 auto const [to_it, inserted] =
                     id_to_node.emplace(file_ref->getUniqueID(), empty);
