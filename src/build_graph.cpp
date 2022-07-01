@@ -243,10 +243,13 @@ build_graph::from_dir(std::filesystem::path source_dir,
                 }
                 const std::string include(tok.getLiteralData(),
                                           tok.getLength());
-                add_edge(
-                    it->second.v, to_it->second.v,
-                    {include, sm->getSpellingLineNumber(tok.getLocation())},
-                    r.graph);
+                const std::filesystem::path p(
+                    file_ref.getValue().getFileEntry().getName().str());
+                const bool is_removable = p.stem() != source.stem();
+                add_edge(it->second.v, to_it->second.v,
+                         {include, sm->getSpellingLineNumber(tok.getLocation()),
+                          is_removable},
+                         r.graph);
               } else {
                 r.missing_includes.emplace(tok.getLiteralData(),
                                            tok.getLength());

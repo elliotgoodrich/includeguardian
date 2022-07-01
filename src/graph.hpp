@@ -31,6 +31,7 @@ class include_edge {
 public:
   std::string code;
   unsigned lineNumber;
+  bool is_removable = true;
 };
 
 std::ostream &operator<<(std::ostream &stream, const include_edge &value);

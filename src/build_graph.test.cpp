@@ -227,4 +227,27 @@ TEST(BuildGraphTest, ExternalCode) {
       get_file_type);
   check_equal(g, results->graph);
 }
+
+TEST(BuildGraphTest, UnremovableHeaders) {
+  Graph g;
+  const std::filesystem::path include = "include";
+  const Graph::vertex_descriptor a_cpp =
+      add_vertex({"a.cpp", not_external, 100 * B}, g);
+  const Graph::vertex_descriptor a_hpp =
+      add_vertex({"a.hpp", not_external, 1000 * B}, g);
+  const Graph::vertex_descriptor b_cpp =
+      add_vertex({"b.cpp", not_external, 100 * B}, g);
+  const Graph::vertex_descriptor b_hpp =
+      add_vertex({include / "b.hpp", not_external, 2000 * B}, g);
+  add_edge(a_cpp, a_hpp, {"\"a.hpp\"", 1, true}, g);
+  add_edge(b_cpp, b_hpp, {"\"include/b.hpp\"", 1, true}, g);
+
+  const std::filesystem::path working_directory = root / "working_dir";
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
+      make_file_system(g, working_directory);
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  check_equal(g, results->graph);
+}
+
 } // namespace

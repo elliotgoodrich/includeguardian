@@ -173,6 +173,11 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
         if (graph[source(include, graph)].is_external) {
           return;
         }
+
+        if (!graph[include].is_removable) {
+          return;
+        }
+
         DFSHelper helper(graph);
         const boost::units::quantity<boost::units::information::info> saved =
             std::accumulate(
