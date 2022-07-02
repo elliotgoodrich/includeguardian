@@ -28,13 +28,11 @@ struct find_expensive_files {
   static std::vector<file_and_cost>
   from_graph(const Graph &graph,
              std::span<const Graph::vertex_descriptor> sources,
-             boost::units::quantity<boost::units::information::info>
-                 minimum_size_cut_off = 0 * boost::units::information::bytes);
+             unsigned minimum_token_count_cut_off = 0u);
   static std::vector<file_and_cost>
   from_graph(const Graph &graph,
              std::initializer_list<Graph::vertex_descriptor> sources,
-             boost::units::quantity<boost::units::information::info>
-                 minimum_size_cut_off = 0 * boost::units::information::bytes);
+             unsigned minimum_token_count_cut_off = 0u);
 };
 
 } // namespace IncludeGuardian

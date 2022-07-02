@@ -19,6 +19,7 @@ public:
                               //< it will be unknown and generally unnecessary
                               //< as to what path it is relative to.
   bool is_external = false; //< Whether this file comes from an external library
+  unsigned token_count = 0u; //< Number of preprocessing tokens in the file
   boost::units::quantity<boost::units::information::info> file_size =
       0 * boost::units::information::bytes;
 };

@@ -50,54 +50,63 @@ struct Arguments {
       : source_dir(source_dir), id_to_node() {}
 };
 
-// Return `[finished, ?file_size]`, the behavior is undefined
-// unless `tok.getRawIdentifier() == "pragma"`.
-std::pair<bool, std::optional<
-                    boost::units::quantity<boost::units::information::info>>>
-parse_pragma(clang::Lexer &lex, clang::Token &tok, unsigned &token_count) {
+// Update `f`s `file_size` or `token_count` based on the `#pragma` stored in the
+// specified `tok`.  Return whether this is the end of the file.
+bool parse_pragma(clang::Lexer &lex, clang::Token &tok, unsigned &token_count,
+                  file_node &f, bool &token_count_overriden) {
   assert(tok.getRawIdentifier() == "pragma");
   if (lex.LexFromRawLexer(tok)) {
     ++token_count;
-    return {true, std::nullopt};
+    return true;
   }
   if (!tok.is(clang::tok::raw_identifier)) {
-    return {false, std::nullopt};
+    return false;
   }
 
-  if (tok.getRawIdentifier() != "override_file_size") {
-    return {false, std::nullopt};
+  const llvm::StringRef pragmas[] = {"override_file_size",
+                                     "override_token_count"};
+  const int type = std::find(std::begin(pragmas), std::end(pragmas),
+                             tok.getRawIdentifier()) -
+                   std::begin(pragmas);
+  if (type == 2) {
+    return false;
   }
 
   if (lex.LexFromRawLexer(tok)) {
     ++token_count;
-    return {true, std::nullopt};
+    return true;
   }
 
   if (!tok.is(clang::tok::l_paren)) {
-    return {false, std::nullopt};
+    return false;
   }
 
   if (lex.LexFromRawLexer(tok)) {
     ++token_count;
-    return {true, std::nullopt};
+    return true;
   }
 
   if (!tok.is(clang::tok::numeric_constant)) {
-    return {false, std::nullopt};
+    return false;
   }
 
-  const std::string_view file_size_str(tok.getLiteralData(), tok.getLength());
-  std::size_t file_size;
+  const std::string_view arg_str(tok.getLiteralData(), tok.getLength());
+  std::size_t arg;
   const auto [ptr, ec] =
-      std::from_chars(file_size_str.data(),
-                      file_size_str.data() + file_size_str.size(), file_size);
+      std::from_chars(arg_str.data(), arg_str.data() + arg_str.size(), arg);
   if (ec == std::errc()) {
-    return {false, file_size * boost::units::information::bytes};
+    if (type == 0) {
+      f.file_size = arg * boost::units::information::bytes;
+    } else {
+      f.token_count = arg;
+      token_count_overriden = true;
+    }
+    return false;
   }
 
   // TODO, finish the closing paren
 
-  return {false, std::nullopt};
+  return false;
 }
 
 } // namespace
@@ -180,11 +189,13 @@ build_graph::from_dir(std::filesystem::path source_dir,
     if (inserted) {
       const bool is_external = false;
       it->second.v =
-          add_vertex({source.lexically_relative(source_dir), is_external,
+          add_vertex({source.lexically_relative(source_dir), is_external, 0u,
                       file_entry->getSize() * boost::units::information::bytes},
                      r.graph);
       r.sources.emplace_back(it->second.v);
     }
+
+    bool token_count_overriden = false;
 
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
         file_manager->getBufferForFile(file_entry);
@@ -235,7 +246,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
                                           current_directory->getName()))
                                     : source_dir;
                     to_it->second.v =
-                        add_vertex({p.lexically_relative(dir), is_external,
+                        add_vertex({p.lexically_relative(dir), is_external, 0u,
                                     static_cast<double>(file_ref->getSize()) *
                                         boost::units::information::bytes},
                                    r.graph);
@@ -257,17 +268,16 @@ build_graph::from_dir(std::filesystem::path source_dir,
               ++include_count;
             }
           } else if (tok.getRawIdentifier() == "pragma") {
-            const auto [finished, file_size] =
-                parse_pragma(lex, tok, token_count);
-            if (file_size.has_value()) {
-              r.graph[it->second.v].file_size = *file_size;
-            }
-            if (finished) {
+            if (parse_pragma(lex, tok, token_count, r.graph[it->second.v],
+                             token_count_overriden)) {
               break;
             }
           }
         }
       }
+    }
+    if (!token_count_overriden) {
+      r.graph[it->second.v].token_count = token_count;
     }
     it->second.fully_processed = true;
   }

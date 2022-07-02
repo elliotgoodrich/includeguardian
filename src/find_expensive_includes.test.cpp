@@ -16,20 +16,20 @@ const bool not_external = false;
 
 bool test_sort(const include_directive_and_cost &lhs,
                const include_directive_and_cost &rhs) {
-  return std::tie(lhs.file, lhs.include->code, lhs.saving) <
-         std::tie(rhs.file, rhs.include->code, rhs.saving);
+  return std::tie(lhs.file, lhs.include->code, lhs.file_size, lhs.token_count) <
+         std::tie(rhs.file, rhs.include->code, rhs.file_size, rhs.token_count);
 }
 
 TEST(FindExpensiveIncludesTest, DiamondIncludes) {
   Graph graph;
   const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 0b1000 * B}, graph);
+      add_vertex({"a", not_external, 1u, 0b1000 * B}, graph);
   const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 0b0100 * B}, graph);
+      add_vertex({"b", not_external, 2u, 0b0100 * B}, graph);
   const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 0b0010 * B}, graph);
+      add_vertex({"c", not_external, 4u, 0b0010 * B}, graph);
   const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 0b0001 * B}, graph);
+      add_vertex({"d", not_external, 8u, 0b0001 * B}, graph);
 
   //      a
   //     / \
@@ -42,11 +42,11 @@ TEST(FindExpensiveIncludesTest, DiamondIncludes) {
   const Graph::edge_descriptor c_to_d = add_edge(c, d, {"c->d"}, graph).first;
 
   std::vector<include_directive_and_cost> actual =
-      find_expensive_includes::from_graph(graph, {a}, 1 * B);
+      find_expensive_includes::from_graph(graph, {a}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<include_directive_and_cost> expected = {
-      {"a", graph[b].file_size, &graph[a_to_b]},
-      {"a", graph[c].file_size, &graph[a_to_c]},
+      {"a", graph[b].file_size, 2u, &graph[a_to_b]},
+      {"a", graph[c].file_size, 4u, &graph[a_to_c]},
   };
   EXPECT_EQ(actual, expected);
 }
@@ -54,21 +54,21 @@ TEST(FindExpensiveIncludesTest, DiamondIncludes) {
 TEST(FindExpensiveIncludesTest, MultiLevel) {
   Graph graph;
   const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 0b1000'0000 * B}, graph);
+      add_vertex({"a", not_external, 1u, 0b1000'0000 * B}, graph);
   const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 0b0100'0000 * B}, graph);
+      add_vertex({"b", not_external, 2u, 0b0100'0000 * B}, graph);
   const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 0b0010'0000 * B}, graph);
+      add_vertex({"c", not_external, 4u, 0b0010'0000 * B}, graph);
   const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 0b0001'0000 * B}, graph);
+      add_vertex({"d", not_external, 8u, 0b0001'0000 * B}, graph);
   const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 0b0000'1000 * B}, graph);
+      add_vertex({"e", not_external, 16u, 0b0000'1000 * B}, graph);
   const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 0b0000'0100 * B}, graph);
+      add_vertex({"f", not_external, 32u, 0b0000'0100 * B}, graph);
   const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 0b0000'0010 * B}, graph);
+      add_vertex({"g", not_external, 64u, 0b0000'0010 * B}, graph);
   const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 0b0000'0001 * B}, graph);
+      add_vertex({"h", not_external, 128u, 0b0000'0001 * B}, graph);
 
   //      a   b
   //     / \ / \
@@ -89,16 +89,18 @@ TEST(FindExpensiveIncludesTest, MultiLevel) {
   const Graph::edge_descriptor g_to_h = add_edge(g, h, {"g->h"}, graph).first;
 
   std::vector<include_directive_and_cost> actual =
-      find_expensive_includes::from_graph(graph, {a, b}, 1 * B);
+      find_expensive_includes::from_graph(graph, {a, b}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<include_directive_and_cost> expected = {
-      {"a", graph[c].file_size, &graph[a_to_c]},
-      {"a", graph[d].file_size, &graph[a_to_d]},
-      {"b", graph[d].file_size + graph[f].file_size, &graph[b_to_d]},
-      {"b", graph[e].file_size + graph[g].file_size, &graph[b_to_e]},
-      {"d", graph[f].file_size, &graph[d_to_f]},
-      {"e", graph[g].file_size, &graph[e_to_g]},
-      {"f", graph[h].file_size, &graph[f_to_h]},
+      {"a", graph[c].file_size, graph[c].token_count, &graph[a_to_c]},
+      {"a", graph[d].file_size, graph[d].token_count, &graph[a_to_d]},
+      {"b", graph[d].file_size + graph[f].file_size,
+       graph[d].token_count + graph[f].token_count, &graph[b_to_d]},
+      {"b", graph[e].file_size + graph[g].file_size,
+       graph[e].token_count + graph[g].token_count, &graph[b_to_e]},
+      {"d", graph[f].file_size, graph[f].token_count, &graph[d_to_f]},
+      {"e", graph[g].file_size, graph[g].token_count, &graph[e_to_g]},
+      {"f", graph[h].file_size, graph[h].token_count, &graph[f_to_h]},
   };
   EXPECT_EQ(actual, expected);
 }
@@ -106,25 +108,25 @@ TEST(FindExpensiveIncludesTest, MultiLevel) {
 TEST(FindExpensiveIncludesTest, LongChain) {
   Graph graph;
   const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 0b10'0000'0000 * B}, graph);
+      add_vertex({"a", not_external, 1u, 0b10'0000'0000 * B}, graph);
   const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 0b01'0000'0000 * B}, graph);
+      add_vertex({"b", not_external, 2u, 0b01'0000'0000 * B}, graph);
   const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 0b00'1000'0000 * B}, graph);
+      add_vertex({"c", not_external, 4u, 0b00'1000'0000 * B}, graph);
   const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 0b00'0100'0000 * B}, graph);
+      add_vertex({"d", not_external, 8u, 0b00'0100'0000 * B}, graph);
   const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 0b00'0010'0000 * B}, graph);
+      add_vertex({"e", not_external, 16u, 0b00'0010'0000 * B}, graph);
   const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 0b00'0001'0000 * B}, graph);
+      add_vertex({"f", not_external, 32u, 0b00'0001'0000 * B}, graph);
   const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 0b00'0000'1000 * B}, graph);
+      add_vertex({"g", not_external, 64u, 0b00'0000'1000 * B}, graph);
   const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 0b00'0000'0100 * B}, graph);
+      add_vertex({"h", not_external, 128u, 0b00'0000'0100 * B}, graph);
   const Graph::vertex_descriptor i =
-      add_vertex({"i", not_external, 0b00'0000'0010 * B}, graph);
+      add_vertex({"i", not_external, 256u, 0b00'0000'0010 * B}, graph);
   const Graph::vertex_descriptor j =
-      add_vertex({"j", not_external, 0b00'0000'0001 * B}, graph);
+      add_vertex({"j", not_external, 512u, 0b00'0000'0001 * B}, graph);
 
   //      a
   //     / \
@@ -154,14 +156,14 @@ TEST(FindExpensiveIncludesTest, LongChain) {
   const Graph::edge_descriptor i_to_j = add_edge(i, j, {"i->j"}, graph).first;
 
   std::vector<include_directive_and_cost> actual =
-      find_expensive_includes::from_graph(graph, {a}, 1 * B);
+      find_expensive_includes::from_graph(graph, {a}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<include_directive_and_cost> expected = {
-      {"a", graph[b].file_size, &graph[a_to_b]},
-      {"a", graph[c].file_size, &graph[a_to_c]},
-      {"d", graph[e].file_size, &graph[d_to_e]},
-      {"d", graph[f].file_size, &graph[d_to_f]},
-      {"g", graph[h].file_size, &graph[g_to_h]},
+      {"a", graph[b].file_size, graph[b].token_count, &graph[a_to_b]},
+      {"a", graph[c].file_size, graph[c].token_count, &graph[a_to_c]},
+      {"d", graph[e].file_size, graph[e].token_count, &graph[d_to_e]},
+      {"d", graph[f].file_size, graph[f].token_count, &graph[d_to_f]},
+      {"g", graph[h].file_size, graph[h].token_count, &graph[g_to_h]},
   };
   EXPECT_EQ(actual, expected);
 }

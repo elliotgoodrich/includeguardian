@@ -26,8 +26,7 @@ std::ostream &operator<<(std::ostream &out, const file_and_cost &v) {
 
 std::vector<file_and_cost> find_expensive_files::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
-    boost::units::quantity<boost::units::information::info>
-        minimum_size_cut_off) {
+    const unsigned minimum_token_count_cut_off) {
   reachability_graph reach(graph);
   std::mutex m;
   std::vector<file_and_cost> results;
@@ -42,7 +41,8 @@ std::vector<file_and_cost> find_expensive_files::from_graph(
               return count + reach.is_reachable(source, file);
             });
 
-        if (reachable_count * graph[file].file_size >= minimum_size_cut_off) {
+        if (reachable_count * graph[file].token_count >=
+            minimum_token_count_cut_off) {
           // There are ways to avoid this mutex, but if the
           // `minimum_size_cut_off` is large enough, it's relatively rare to
           // enter this if statement
@@ -55,10 +55,9 @@ std::vector<file_and_cost> find_expensive_files::from_graph(
 
 std::vector<file_and_cost> find_expensive_files::from_graph(
     const Graph &graph, std::initializer_list<Graph::vertex_descriptor> sources,
-    boost::units::quantity<boost::units::information::info>
-        minimum_size_cut_off) {
+    const unsigned minimum_token_count_cut_off) {
   return from_graph(graph, std::span(sources.begin(), sources.end()),
-                    minimum_size_cut_off);
+                    minimum_token_count_cut_off);
 }
 
 } // namespace IncludeGuardian

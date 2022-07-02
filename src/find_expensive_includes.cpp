@@ -23,6 +23,15 @@ namespace IncludeGuardian {
 
 namespace {
 
+struct cost {
+  boost::units::quantity<boost::units::information::info> file_size;
+  unsigned token_count;
+};
+
+cost operator+(cost lhs, cost rhs) {
+  return {lhs.file_size + rhs.file_size, lhs.token_count + rhs.token_count};
+}
+
 class DFSHelper {
   enum class search_state : std::uint8_t {
     not_seen,      // not found yet
@@ -45,9 +54,8 @@ public:
 
   // Return the total file size for all vertices that are unreachable from
   // `source` through `removed_edge` in the graph specified at constructon.
-  boost::units::quantity<boost::units::information::info>
-  total_file_size_of_unreachable(Graph::vertex_descriptor from,
-                                 Graph::edge_descriptor removed_edge) {
+  cost total_file_size_of_unreachable(Graph::vertex_descriptor from,
+                                      Graph::edge_descriptor removed_edge) {
     std::fill(m_state.get(), m_state.get() + num_vertices(m_graph),
               search_state::not_seen);
 
@@ -93,7 +101,7 @@ public:
         const Graph::vertex_descriptor w = target(e, m_graph);
         if (w == includee) {
           m_stack.clear();
-          return 0u;
+          return {};
         }
 
         m_stack.push_back(w);
@@ -104,10 +112,10 @@ public:
     // we're removing, then there's no gains to be had
     const Graph::vertex_descriptor includer = source(removed_edge, m_graph);
     if (m_state[includer] == search_state::not_seen) {
-      return 0u;
+      return {};
     }
 
-    boost::units::quantity<boost::units::information::info> savings;
+    cost savings = {};
 
     // Once all found vertices are marked, we DFS from `target(removed_edge)`
     // only looking at unmarked vertices and summing up their file sizes
@@ -122,7 +130,8 @@ public:
       case search_state::not_seen:
         // If we didn't see this file when we skipped `removed_edge` then we
         // will get that saving
-        savings += m_graph[v].file_size;
+        savings.file_size += m_graph[v].file_size;
+        savings.token_count += m_graph[v].token_count;
         [[fallthrough]];
       case search_state::seen_initial:
         // If we already saw this file, we don't get a saving but need to
@@ -143,7 +152,7 @@ public:
 bool operator==(const include_directive_and_cost &lhs,
                 const include_directive_and_cost &rhs) {
   return lhs.file == rhs.file && lhs.include == rhs.include &&
-         lhs.saving == rhs.saving;
+         lhs.file_size == rhs.file_size && lhs.token_count == rhs.token_count;
 }
 
 bool operator!=(const include_directive_and_cost &lhs,
@@ -155,13 +164,12 @@ std::ostream &operator<<(std::ostream &out,
                          const include_directive_and_cost &v) {
   return out << "[" << v.file << "#L" << v.include->lineNumber << ", "
              << v.include->code << ", " << std::setprecision(2) << std::fixed
-             << v.saving << ']';
+             << v.file_size << ", " << v.token_count << ']';
 }
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
-    const boost::units::quantity<boost::units::information::info>
-        minimum_size_cut_off) {
+    const unsigned minimum_token_count_cut_off) {
 
   std::mutex m;
   std::vector<include_directive_and_cost> results;
@@ -179,24 +187,21 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
         }
 
         DFSHelper helper(graph);
-        const boost::units::quantity<boost::units::information::info> saved =
-            std::accumulate(
-                sources.begin(), sources.end(),
-                0 * boost::units::information::bytes,
-                [&](boost::units::quantity<boost::units::information::info> acc,
-                    Graph::vertex_descriptor source) {
-                  return acc +
-                         helper.total_file_size_of_unreachable(source, include);
-                });
+        const cost saved = std::accumulate(
+            sources.begin(), sources.end(), cost{},
+            [&](cost acc, Graph::vertex_descriptor source) {
+              return acc +
+                     helper.total_file_size_of_unreachable(source, include);
+            });
 
-        if (saved >= minimum_size_cut_off) {
+        if (saved.token_count >= minimum_token_count_cut_off) {
           // There are ways to avoid this mutex, but if the
-          // `minimum_size_cut_off` is large enough, it's relatively rare to
-          // enter this if statement
+          // `minimum_token_count_cut_off` is large enough, it's
+          // relatively rare to enter this if statement
           std::lock_guard g(m);
           results.emplace_back(
-              std::filesystem::path(graph[source(include, graph)].path), saved,
-              &graph[include]);
+              std::filesystem::path(graph[source(include, graph)].path),
+              saved.file_size, saved.token_count, &graph[include]);
         }
       });
   return results;
@@ -204,10 +209,9 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::initializer_list<Graph::vertex_descriptor> sources,
-    boost::units::quantity<boost::units::information::info>
-        minimum_size_cut_off) {
+    const unsigned minimum_token_count_cut_off) {
   return from_graph(graph, std::span(sources.begin(), sources.end()),
-                    minimum_size_cut_off);
+                    minimum_token_count_cut_off);
 }
 
 } // namespace IncludeGuardian

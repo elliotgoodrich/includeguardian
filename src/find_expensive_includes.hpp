@@ -14,7 +14,8 @@ namespace IncludeGuardian {
 
 struct include_directive_and_cost {
   std::filesystem::path file;
-  boost::units::quantity<boost::units::information::info> saving;
+  boost::units::quantity<boost::units::information::info> file_size;
+  unsigned token_count;
   const include_edge *include;
 };
 
@@ -31,13 +32,11 @@ struct find_expensive_includes {
   static std::vector<include_directive_and_cost>
   from_graph(const Graph &graph,
              std::span<const Graph::vertex_descriptor> sources,
-             boost::units::quantity<boost::units::information::info>
-                 minimum_size_cut_off = 0 * boost::units::information::bytes);
+             unsigned minimum_token_count_cut_off = 0u);
   static std::vector<include_directive_and_cost>
   from_graph(const Graph &graph,
              std::initializer_list<Graph::vertex_descriptor> sources,
-             boost::units::quantity<boost::units::information::info>
-                 minimum_size_cut_off = 0 * boost::units::information::bytes);
+             unsigned minimum_token_count_cut_off = 0u);
 };
 
 } // namespace IncludeGuardian

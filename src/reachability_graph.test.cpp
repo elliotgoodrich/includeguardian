@@ -16,13 +16,13 @@ const bool not_external = false;
 TEST(ReachabilityGraphTest, DiamondIncludes) {
   Graph g;
   const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 100 * B}, g);
+      add_vertex({"a", not_external, 0u, 100 * B}, g);
   const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 1000 * B}, g);
+      add_vertex({"b", not_external, 0u, 1000 * B}, g);
   const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 2000 * B}, g);
+      add_vertex({"c", not_external, 0u, 2000 * B}, g);
   const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 30000 * B}, g);
+      add_vertex({"d", not_external, 0u, 30000 * B}, g);
 
   //      a
   //     / \
@@ -59,21 +59,21 @@ TEST(ReachabilityGraphTest, DiamondIncludes) {
 TEST(ReachabilityGraphTest, MultiLevel) {
   Graph graph;
   const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 0 * B}, graph);
+      add_vertex({"a", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 0 * B}, graph);
+      add_vertex({"b", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 0 * B}, graph);
+      add_vertex({"c", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 0 * B}, graph);
+      add_vertex({"d", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 0 * B}, graph);
+      add_vertex({"e", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 0 * B}, graph);
+      add_vertex({"f", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 0 * B}, graph);
+      add_vertex({"g", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 0 * B}, graph);
+      add_vertex({"h", not_external, 0u, 0 * B}, graph);
 
   //      a   b
   //     / \ / \
@@ -126,25 +126,25 @@ TEST(ReachabilityGraphTest, MultiLevel) {
 TEST(ReachabilityGraphTest, LongChain) {
   Graph graph;
   const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 0 * B}, graph);
+      add_vertex({"a", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 0 * B}, graph);
+      add_vertex({"b", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 0 * B}, graph);
+      add_vertex({"c", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 0 * B}, graph);
+      add_vertex({"d", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 0 * B}, graph);
+      add_vertex({"e", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 0 * B}, graph);
+      add_vertex({"f", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 0 * B}, graph);
+      add_vertex({"g", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 0 * B}, graph);
+      add_vertex({"h", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor i =
-      add_vertex({"i", not_external, 0 * B}, graph);
+      add_vertex({"i", not_external, 0u, 0 * B}, graph);
   const Graph::vertex_descriptor j =
-      add_vertex({"j", not_external, 0 * B}, graph);
+      add_vertex({"j", not_external, 0u, 0 * B}, graph);
 
   //      a
   //     / \
