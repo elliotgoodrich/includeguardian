@@ -1,6 +1,7 @@
 #include "build_graph.hpp"
 #include "dot_graph.hpp"
 #include "find_expensive_files.hpp"
+#include "find_expensive_headers.hpp"
 #include "find_expensive_includes.hpp"
 #include "get_total_cost.hpp"
 #include "graph.hpp"
@@ -159,6 +160,27 @@ int main(int argc, const char **argv) {
                   << percentage << "%) from " << i.file.filename().string()
                   << "L#" << i.include->lineNumber << " remove #include "
                   << i.include->code << "\n";
+      }
+    }
+
+    {
+      std::vector<find_expensive_headers::result> results =
+          find_expensive_headers::from_graph(
+              graph, sources, total_project_cost.token_count * percent_cut_off);
+      std::cout << "\nHeaders analyzed in "
+                << duration_cast<std::chrono::milliseconds>(timer.restart())
+                << "\n";
+      std::sort(results.begin(), results.end(),
+                [](const find_expensive_headers::result &l,
+                   const find_expensive_headers::result &r) {
+                  return l.token_count > r.token_count;
+                });
+      for (const find_expensive_headers::result &i : results) {
+        const double percentage =
+            (100.0 * i.token_count) / total_project_cost.token_count;
+        std::cout << std::setprecision(2) << std::fixed << i.token_count << " ("
+                  << percentage << "%) removing references to "
+                  << graph[i.v].path << "\n";
       }
     }
 

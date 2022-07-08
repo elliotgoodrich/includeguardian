@@ -34,6 +34,7 @@ add_library(
     build_graph.hpp build_graph.cpp
     dot_graph.hpp dot_graph.cpp
     find_expensive_files.hpp find_expensive_files.cpp
+    find_expensive_headers.hpp find_expensive_headers.cpp
     find_expensive_includes.hpp find_expensive_includes.cpp
     get_total_cost.hpp get_total_cost.cpp
     reachability_graph.hpp
@@ -61,6 +62,7 @@ add_executable(
     build_graph.test.cpp
     dot_graph.test.cpp
     find_expensive_files.test.cpp
+    find_expensive_headers.test.cpp
     find_expensive_includes.test.cpp
     get_total_cost.test.cpp
     reachability_graph.test.cpp
