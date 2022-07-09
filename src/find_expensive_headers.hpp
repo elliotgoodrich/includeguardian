@@ -13,8 +13,7 @@ namespace IncludeGuardian {
 struct find_expensive_headers {
     struct result {
         Graph::vertex_descriptor v;
-        unsigned token_count;
-  boost::units::quantity<boost::units::information::info> saved_file_size;
+        cost saving;
         unsigned sources_count;
     };
 

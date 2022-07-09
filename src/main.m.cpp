@@ -132,8 +132,7 @@ int main(int argc, const char **argv) {
     return 0;
   }
   case output::most_expensive: {
-    const get_total_cost::result total_project_cost =
-        get_total_cost::from_graph(graph, sources);
+    const cost total_project_cost = get_total_cost::from_graph(graph, sources);
     std::cout << "Total file size found " << std::setprecision(2) << std::fixed
               << boost::units::binary_prefix << total_project_cost.file_size
               << " and " << total_project_cost.token_count
@@ -151,15 +150,15 @@ int main(int argc, const char **argv) {
       std::sort(results.begin(), results.end(),
                 [](const include_directive_and_cost &l,
                    const include_directive_and_cost &r) {
-                  return l.token_count > r.token_count;
+                  return l.saving.token_count > r.saving.token_count;
                 });
       for (const include_directive_and_cost &i : results) {
         const double percentage =
-            (100.0 * i.token_count) / total_project_cost.token_count;
-        std::cout << std::setprecision(2) << std::fixed << i.token_count << " ("
-                  << percentage << "%) from " << i.file.filename().string()
-                  << "L#" << i.include->lineNumber << " remove #include "
-                  << i.include->code << "\n";
+            (100.0 * i.saving.token_count) / total_project_cost.token_count;
+        std::cout << std::setprecision(2) << std::fixed << i.saving.token_count
+                  << " (" << percentage << "%) from "
+                  << i.file.filename().string() << "L#" << i.include->lineNumber
+                  << " remove #include " << i.include->code << "\n";
       }
     }
 
@@ -173,13 +172,13 @@ int main(int argc, const char **argv) {
       std::sort(results.begin(), results.end(),
                 [](const find_expensive_headers::result &l,
                    const find_expensive_headers::result &r) {
-                  return l.token_count > r.token_count;
+                  return l.saving.token_count > r.saving.token_count;
                 });
       for (const find_expensive_headers::result &i : results) {
         const double percentage =
-            (100.0 * i.token_count) / total_project_cost.token_count;
-        std::cout << std::setprecision(2) << std::fixed << i.token_count << " ("
-                  << percentage << "%) removing references to "
+            (100.0 * i.saving.token_count) / total_project_cost.token_count;
+        std::cout << std::setprecision(2) << std::fixed << i.saving.token_count
+                  << " (" << percentage << "%) removing references to "
                   << graph[i.v].path << "\n";
       }
     }
@@ -193,15 +192,16 @@ int main(int argc, const char **argv) {
       std::cout << "\nFiles analyzed in "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())
                 << "\n";
-      std::sort(
-          results.begin(), results.end(),
-          [](const file_and_cost &l, const file_and_cost &r) {
-            return static_cast<std::size_t>(l.node->token_count) * l.sources >
-                   static_cast<std::size_t>(r.node->token_count) * r.sources;
-          });
+      std::sort(results.begin(), results.end(),
+                [](const file_and_cost &l, const file_and_cost &r) {
+                  return static_cast<std::size_t>(l.node->cost.token_count) *
+                             l.sources >
+                         static_cast<std::size_t>(r.node->cost.token_count) *
+                             r.sources;
+                });
       for (const file_and_cost &i : results) {
         const unsigned saving =
-            i.sources * assumed_reduction * i.node->token_count;
+            i.sources * assumed_reduction * i.node->cost.token_count;
         const double percentage =
             (100.0 * saving) / total_project_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed << saving << " ("

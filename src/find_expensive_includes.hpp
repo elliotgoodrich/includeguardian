@@ -14,8 +14,7 @@ namespace IncludeGuardian {
 
 struct include_directive_and_cost {
   std::filesystem::path file;
-  boost::units::quantity<boost::units::information::info> file_size;
-  unsigned token_count;
+  cost saving;
   const include_edge *include;
 };
 

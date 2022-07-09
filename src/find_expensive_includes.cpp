@@ -23,15 +23,6 @@ namespace IncludeGuardian {
 
 namespace {
 
-struct cost {
-  boost::units::quantity<boost::units::information::info> file_size;
-  unsigned token_count;
-};
-
-cost operator+(cost lhs, cost rhs) {
-  return {lhs.file_size + rhs.file_size, lhs.token_count + rhs.token_count};
-}
-
 class DFSHelper {
   enum class search_state : std::uint8_t {
     not_seen,      // not found yet
@@ -115,7 +106,7 @@ public:
       return {};
     }
 
-    cost savings = {};
+    cost savings;
 
     // Once all found vertices are marked, we DFS from `target(removed_edge)`
     // only looking at unmarked vertices and summing up their file sizes
@@ -130,8 +121,7 @@ public:
       case search_state::not_seen:
         // If we didn't see this file when we skipped `removed_edge` then we
         // will get that saving
-        savings.file_size += m_graph[v].file_size;
-        savings.token_count += m_graph[v].token_count;
+        savings += m_graph[v].cost;
         [[fallthrough]];
       case search_state::seen_initial:
         // If we already saw this file, we don't get a saving but need to
@@ -152,7 +142,7 @@ public:
 bool operator==(const include_directive_and_cost &lhs,
                 const include_directive_and_cost &rhs) {
   return lhs.file == rhs.file && lhs.include == rhs.include &&
-         lhs.file_size == rhs.file_size && lhs.token_count == rhs.token_count;
+         lhs.saving == rhs.saving;
 }
 
 bool operator!=(const include_directive_and_cost &lhs,
@@ -163,8 +153,7 @@ bool operator!=(const include_directive_and_cost &lhs,
 std::ostream &operator<<(std::ostream &out,
                          const include_directive_and_cost &v) {
   return out << "[" << v.file << "#L" << v.include->lineNumber << ", "
-             << v.include->code << ", " << std::setprecision(2) << std::fixed
-             << v.file_size << ", " << v.token_count << ']';
+             << v.include->code << ' ' << v.saving << ']';
 }
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
@@ -200,8 +189,8 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
           // relatively rare to enter this if statement
           std::lock_guard g(m);
           results.emplace_back(
-              std::filesystem::path(graph[source(include, graph)].path),
-              saved.file_size, saved.token_count, &graph[include]);
+              std::filesystem::path(graph[source(include, graph)].path), saved,
+              &graph[include]);
         }
       });
   return results;

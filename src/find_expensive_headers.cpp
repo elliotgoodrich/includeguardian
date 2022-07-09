@@ -17,19 +17,6 @@ namespace IncludeGuardian {
 
 namespace {
 
-struct cost {
-  boost::units::quantity<boost::units::information::info> file_size;
-  unsigned token_count;
-};
-
-cost operator+(cost lhs, cost rhs) {
-  return {lhs.file_size + rhs.file_size, lhs.token_count + rhs.token_count};
-}
-
-cost operator-(cost lhs, cost rhs) {
-  return {lhs.file_size - rhs.file_size, lhs.token_count - rhs.token_count};
-}
-
 class DFSHelper {
   enum search_state : std::uint8_t {
     not_seen, // not found yet
@@ -67,7 +54,7 @@ public:
 #endif
     std::vector<Graph::vertex_descriptor> descendents;
 
-    cost total_size = {};
+    cost total_size;
 
     // Do a DFS from `source`, skipping the `removed_edge`, and add all vertices
     // found to `marked`.
@@ -79,8 +66,7 @@ public:
         continue;
       }
 
-      total_size.file_size += m_graph[v].file_size;
-      total_size.token_count += m_graph[v].token_count;
+      total_size += m_graph[v].cost;
       m_reachable[v] = true;
       m_state[v] = seen;
       descendents.emplace_back(v);
@@ -88,7 +74,7 @@ public:
       m_stack.insert(m_stack.end(), begin, end);
     }
 
-    cost savings = {};
+    cost savings;
 
     for (const Graph::vertex_descriptor source : sources) {
       // No need to consider the case where we are trying to remove a source
@@ -109,7 +95,7 @@ public:
       m_state[file] = seen;
 
       // Assume we save the total cost of `file` and all its dependencies
-      savings = savings + total_size;
+      savings += total_size;
 
       // Once all found vertices are marked, we DFS from `file`
       // only looking at unmarked vertices and summing up their file sizes
@@ -123,8 +109,7 @@ public:
 
         if (m_reachable[v]) {
           // Undo
-          savings =
-              savings - cost{m_graph[v].file_size, m_graph[v].token_count};
+          savings -= m_graph[v].cost;
         }
 
         m_state[v] = seen;
@@ -164,8 +149,7 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
       // rare to enter this if statement
       std::lock_guard g(m);
       const unsigned sources_count = 0u; // FIX
-      results.emplace_back(file, saving.token_count, saving.file_size,
-                           sources_count);
+      results.emplace_back(file, saving, sources_count);
     }
   });
   return results;
@@ -181,8 +165,7 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
 
 bool operator==(const find_expensive_headers::result &lhs,
                 const find_expensive_headers::result &rhs) {
-  return lhs.v == rhs.v && lhs.saved_file_size == rhs.saved_file_size &&
-         lhs.token_count == rhs.token_count &&
+  return lhs.v == rhs.v && lhs.saving == rhs.saving &&
          lhs.sources_count == rhs.sources_count;
 }
 
@@ -193,9 +176,8 @@ bool operator!=(const find_expensive_headers::result &lhs,
 
 std::ostream &operator<<(std::ostream &out,
                          const find_expensive_headers::result &v) {
-  return out << '[' << v.v << " file_size=" << v.saved_file_size
-             << " sources_count=" << v.sources_count
-             << " token_count=" << v.token_count << ']';
+  return out << '[' << v.v << " saving=" << v.saving
+             << " sources_count=" << v.sources_count << ']';
 }
 
 } // namespace IncludeGuardian

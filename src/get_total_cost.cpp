@@ -28,9 +28,9 @@ public:
 
   // Return the total file size for all vertices that are reachable from
   // `source`.
-  get_total_cost::result total_file_size(Graph::vertex_descriptor source) {
+  cost total_file_size(Graph::vertex_descriptor source) {
 
-    get_total_cost::result total = {};
+    cost total;
     // Make sure that we reset our temporary variables
     BOOST_SCOPE_EXIT(&m_state, &m_stack) {
       std::fill(m_state.begin(), m_state.end(), search_state::not_seen);
@@ -49,8 +49,7 @@ public:
       }
 
       m_state[v] = search_state::seen;
-      total.file_size += m_graph[v].file_size;
-      total.token_count += m_graph[v].token_count;
+      total += m_graph[v].cost;
 
       const auto [begin, end] = adjacent_vertices(v, m_graph);
       m_stack.insert(m_stack.end(), begin, end);
@@ -62,36 +61,21 @@ public:
 
 } // namespace
 
-get_total_cost::result
+cost
 get_total_cost::from_graph(const Graph &graph,
                            std::span<const Graph::vertex_descriptor> sources) {
   DFSSizeHelper helper(graph);
-  get_total_cost::result total = {};
+  cost total;
   for (const Graph::vertex_descriptor source : sources) {
-    const get_total_cost::result sub_total = helper.total_file_size(source);
-    total.file_size += sub_total.file_size;
-    total.token_count += sub_total.token_count;
+    total += helper.total_file_size(source);
   }
   return total;
 }
 
-get_total_cost::result get_total_cost::from_graph(
+cost get_total_cost::from_graph(
     const Graph &graph,
     std::initializer_list<Graph::vertex_descriptor> sources) {
   return from_graph(graph, std::span(sources.begin(), sources.end()));
-}
-
-bool operator==(const get_total_cost::result &lhs,
-                const get_total_cost::result &rhs) {
-    return lhs.file_size == rhs.file_size && lhs.token_count == rhs.token_count;
-}
-bool operator!=(const get_total_cost::result &lhs,
-                const get_total_cost::result &rhs) {
-    return !(lhs == rhs);
-}
-std::ostream &operator<<(std::ostream &out,
-                         const get_total_cost::result &v) {
-    return out << "file_size=" << v.file_size << " token_count=" << v.token_count;
 }
 
 } // namespace IncludeGuardian

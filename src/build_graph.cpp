@@ -96,9 +96,9 @@ bool parse_pragma(clang::Lexer &lex, clang::Token &tok, unsigned &token_count,
       std::from_chars(arg_str.data(), arg_str.data() + arg_str.size(), arg);
   if (ec == std::errc()) {
     if (type == 0) {
-      f.file_size = arg * boost::units::information::bytes;
+      f.cost.file_size = arg * boost::units::information::bytes;
     } else {
-      f.token_count = arg;
+      f.cost.token_count = arg;
       token_count_overriden = true;
     }
     return false;
@@ -188,10 +188,10 @@ build_graph::from_dir(std::filesystem::path source_dir,
 
     if (inserted) {
       const bool is_external = false;
-      it->second.v =
-          add_vertex({source.lexically_relative(source_dir), is_external, 0u,
-                      file_entry->getSize() * boost::units::information::bytes},
-                     r.graph);
+      it->second.v = add_vertex(
+          {source.lexically_relative(source_dir), is_external,
+           cost{0u, file_entry->getSize() * boost::units::information::bytes}},
+          r.graph);
       r.sources.emplace_back(it->second.v);
     }
 
@@ -245,11 +245,11 @@ build_graph::from_dir(std::filesystem::path source_dir,
                         is_external ? std::filesystem::path(std::string(
                                           current_directory->getName()))
                                     : source_dir;
-                    to_it->second.v =
-                        add_vertex({p.lexically_relative(dir), is_external, 0u,
-                                    static_cast<double>(file_ref->getSize()) *
-                                        boost::units::information::bytes},
-                                   r.graph);
+                    to_it->second.v = add_vertex(
+                        {p.lexically_relative(dir), is_external,
+                         cost{0u, static_cast<double>(file_ref->getSize()) *
+                                      boost::units::information::bytes}},
+                        r.graph);
                   }
                 }
                 const std::string include(tok.getLiteralData(),
@@ -277,7 +277,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
       }
     }
     if (!token_count_overriden) {
-      r.graph[it->second.v].token_count = token_count;
+      r.graph[it->second.v].cost.token_count = token_count;
     }
     it->second.fully_processed = true;
   }

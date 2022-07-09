@@ -10,25 +10,33 @@ using namespace IncludeGuardian;
 
 namespace {
 
-const auto B = boost::units::information::byte;
+using namespace boost::units::information;
 
 const bool not_external = false;
 
 bool test_sort(const find_expensive_headers::result &lhs,
                const find_expensive_headers::result &rhs) {
-  return std::tie(lhs.v, lhs.token_count) < std::tie(rhs.v, rhs.token_count);
+  return std::tie(lhs.v, lhs.saving.token_count) <
+         std::tie(rhs.v, rhs.saving.token_count);
 }
+
+const cost A{1u, 2000000000.0 * bytes};
+const cost B{10u, 200000000.0 * bytes};
+const cost C{100u, 20000000.0 * bytes};
+const cost D{1000u, 2000000.0 * bytes};
+const cost E{10000u, 200000.0 * bytes};
+const cost F{100000u, 20000.0 * bytes};
+const cost G{1000000u, 2000.0 * bytes};
+const cost H{10000000u, 200.0 * bytes};
+const cost I{100000000u, 20.0 * bytes};
+const cost J{1000000000u, 2.0 * bytes};
 
 TEST(FindExpensiveHeadersTest, DiamondIncludes) {
   Graph graph;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 1u, 0b1000 * B}, graph);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 2u, 0b0100 * B}, graph);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 3u, 0b0010 * B}, graph);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 4u, 0b0001 * B}, graph);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, graph);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, graph);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, graph);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, graph);
 
   //      a
   //     / \
@@ -44,31 +52,23 @@ TEST(FindExpensiveHeadersTest, DiamondIncludes) {
       find_expensive_headers::from_graph(graph, {a}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<find_expensive_headers::result> expected = {
-      {b, 2u, 0b0100 * B, 0u},
-      {c, 3u, 0b0010 * B, 0u},
-      {d, 4u, 0b0001 * B, 0u},
+      {b, B, 0u},
+      {c, C, 0u},
+      {d, D, 0u},
   };
   EXPECT_EQ(actual, expected);
 }
 
 TEST(FindExpensiveHeadersTest, MultiLevel) {
   Graph graph;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 1u, 0b1000'0000 * B}, graph);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 2u, 0b0100'0000 * B}, graph);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 3u, 0b0010'0000 * B}, graph);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 4u, 0b0001'0000 * B}, graph);
-  const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 5u, 0b0000'1000 * B}, graph);
-  const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 6u, 0b0000'0100 * B}, graph);
-  const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 7u, 0b0000'0010 * B}, graph);
-  const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 8u, 0b0000'0001 * B}, graph);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, graph);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, graph);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, graph);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, graph);
+  const Graph::vertex_descriptor e = add_vertex({"e", not_external, E}, graph);
+  const Graph::vertex_descriptor f = add_vertex({"f", not_external, F}, graph);
+  const Graph::vertex_descriptor g = add_vertex({"g", not_external, G}, graph);
+  const Graph::vertex_descriptor h = add_vertex({"h", not_external, H}, graph);
 
   //      a   b
   //     / \ / \
@@ -92,38 +92,24 @@ TEST(FindExpensiveHeadersTest, MultiLevel) {
       find_expensive_headers::from_graph(graph, {a, b}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<find_expensive_headers::result> expected = {
-      {c, 3u, 0b0010'0000 * B, 0u},
-      {d, 14u, 36.0 * B, 0u},
-      {e, 12u, (0b0000'1000 + 0b0000'0010) * B, 0u},
-      {f, 20u, 9.0 * B, 0u},
-      {g, 7u, 0b0010 * B, 0u},
-      {h, 16u, 2.0 * B, 0u},
+      {c, C, 0u},         {d, D + D + F, 0u}, {e, E + G, 0u},
+      {f, F + F + H, 0u}, {g, G, 0u},     {h, H + H, 0u},
   };
   EXPECT_EQ(actual, expected);
 }
 
 TEST(FindExpensiveHeadersTest, LongChain) {
   Graph graph;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 1u, 0b10'0000'0000 * B}, graph);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 2u, 0b01'0000'0000 * B}, graph);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 4u, 0b00'1000'0000 * B}, graph);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 8u, 0b00'0100'0000 * B}, graph);
-  const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 16u, 0b00'0010'0000 * B}, graph);
-  const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 32u, 0b00'0001'0000 * B}, graph);
-  const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 64u, 0b00'0000'1000 * B}, graph);
-  const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 128u, 0b00'0000'0100 * B}, graph);
-  const Graph::vertex_descriptor i =
-      add_vertex({"i", not_external, 256u, 0b00'0000'0010 * B}, graph);
-  const Graph::vertex_descriptor j =
-      add_vertex({"j", not_external, 512u, 0b00'0000'0001 * B}, graph);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, graph);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, graph);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, graph);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, graph);
+  const Graph::vertex_descriptor e = add_vertex({"e", not_external, E}, graph);
+  const Graph::vertex_descriptor f = add_vertex({"f", not_external, F}, graph);
+  const Graph::vertex_descriptor g = add_vertex({"g", not_external, G}, graph);
+  const Graph::vertex_descriptor h = add_vertex({"h", not_external, H}, graph);
+  const Graph::vertex_descriptor i = add_vertex({"i", not_external, I}, graph);
+  const Graph::vertex_descriptor j = add_vertex({"j", not_external, J}, graph);
 
   //      a
   //     / \
@@ -156,11 +142,9 @@ TEST(FindExpensiveHeadersTest, LongChain) {
       find_expensive_headers::from_graph(graph, {a}, 1u);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<find_expensive_headers::result> expected = {
-      {b, 2u, 0b01'0000'0000 * B, 0u}, {c, 4u, 0b1000'0000 * B, 0u},
-      {d, 1016u, 127.0 * B, 0u},       {e, 16u, 32.0 * B, 0u},
-      {f, 32u, 16.0 * B, 0u},          {g, 192u, 12.0 * B, 0u},
-      {h, 128u, 4.0 * B, 0u},          {i, 256u, 2.0 * B, 0u},
-      {j, 512u, 1.0 * B, 0u},
+      {b, B, 0u}, {c, C, 0u}, {d, D + E + F + G + H + I + J, 0u},
+      {e, E, 0u}, {f, F, 0u}, {g, G + H, 0u},
+      {h, H, 0u}, {i, I, 0u}, {j, J, 0u},
   };
   EXPECT_EQ(actual, expected);
 }

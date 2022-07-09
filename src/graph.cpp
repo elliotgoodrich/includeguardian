@@ -7,14 +7,13 @@
 namespace IncludeGuardian {
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value) {
-  return stream << value.path << " (" << value.token_count << ", "
-                << value.file_size << ")"
+  return stream << value.path << ' ' << value.cost << ' '
                 << (value.is_external ? " external" : "");
 }
 
 bool operator==(const file_node &lhs, const file_node &rhs) {
   return lhs.path == rhs.path && lhs.is_external == rhs.is_external &&
-         lhs.token_count == rhs.token_count && lhs.file_size == rhs.file_size;
+         lhs.cost == rhs.cost;
 }
 
 bool operator!=(const file_node &lhs, const file_node &rhs) {

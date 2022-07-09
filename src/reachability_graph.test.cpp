@@ -10,19 +10,27 @@ using namespace IncludeGuardian;
 
 namespace {
 
-const auto B = boost::units::information::byte;
+using namespace boost::units::information;
 
 const bool not_external = false;
+
+const cost A{1u, 2000000000.0 * bytes};
+const cost B{10u, 200000000.0 * bytes};
+const cost C{100u, 20000000.0 * bytes};
+const cost D{1000u, 2000000.0 * bytes};
+const cost E{10000u, 200000.0 * bytes};
+const cost F{100000u, 20000.0 * bytes};
+const cost G{1000000u, 2000.0 * bytes};
+const cost H{10000000u, 200.0 * bytes};
+const cost I{100000000u, 20.0 * bytes};
+const cost J{1000000000u, 2.0 * bytes};
+
 TEST(ReachabilityGraphTest, DiamondIncludes) {
   Graph g;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 0u, 100 * B}, g);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 0u, 1000 * B}, g);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 0u, 2000 * B}, g);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 0u, 30000 * B}, g);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, g);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, g);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, g);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, g);
 
   //      a
   //     / \
@@ -58,22 +66,14 @@ TEST(ReachabilityGraphTest, DiamondIncludes) {
 
 TEST(ReachabilityGraphTest, MultiLevel) {
   Graph graph;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 0u, 0 * B}, graph);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, graph);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, graph);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, graph);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, graph);
+  const Graph::vertex_descriptor e = add_vertex({"e", not_external, E}, graph);
+  const Graph::vertex_descriptor f = add_vertex({"f", not_external, F}, graph);
+  const Graph::vertex_descriptor g = add_vertex({"g", not_external, G}, graph);
+  const Graph::vertex_descriptor h = add_vertex({"h", not_external, H}, graph);
 
   //      a   b
   //     / \ / \
@@ -125,26 +125,16 @@ TEST(ReachabilityGraphTest, MultiLevel) {
 
 TEST(ReachabilityGraphTest, LongChain) {
   Graph graph;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor i =
-      add_vertex({"i", not_external, 0u, 0 * B}, graph);
-  const Graph::vertex_descriptor j =
-      add_vertex({"j", not_external, 0u, 0 * B}, graph);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, graph);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, graph);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, graph);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, graph);
+  const Graph::vertex_descriptor e = add_vertex({"e", not_external, E}, graph);
+  const Graph::vertex_descriptor f = add_vertex({"f", not_external, F}, graph);
+  const Graph::vertex_descriptor g = add_vertex({"g", not_external, G}, graph);
+  const Graph::vertex_descriptor h = add_vertex({"h", not_external, H}, graph);
+  const Graph::vertex_descriptor i = add_vertex({"i", not_external, I}, graph);
+  const Graph::vertex_descriptor j = add_vertex({"j", not_external, J}, graph);
 
   //      a
   //     / \

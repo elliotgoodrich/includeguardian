@@ -34,14 +34,13 @@ std::vector<file_and_cost> find_expensive_files::from_graph(
   std::for_each(
       std::execution::par, begin, end,
       [&](const Graph::vertex_descriptor &file) {
-        const auto file_size = graph[file].file_size;
         const double reachable_count = std::accumulate(
             sources.begin(), sources.end(), 0.0,
             [&](const unsigned count, const Graph::vertex_descriptor source) {
               return count + reach.is_reachable(source, file);
             });
 
-        if (reachable_count * graph[file].token_count >=
+        if (reachable_count * graph[file].cost.token_count >=
             minimum_token_count_cut_off) {
           // There are ways to avoid this mutex, but if the
           // `minimum_size_cut_off` is large enough, it's relatively rare to

@@ -10,20 +10,27 @@ using namespace IncludeGuardian;
 
 namespace {
 
-const auto B = boost::units::information::byte;
+using namespace boost::units::information;
 
 const bool not_external = false;
 
+const cost A{1u, 2000000000.0 * bytes};
+const cost B{10u, 200000000.0 * bytes};
+const cost C{100u, 20000000.0 * bytes};
+const cost D{1000u, 2000000.0 * bytes};
+const cost E{10000u, 200000.0 * bytes};
+const cost F{100000u, 20000.0 * bytes};
+const cost G{1000000u, 2000.0 * bytes};
+const cost H{10000000u, 200.0 * bytes};
+const cost I{100000000u, 20.0 * bytes};
+const cost J{1000000000u, 2.0 * bytes};
+
 TEST(GetTotalCostTest, DiamondIncludes) {
   Graph graph;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 101u, 0b1000 * B}, graph);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 102u, 0b0100 * B}, graph);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 104u, 0b0010 * B}, graph);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 108u, 0b0001 * B}, graph);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, graph);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, graph);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, graph);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, graph);
 
   //      a
   //     / \
@@ -35,28 +42,19 @@ TEST(GetTotalCostTest, DiamondIncludes) {
   add_edge(b, d, {"b->d"}, graph);
   add_edge(c, d, {"c->d"}, graph);
 
-  EXPECT_EQ(get_total_cost::from_graph(graph, {a}),
-            get_total_cost::result(0b1111 * B, 415u));
+  EXPECT_EQ(get_total_cost::from_graph(graph, {a}), A + B + C + D);
 }
 
 TEST(GetTotalCostTest, MultiLevel) {
   Graph graph;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 101u, 0b1000'0000 * B}, graph);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 102u, 0b0100'0000 * B}, graph);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 104u, 0b0010'0000 * B}, graph);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 108u, 0b0001'0000 * B}, graph);
-  const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 116u, 0b0000'1000 * B}, graph);
-  const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 132u, 0b0000'0100 * B}, graph);
-  const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 164u, 0b0000'0010 * B}, graph);
-  const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 228u, 0b0000'0001 * B}, graph);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, graph);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, graph);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, graph);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, graph);
+  const Graph::vertex_descriptor e = add_vertex({"e", not_external, E}, graph);
+  const Graph::vertex_descriptor f = add_vertex({"f", not_external, F}, graph);
+  const Graph::vertex_descriptor g = add_vertex({"g", not_external, G}, graph);
+  const Graph::vertex_descriptor h = add_vertex({"h", not_external, H}, graph);
 
   //      a   b
   //     / \ / \
@@ -77,33 +75,21 @@ TEST(GetTotalCostTest, MultiLevel) {
   add_edge(g, h, {"g->h"}, graph);
 
   EXPECT_EQ(get_total_cost::from_graph(graph, {a, b}),
-            get_total_cost::result(0b1111'1111 * B + graph[d].file_size +
-                                       graph[f].file_size + graph[h].file_size,
-                                   1523u));
+            (A + C + D + F + H) + (B + D + E + F + G + H));
 }
 
 TEST(GetTotalCostTest, LongChain) {
   Graph graph;
-  const Graph::vertex_descriptor a =
-      add_vertex({"a", not_external, 1u, 0b10'0000'0000 * B}, graph);
-  const Graph::vertex_descriptor b =
-      add_vertex({"b", not_external, 1u, 0b01'0000'0000 * B}, graph);
-  const Graph::vertex_descriptor c =
-      add_vertex({"c", not_external, 1u, 0b00'1000'0000 * B}, graph);
-  const Graph::vertex_descriptor d =
-      add_vertex({"d", not_external, 1u, 0b00'0100'0000 * B}, graph);
-  const Graph::vertex_descriptor e =
-      add_vertex({"e", not_external, 1u, 0b00'0010'0000 * B}, graph);
-  const Graph::vertex_descriptor f =
-      add_vertex({"f", not_external, 1u, 0b00'0001'0000 * B}, graph);
-  const Graph::vertex_descriptor g =
-      add_vertex({"g", not_external, 1u, 0b00'0000'1000 * B}, graph);
-  const Graph::vertex_descriptor h =
-      add_vertex({"h", not_external, 1u, 0b00'0000'0100 * B}, graph);
-  const Graph::vertex_descriptor i =
-      add_vertex({"i", not_external, 1u, 0b00'0000'0010 * B}, graph);
-  const Graph::vertex_descriptor j =
-      add_vertex({"j", not_external, 1u, 0b00'0000'0001 * B}, graph);
+  const Graph::vertex_descriptor a = add_vertex({"a", not_external, A}, graph);
+  const Graph::vertex_descriptor b = add_vertex({"b", not_external, B}, graph);
+  const Graph::vertex_descriptor c = add_vertex({"c", not_external, C}, graph);
+  const Graph::vertex_descriptor d = add_vertex({"d", not_external, D}, graph);
+  const Graph::vertex_descriptor e = add_vertex({"e", not_external, E}, graph);
+  const Graph::vertex_descriptor f = add_vertex({"f", not_external, F}, graph);
+  const Graph::vertex_descriptor g = add_vertex({"g", not_external, G}, graph);
+  const Graph::vertex_descriptor h = add_vertex({"h", not_external, H}, graph);
+  const Graph::vertex_descriptor i = add_vertex({"i", not_external, I}, graph);
+  const Graph::vertex_descriptor j = add_vertex({"j", not_external, J}, graph);
 
   //      a
   //     / \
@@ -133,7 +119,7 @@ TEST(GetTotalCostTest, LongChain) {
   add_edge(i, j, {"i->j"}, graph);
 
   EXPECT_EQ(get_total_cost::from_graph(graph, {a}),
-            get_total_cost::result(0b11'1111'1111 * B, 10u));
+            A + B + C + D + E + F + G + H + I + J);
 }
 
 } // namespace

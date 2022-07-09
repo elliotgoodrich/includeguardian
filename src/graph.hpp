@@ -1,6 +1,8 @@
 #ifndef INCLUDE_GUARD_9228E240_D576_4608_9B9A_9D747F5AEF27
 #define INCLUDE_GUARD_9228E240_D576_4608_9B9A_9D747F5AEF27
 
+#include "cost.hpp"
+
 #include <boost/graph/adjacency_list.hpp>
 
 #include <boost/units/quantity.hpp>
@@ -19,9 +21,7 @@ public:
                               //< it will be unknown and generally unnecessary
                               //< as to what path it is relative to.
   bool is_external = false; //< Whether this file comes from an external library
-  unsigned token_count = 0u; //< Number of preprocessing tokens in the file
-  boost::units::quantity<boost::units::information::info> file_size =
-      0 * boost::units::information::bytes;
+  cost cost;
 };
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value);
