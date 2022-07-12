@@ -17,6 +17,8 @@ const auto B = boost::units::information::byte;
 
 const bool external = true;
 const bool not_external = false;
+const bool removable = true;
+const bool not_removable = false;
 
 const std::function<build_graph::file_type(std::string_view)> get_file_type =
     [](std::string_view file) {
@@ -81,6 +83,28 @@ template <typename T> void dump(T &out, const std::vector<include_edge> &v) {
   out << v.back() << ']';
 }
 
+bool vertices_equal(const file_node &lhs, const Graph &lgraph,
+                    const file_node &rhs, const Graph &rgraph) {
+  if (lhs.path != rhs.path || lhs.is_external != rhs.is_external ||
+      lhs.cost != rhs.cost) {
+    return false;
+  }
+
+  if (lhs.component.has_value() != rhs.component.has_value()) {
+    return false;
+  }
+
+  if (!lhs.component.has_value()) {
+    return true;
+  }
+
+  if (lgraph[*lhs.component].path != rgraph[*rhs.component].path) {
+    return false;
+  }
+
+  return true;
+}
+
 MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
   if (num_vertices(arg) != num_vertices(expected)) {
     *result_listener << "num_vertices(arg) != num_vertices(expected)"
@@ -110,7 +134,8 @@ MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
       return false;
     }
 
-    if (arg[it->second] != expected[v]) {
+    if (!vertices_equal(*result_listener, arg[it->second], arg, expected[v],
+                        expected)) {
       *result_listener << "file_nodes do not compare equal " << arg[it->second]
                        << " != " << expected[v];
       return false;
@@ -281,8 +306,15 @@ TEST(BuildGraphTest, UnremovableHeaders) {
       add_vertex({"b.cpp", not_external, {4u, 100 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
       add_vertex({include / "b.hpp", not_external, {8u, 2000 * B}}, g);
-  add_edge(a_cpp, a_hpp, {"\"a.hpp\"", 1, true}, g);
-  add_edge(b_cpp, b_hpp, {"\"include/b.hpp\"", 1, true}, g);
+  const Graph::edge_descriptor a_to_a =
+      add_edge(a_cpp, a_hpp, {"\"a.hpp\"", 1, not_removable}, g).first;
+  const Graph::edge_descriptor b_to_b =
+      add_edge(b_cpp, b_hpp, {"\"include/b.hpp\"", 1, not_removable}, g).first;
+
+  g[a_hpp].component = a_cpp;
+  g[a_cpp].component = a_hpp;
+  g[b_hpp].component = b_cpp;
+  g[b_cpp].component = b_hpp;
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =

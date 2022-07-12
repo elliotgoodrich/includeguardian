@@ -190,7 +190,8 @@ build_graph::from_dir(std::filesystem::path source_dir,
       const bool is_external = false;
       it->second.v = add_vertex(
           {source.lexically_relative(source_dir), is_external,
-           cost{0u, file_entry->getSize() * boost::units::information::bytes}},
+           cost{0u, file_entry->getSize() * boost::units::information::bytes},
+           std::nullopt},
           r.graph);
       r.sources.emplace_back(it->second.v);
     }
@@ -247,8 +248,12 @@ build_graph::from_dir(std::filesystem::path source_dir,
                                     : source_dir;
                     to_it->second.v = add_vertex(
                         {p.lexically_relative(dir), is_external,
-                         cost{0u, static_cast<double>(file_ref->getSize()) *
-                                      boost::units::information::bytes}},
+                         cost{
+                             0u,
+                             static_cast<double>(file_ref->getSize()) *
+                                 boost::units::information::bytes,
+                         },
+                         std::nullopt},
                         r.graph);
                   }
                 }
@@ -261,6 +266,14 @@ build_graph::from_dir(std::filesystem::path source_dir,
                          {include, sm->getSpellingLineNumber(tok.getLocation()),
                           is_removable},
                          r.graph);
+
+                // If we haven't already guessed at a header-source connection
+                // then add it in.
+                if (!is_removable &&
+                    !r.graph[it->second.v].component.has_value()) {
+                  r.graph[to_it->second.v].component = it->second.v;
+                  r.graph[it->second.v].component = to_it->second.v;
+                }
               } else {
                 r.missing_includes.emplace(tok.getLiteralData(),
                                            tok.getLength());
