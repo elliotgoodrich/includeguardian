@@ -77,11 +77,6 @@ public:
     cost savings;
 
     for (const Graph::vertex_descriptor source : sources) {
-      // No need to consider the case where we are trying to remove a source
-      if (source == file) {
-        continue;
-      }
-
       // Do nothing if we're not reachable
       if (!m_dag.is_reachable(source, file)) {
         continue;
@@ -135,9 +130,11 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
   std::mutex m;
   std::vector<find_expensive_headers::result> results;
   const auto [begin, end] = vertices(graph);
-  // std::for_each(std::execution::par, begin, end,
   std::for_each(begin, end, [&](const Graph::vertex_descriptor &file) {
     if (graph[file].is_external) {
+      return;
+    }
+    if (graph[file].incoming == 0) {
       return;
     }
     DFSHelper helper(graph, reach);

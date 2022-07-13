@@ -31,10 +31,12 @@ struct find_expensive_headers {
              unsigned maximum_dependencies = UINT_MAX);
 };
 
-bool operator==(const find_expensive_headers::result &lhs, const find_expensive_headers::result &rhs);
-bool operator!=(const find_expensive_headers::result &lhs, const find_expensive_headers::result &rhs);
-std::ostream &operator<<(std::ostream &out, const find_expensive_headers::result &v);
-
+bool operator==(const find_expensive_headers::result &lhs,
+                const find_expensive_headers::result &rhs);
+bool operator!=(const find_expensive_headers::result &lhs,
+                const find_expensive_headers::result &rhs);
+std::ostream &operator<<(std::ostream &out,
+                         const find_expensive_headers::result &v);
 
 } // namespace IncludeGuardian
 

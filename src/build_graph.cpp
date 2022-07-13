@@ -190,6 +190,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
       const bool is_external = false;
       it->second.v = add_vertex(
           {source.lexically_relative(source_dir), is_external,
+           0u,
            cost{0u, file_entry->getSize() * boost::units::information::bytes},
            std::nullopt},
           r.graph);
@@ -248,6 +249,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
                                     : source_dir;
                     to_it->second.v = add_vertex(
                         {p.lexically_relative(dir), is_external,
+                         0u,
                          cost{
                              0u,
                              static_cast<double>(file_ref->getSize()) *
@@ -266,6 +268,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
                          {include, sm->getSpellingLineNumber(tok.getLocation()),
                           is_removable},
                          r.graph);
+                ++r.graph[to_it->second.v].incoming;
 
                 // If we haven't already guessed at a header-source connection
                 // then add it in.

@@ -27,6 +27,7 @@ public:
                               //< it will be unknown and generally unnecessary
                               //< as to what path it is relative to.
   bool is_external = false; //< Whether this file comes from an external library
+  unsigned incoming = 0; //< The number of times this file is included
   cost cost;
   std::optional<Graph::vertex_descriptor>
       component; //< If this is not null then this
