@@ -31,11 +31,11 @@ struct find_expensive_includes {
   static std::vector<include_directive_and_cost>
   from_graph(const Graph &graph,
              std::span<const Graph::vertex_descriptor> sources,
-             unsigned minimum_token_count_cut_off = 0u);
+             int minimum_token_count_cut_off = 0);
   static std::vector<include_directive_and_cost>
   from_graph(const Graph &graph,
              std::initializer_list<Graph::vertex_descriptor> sources,
-             unsigned minimum_token_count_cut_off = 0u);
+             int minimum_token_count_cut_off = 0);
 };
 
 } // namespace IncludeGuardian

@@ -14,16 +14,16 @@ using namespace boost::units::information;
 
 const bool not_external = false;
 
-const cost A{1u, 2000000000.0 * bytes};
-const cost B{10u, 200000000.0 * bytes};
-const cost C{100u, 20000000.0 * bytes};
-const cost D{1000u, 2000000.0 * bytes};
-const cost E{10000u, 200000.0 * bytes};
-const cost F{100000u, 20000.0 * bytes};
-const cost G{1000000u, 2000.0 * bytes};
-const cost H{10000000u, 200.0 * bytes};
-const cost I{100000000u, 20.0 * bytes};
-const cost J{1000000000u, 2.0 * bytes};
+const cost A{1, 2000000000.0 * bytes};
+const cost B{10, 200000000.0 * bytes};
+const cost C{100, 20000000.0 * bytes};
+const cost D{1000, 2000000.0 * bytes};
+const cost E{10000, 200000.0 * bytes};
+const cost F{100000, 20000.0 * bytes};
+const cost G{1000000, 2000.0 * bytes};
+const cost H{10000000, 200.0 * bytes};
+const cost I{100000000, 20.0 * bytes};
+const cost J{1000000000, 2.0 * bytes};
 
 TEST(GetTotalCostTest, DiamondIncludes) {
   Graph graph;

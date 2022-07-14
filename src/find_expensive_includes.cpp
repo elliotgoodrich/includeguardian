@@ -158,7 +158,7 @@ std::ostream &operator<<(std::ostream &out,
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
-    const unsigned minimum_token_count_cut_off) {
+    const int minimum_token_count_cut_off) {
 
   std::mutex m;
   std::vector<include_directive_and_cost> results;
@@ -198,7 +198,7 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
 
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::initializer_list<Graph::vertex_descriptor> sources,
-    const unsigned minimum_token_count_cut_off) {
+    const int minimum_token_count_cut_off) {
   return from_graph(graph, std::span(sources.begin(), sources.end()),
                     minimum_token_count_cut_off);
 }

@@ -16,20 +16,19 @@ const bool not_external = false;
 
 bool test_sort(const find_expensive_headers::result &lhs,
                const find_expensive_headers::result &rhs) {
-  return std::tie(lhs.v, lhs.saving.token_count) <
-         std::tie(rhs.v, rhs.saving.token_count);
+  return lhs.v < rhs.v;
 }
 
-const cost A{1u, 2000000000.0 * bytes};
-const cost B{10u, 200000000.0 * bytes};
-const cost C{100u, 20000000.0 * bytes};
-const cost D{1000u, 2000000.0 * bytes};
-const cost E{10000u, 200000.0 * bytes};
-const cost F{100000u, 20000.0 * bytes};
-const cost G{1000000u, 2000.0 * bytes};
-const cost H{10000000u, 200.0 * bytes};
-const cost I{100000000u, 20.0 * bytes};
-const cost J{1000000000u, 2.0 * bytes};
+const cost A{1, 2000000000.0 * bytes};
+const cost B{10, 200000000.0 * bytes};
+const cost C{100, 20000000.0 * bytes};
+const cost D{1000, 2000000.0 * bytes};
+const cost E{10000, 200000.0 * bytes};
+const cost F{100000, 20000.0 * bytes};
+const cost G{1000000, 2000.0 * bytes};
+const cost H{10000000, 200.0 * bytes};
+const cost I{100000000, 20.0 * bytes};
+const cost J{1000000000, 2.0 * bytes};
 
 TEST(FindExpensiveHeadersTest, DiamondIncludes) {
   Graph graph;
@@ -53,12 +52,12 @@ TEST(FindExpensiveHeadersTest, DiamondIncludes) {
   const Graph::edge_descriptor c_to_d = add_edge(c, d, {"c->d"}, graph).first;
 
   std::vector<find_expensive_headers::result> actual =
-      find_expensive_headers::from_graph(graph, {a}, 1u);
+      find_expensive_headers::from_graph(graph, {a}, INT_MIN);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<find_expensive_headers::result> expected = {
-      {b, B, 0u},
-      {c, C, 0u},
-      {d, D, 0u},
+      {b, cost{}, B + D},
+      {c, cost{}, C + D},
+      {d, D, D},
   };
   EXPECT_EQ(actual, expected);
 }
@@ -101,11 +100,11 @@ TEST(FindExpensiveHeadersTest, MultiLevel) {
   const Graph::edge_descriptor g_to_h = add_edge(g, h, {"g->h"}, graph).first;
 
   std::vector<find_expensive_headers::result> actual =
-      find_expensive_headers::from_graph(graph, {a, b}, 1u);
+      find_expensive_headers::from_graph(graph, {a, b}, INT_MIN);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<find_expensive_headers::result> expected = {
-      {c, C, 0u},         {d, D + D + F, 0u}, {e, E + G, 0u},
-      {f, F + F + H, 0u}, {g, G, 0u},         {h, H + H, 0u},
+      {c, cost{}, C + F + H}, {d, cost{}, D + F + H}, {e, cost{}, E + G + H},
+      {f, F + F + H, F + H},  {g, G, G + H},          {h, H + H, H},
   };
   EXPECT_EQ(actual, expected);
 }
@@ -160,13 +159,32 @@ TEST(FindExpensiveHeadersTest, LongChain) {
   const Graph::edge_descriptor h_to_j = add_edge(h, j, {"h->j"}, graph).first;
   const Graph::edge_descriptor i_to_j = add_edge(i, j, {"i->j"}, graph).first;
 
+  //      a
+  //     / \
+  //    b   c
+  //     \ /
+  //      d
+  //     / \
+  //    e   f
+  //     \ / \
+  //      g   |
+  //     / \ /
+  //    h   i
+  //     \ /
+  //      j
   std::vector<find_expensive_headers::result> actual =
-      find_expensive_headers::from_graph(graph, {a}, 1u);
+      find_expensive_headers::from_graph(graph, {a}, INT_MIN);
   std::sort(actual.begin(), actual.end(), test_sort);
   const std::vector<find_expensive_headers::result> expected = {
-      {b, B, 0u}, {c, C, 0u}, {d, D + E + F + G + H + I + J, 0u},
-      {e, E, 0u}, {f, F, 0u}, {g, G + H, 0u},
-      {h, H, 0u}, {i, I, 0u}, {j, J, 0u},
+      {b, cost{}, B + D + E + F + G + H + I + J},
+      {c, cost{}, C + D + E + F + G + H + I + J},
+      {d, D + E + F + G + H + I + J, D + E + F + G + H + I + J},
+      {e, E, E + G + H + I + J},
+      {f, F, F + G + H + I + J},
+      {g, G + H, G + H + I + J},
+      {h, H, H + J},
+      {i, I, I + J},
+      {j, J, J},
   };
   EXPECT_EQ(actual, expected);
 }

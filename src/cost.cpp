@@ -7,12 +7,12 @@
 
 namespace IncludeGuardian {
 
-cost::cost() : cost{0u, 0.0 * boost::units::information::bytes} {}
+cost::cost() : cost{0, 0.0 * boost::units::information::bytes} {}
 
 cost::cost(
-    const unsigned token_count,
+    const int token_count,
     const boost::units::quantity<boost::units::information::info> file_size)
-    : token_count(token_count), file_size(file_size) {}
+    : token_count{token_count}, file_size{file_size} {}
 
 std::ostream &operator<<(std::ostream &stream, cost c) {
   return stream << '{' << std::setprecision(2) << std::fixed << c.token_count

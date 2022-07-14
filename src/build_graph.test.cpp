@@ -155,7 +155,7 @@ MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
 
 TEST(BuildGraphTest, SimpleGraph) {
   Graph g;
-  add_vertex({"main.cpp", not_external, 0u, {1u, 100 * B}}, g);
+  add_vertex({"main.cpp", not_external, 0u, {1, 100 * B}}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
@@ -168,11 +168,11 @@ TEST(BuildGraphTest, SimpleGraph) {
 TEST(BuildGraphTest, MultipleChildren) {
   Graph g;
   const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main.cpp", not_external, 0u, {1u, 100 * B}}, g);
+      add_vertex({"main.cpp", not_external, 0u, {1, 100 * B}}, g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {2u, 1000 * B}}, g);
+      add_vertex({"a.hpp", not_external, 1u, {2, 1000 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", not_external, 1u, {4u, 2000 * B}}, g);
+      add_vertex({"b.hpp", not_external, 1u, {4, 2000 * B}}, g);
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
   add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 2}, g);
 
@@ -187,16 +187,16 @@ TEST(BuildGraphTest, MultipleChildren) {
 TEST(BuildGraphTest, DiamondIncludes) {
   Graph g;
   const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main.cpp", not_external, 0u, {1u, 100 * B}}, g);
+      add_vertex({"main.cpp", not_external, 0u, {1, 100 * B}}, g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {2u, 1000 * B}}, g);
+      add_vertex({"a.hpp", not_external, 1u, {2, 1000 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", not_external, 1u, {4u, 2000 * B}}, g);
+      add_vertex({"b.hpp", not_external, 1u, {4, 2000 * B}}, g);
 
   const std::string c_path =
       (std::filesystem::path("common") / "c.hpp").string();
   const Graph::vertex_descriptor c_hpp =
-      add_vertex({c_path, not_external, 2u, {8u, 30000 * B}}, g);
+      add_vertex({c_path, not_external, 2u, {8, 30000 * B}}, g);
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
   add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 2}, g);
   add_edge(a_hpp, c_hpp, {"\"" + c_path + "\"", 1}, g);
@@ -213,13 +213,13 @@ TEST(BuildGraphTest, DiamondIncludes) {
 TEST(BuildGraphTest, MultipleSources) {
   Graph g;
   const Graph::vertex_descriptor main1_cpp =
-      add_vertex({"main1.cpp", not_external, 0u, {1u, 100 * B}}, g);
+      add_vertex({"main1.cpp", not_external, 0u, {1, 100 * B}}, g);
   const Graph::vertex_descriptor main2_cpp =
-      add_vertex({"main2.cpp", not_external, 0u, {2u, 150 * B}}, g);
+      add_vertex({"main2.cpp", not_external, 0u, {2, 150 * B}}, g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 2u, {4u, 1000 * B}}, g);
+      add_vertex({"a.hpp", not_external, 2u, {4, 1000 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", not_external, 1u, {8u, 2000 * B}}, g);
+      add_vertex({"b.hpp", not_external, 1u, {8, 2000 * B}}, g);
 
   add_edge(main1_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
   add_edge(main2_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
@@ -238,11 +238,11 @@ TEST(BuildGraphTest, DifferentDirectories) {
   const std::filesystem::path src = "src";
   const std::filesystem::path include = "include";
   const Graph::vertex_descriptor main_cpp =
-      add_vertex({src / "main1.cpp", not_external, 0u, {1u, 100 * B}}, g);
+      add_vertex({src / "main1.cpp", not_external, 0u, {1, 100 * B}}, g);
   const Graph::vertex_descriptor a_hpp = add_vertex(
-      {src / include / "a.hpp", not_external, 1u, {2u, 1000 * B}}, g);
+      {src / include / "a.hpp", not_external, 1u, {2, 1000 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
-      add_vertex({src / "b.hpp", not_external, 1u, {4u, 2000 * B}}, g);
+      add_vertex({src / "b.hpp", not_external, 1u, {4, 2000 * B}}, g);
 
   add_edge(main_cpp, a_hpp, {"\"include/a.hpp\"", 1}, g);
   add_edge(main_cpp, a_hpp, {"\"b.hpp\"", 2}, g);
@@ -278,11 +278,11 @@ TEST(BuildGraphTest, ExternalCode) {
 
   Graph g;
   const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main1.cpp", not_external, 0u, {1u, 123 * B}}, g);
+      add_vertex({"main1.cpp", not_external, 0u, {1, 123 * B}}, g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", external, 1u, {2u, 246 * B}}, g);
+      add_vertex({"a.hpp", external, 1u, {2, 246 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", external, 1u, {4u, 4812 * B}}, g);
+      add_vertex({"b.hpp", external, 1u, {4, 4812 * B}}, g);
 
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
   add_edge(main_cpp, a_hpp, {"<b.hpp>", 2}, g);
@@ -298,13 +298,13 @@ TEST(BuildGraphTest, UnremovableHeaders) {
   Graph g;
   const std::filesystem::path include = "include";
   const Graph::vertex_descriptor a_cpp =
-      add_vertex({"a.cpp", not_external, 0u, {1u, 100 * B}}, g);
+      add_vertex({"a.cpp", not_external, 0u, {1, 100 * B}}, g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {2u, 1000 * B}}, g);
+      add_vertex({"a.hpp", not_external, 1u, {2, 1000 * B}}, g);
   const Graph::vertex_descriptor b_cpp =
-      add_vertex({"b.cpp", not_external, 0u, {4u, 100 * B}}, g);
+      add_vertex({"b.cpp", not_external, 0u, {4, 100 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
-      add_vertex({include / "b.hpp", not_external, 1u, {8u, 2000 * B}}, g);
+      add_vertex({include / "b.hpp", not_external, 1u, {8, 2000 * B}}, g);
   const Graph::edge_descriptor a_to_a =
       add_edge(a_cpp, a_hpp, {"\"a.hpp\"", 1, not_removable}, g).first;
   const Graph::edge_descriptor b_to_b =

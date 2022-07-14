@@ -40,8 +40,9 @@ public:
   }
 
   // Return the total file size for all vertices that are unreachable from
-  // `source` through `removed_edge` in the graph specified at constructon.
-  cost total_file_size_of_unreachable(
+  // `source` if no files ever included `file` + an optional extra cost that
+  // would occur if we needed to add a new source file.
+  std::pair<cost, std::optional<cost>> total_file_size_of_unreachable(
       std::span<const Graph::vertex_descriptor> sources,
       Graph::vertex_descriptor file) {
     std::fill(m_state.begin(), m_state.end(), not_seen);
@@ -56,8 +57,8 @@ public:
 
     cost total_size;
 
-    // Do a DFS from `source`, skipping the `removed_edge`, and add all vertices
-    // found to `marked`.
+    // Do a DFS from `file` and add all vertices found to `marked`, summing
+    // up the total cost of all files found
     m_stack.push_back(file);
     while (!m_stack.empty()) {
       const Graph::vertex_descriptor v = m_stack.back();
@@ -76,9 +77,17 @@ public:
 
     cost savings;
 
+    // Go through all sources that included `file` and find what dependencies
+    // of `file` are reachable through other means.
     for (const Graph::vertex_descriptor source : sources) {
       // Do nothing if we're not reachable
       if (!m_dag.is_reachable(source, file)) {
+        continue;
+      }
+
+      // If a source directly include `file`, then we gain nothing
+      const auto [begin, end] = adjacent_vertices(source, m_graph);
+      if (std::find(begin, end, file) != end) {
         continue;
       }
 
@@ -103,7 +112,8 @@ public:
         }
 
         if (m_reachable[v]) {
-          // Undo
+          // If we find something that's reachable not through `file`
+          // then subtract it from our potential savings.
           savings -= m_graph[v].cost;
         }
 
@@ -116,7 +126,15 @@ public:
       std::fill(m_state.begin(), m_state.end(), not_seen);
     }
 
-    return savings;
+    // If we don't have a source...
+    if (!m_graph[file].component.has_value()) {
+      // ...we would have to recommend adding a new source file that would
+      // include `file`, costing `total_size`.
+      return {savings, total_size};
+    } else {
+      // If we already have a source, there's no extra cost
+      return {savings, std::nullopt};
+    }
   }
 };
 
@@ -124,7 +142,7 @@ public:
 
 std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
-    const unsigned minimum_token_count_cut_off,
+    const int minimum_token_count_cut_off,
     const unsigned maximum_dependencies) {
   reachability_graph reach(graph);
   std::mutex m;
@@ -138,15 +156,16 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
       return;
     }
     DFSHelper helper(graph, reach);
-    const cost saving = helper.total_file_size_of_unreachable(sources, file);
+    const auto [saving, extra] =
+        helper.total_file_size_of_unreachable(sources, file);
 
-    if (saving.token_count >= minimum_token_count_cut_off) {
+    if (saving.token_count - extra.value_or(cost{}).token_count >=
+        minimum_token_count_cut_off) {
       // There are ways to avoid this mutex, but if the
       // `minimum_size_cut_off` is large enough, it's relatively
       // rare to enter this if statement
       std::lock_guard g(m);
-      const unsigned sources_count = 0u; // FIX
-      results.emplace_back(file, saving, sources_count);
+      results.emplace_back(file, saving, extra);
     }
   });
   return results;
@@ -154,7 +173,7 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
 
 std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
     const Graph &graph, std::initializer_list<Graph::vertex_descriptor> sources,
-    const unsigned minimum_token_count_cut_off,
+    const int minimum_token_count_cut_off,
     const unsigned maximum_dependencies) {
   return from_graph(graph, std::span(sources.begin(), sources.end()),
                     minimum_token_count_cut_off, maximum_dependencies);
@@ -163,7 +182,7 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
 bool operator==(const find_expensive_headers::result &lhs,
                 const find_expensive_headers::result &rhs) {
   return lhs.v == rhs.v && lhs.saving == rhs.saving &&
-         lhs.sources_count == rhs.sources_count;
+         lhs.new_source_cost == rhs.new_source_cost;
 }
 
 bool operator!=(const find_expensive_headers::result &lhs,
@@ -173,8 +192,11 @@ bool operator!=(const find_expensive_headers::result &lhs,
 
 std::ostream &operator<<(std::ostream &out,
                          const find_expensive_headers::result &v) {
-  return out << '[' << v.v << " saving=" << v.saving
-             << " sources_count=" << v.sources_count << ']';
+  out << '[' << v.v << " saving=" << v.saving;
+  if (v.new_source_cost.has_value()) {
+    out << "extra_cost=" << *v.new_source_cost;
+  }
+  return out << ']';
 }
 
 } // namespace IncludeGuardian

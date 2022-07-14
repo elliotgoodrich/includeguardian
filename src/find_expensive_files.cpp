@@ -26,7 +26,7 @@ std::ostream &operator<<(std::ostream &out, const file_and_cost &v) {
 
 std::vector<file_and_cost> find_expensive_files::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
-    const unsigned minimum_token_count_cut_off) {
+    const int minimum_token_count_cut_off) {
   reachability_graph reach(graph);
   std::mutex m;
   std::vector<file_and_cost> results;
@@ -36,7 +36,7 @@ std::vector<file_and_cost> find_expensive_files::from_graph(
       [&](const Graph::vertex_descriptor &file) {
         const double reachable_count = std::accumulate(
             sources.begin(), sources.end(), 0.0,
-            [&](const unsigned count, const Graph::vertex_descriptor source) {
+            [&](const double count, const Graph::vertex_descriptor source) {
               return count + reach.is_reachable(source, file);
             });
 
@@ -54,7 +54,7 @@ std::vector<file_and_cost> find_expensive_files::from_graph(
 
 std::vector<file_and_cost> find_expensive_files::from_graph(
     const Graph &graph, std::initializer_list<Graph::vertex_descriptor> sources,
-    const unsigned minimum_token_count_cut_off) {
+    const int minimum_token_count_cut_off) {
   return from_graph(graph, std::span(sources.begin(), sources.end()),
                     minimum_token_count_cut_off);
 }
