@@ -7,12 +7,12 @@
 namespace IncludeGuardian {
 
 struct cost {
-  int token_count;
+  long long int token_count;
   boost::units::quantity<boost::units::information::info> file_size;
 
   cost();
 
-  cost(int token_count, boost::units::quantity<boost::units::information::info> file_size);
+  cost(long long int token_count, boost::units::quantity<boost::units::information::info> file_size);
 };
 
 std::ostream &operator<<(std::ostream &stream, cost c);
@@ -24,6 +24,8 @@ cost &operator+=(cost &lhs, cost rhs);
 cost &operator-=(cost &lhs, cost rhs);
 cost operator+(cost lhs, cost rhs);
 cost operator-(cost lhs, cost rhs);
+cost operator*(cost lhs, int rhs);
+cost operator*(int lhs, cost rhs);
 
 } // namespace IncludeGuardian
 

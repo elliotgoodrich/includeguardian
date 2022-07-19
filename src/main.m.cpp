@@ -3,6 +3,7 @@
 #include "find_expensive_files.hpp"
 #include "find_expensive_headers.hpp"
 #include "find_expensive_includes.hpp"
+#include "find_unnecessary_sources.hpp"
 #include "get_total_cost.hpp"
 #include "graph.hpp"
 
@@ -209,6 +210,31 @@ int main(int argc, const char **argv) {
                   << std::filesystem::path(i.node->path).filename().string()
                   << " by simplifing or splitting by "
                   << 100 * assumed_reduction << "%\n";
+      }
+    }
+
+    {
+      std::vector<find_unnecessary_sources::result> results =
+          find_unnecessary_sources::from_graph(
+              graph, sources,
+              INT_MIN); // total_project_cost.token_count * percent_cut_off);
+      std::cout << "\nSources analyzed in "
+                << duration_cast<std::chrono::milliseconds>(timer.restart())
+                << "\n";
+      std::sort(results.begin(), results.end(),
+                [](const find_unnecessary_sources::result &l,
+                   const find_unnecessary_sources::result &r) {
+                  return l.total_saving().token_count >
+                         r.total_saving().token_count;
+                });
+      for (const find_unnecessary_sources::result &i : results) {
+        const double percentage = (100.0 * i.total_saving().token_count) /
+                                  total_project_cost.token_count;
+        std::cout << std::setprecision(2) << std::fixed
+                  << i.total_saving().token_count << " (" << percentage
+                  << "%) deleting " << graph[i.source].path
+                  << " and putting its contents in "
+                  << graph[*graph[i.source].component].path << "\n";
       }
     }
     return 0;
