@@ -114,6 +114,7 @@ find_unnecessary_sources::from_graph(
               cost total = reachable_from_source_only;
               std::vector<bool> seen(size);
               int count = 0;
+              std::vector<Graph::vertex_descriptor> stack;
               stack.push_back(start_source);
               while (!stack.empty() && count < num_reachable_from_source_only) {
                 const Graph::vertex_descriptor v = stack.back();
