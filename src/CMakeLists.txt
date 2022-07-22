@@ -42,6 +42,15 @@ add_library(
     get_total_cost.hpp get_total_cost.cpp
     reachability_graph.hpp
 )
+target_precompile_headers(common
+  PRIVATE
+    <boost/graph/adjacency_list.hpp>
+    <algorithm>
+    <chrono>
+    <filesystem>
+    <memory>
+    <utility>
+)
 target_link_libraries(common CONAN_PKG::boost)
 target_link_libraries(common clangTooling)
 
@@ -72,6 +81,10 @@ add_executable(
     get_total_cost.test.cpp
     reachability_graph.test.cpp
 )
+target_precompile_headers(tests REUSE_FROM common)
+if(WIN32)
+    target_compile_options(tests PRIVATE /EHsc /FS)
+endif()
 target_link_libraries(tests CONAN_PKG::gtest)
 target_link_libraries(tests common)
 gtest_add_tests(TARGET      tests
@@ -83,4 +96,8 @@ add_executable(
     includeguardian
     main.m.cpp
 )
+if(WIN32)
+    target_compile_options(includeguardian PRIVATE /EHsc /FS)
+endif()
 target_link_libraries(includeguardian common)
+target_precompile_headers(tests REUSE_FROM common)
