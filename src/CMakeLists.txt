@@ -37,6 +37,7 @@ add_library(
     find_expensive_files.hpp find_expensive_files.cpp
     find_expensive_headers.hpp find_expensive_headers.cpp
     find_expensive_includes.hpp find_expensive_includes.cpp
+    list_included_files.hpp list_included_files.cpp
     find_unnecessary_sources.hpp find_unnecessary_sources.cpp
     get_total_cost.hpp get_total_cost.cpp
     reachability_graph.hpp
@@ -66,6 +67,7 @@ add_executable(
     find_expensive_files.test.cpp
     find_expensive_headers.test.cpp
     find_expensive_includes.test.cpp
+    list_included_files.test.cpp
     find_unnecessary_sources.test.cpp
     get_total_cost.test.cpp
     reachability_graph.test.cpp

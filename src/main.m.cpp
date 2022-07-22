@@ -6,6 +6,7 @@
 #include "find_unnecessary_sources.hpp"
 #include "get_total_cost.hpp"
 #include "graph.hpp"
+#include "list_included_files.hpp"
 
 #include <boost/units/io.hpp>
 
@@ -60,6 +61,7 @@ public:
 
 enum class output {
   dot_graph,
+  list_files,
   most_expensive,
 };
 
@@ -76,6 +78,8 @@ int main(int argc, const char **argv) {
       llvm::cl::values(
           llvm::cl::OptionEnumValue(
               "dot-graph", static_cast<int>(output::dot_graph), "DOT graph"),
+          llvm::cl::OptionEnumValue(
+              "list-files", static_cast<int>(output::list_files), "List files"),
           llvm::cl::OptionEnumValue(
               "most-expensive", static_cast<int>(output::most_expensive),
               "List of most expensive include directives")));
@@ -130,6 +134,40 @@ int main(int argc, const char **argv) {
     std::cout << "Graph printed in "
               << duration_cast<std::chrono::milliseconds>(timer.restart())
               << "\n";
+    return 0;
+  }
+  case output::list_files: {
+    const cost total_project_cost = get_total_cost::from_graph(graph, sources);
+    std::cout << "Total file size found " << std::setprecision(2) << std::fixed
+              << boost::units::binary_prefix << total_project_cost.file_size
+              << " and " << total_project_cost.token_count
+              << " total preprocessing tokens found in "
+              << duration_cast<std::chrono::milliseconds>(timer.restart())
+              << "\n";
+    const double percent_cut_off = 0.005;
+    {
+      std::vector<list_included_files::result> results =
+          list_included_files::from_graph(graph, sources);
+      std::cout << "Files found in "
+                << duration_cast<std::chrono::milliseconds>(timer.restart())
+                << "\n";
+      std::sort(results.begin(), results.end(),
+                [&](const list_included_files::result &l,
+                    const list_included_files::result &r) {
+                  return l.source_that_can_reach_it_count *
+                             graph[l.v].cost.token_count >
+                         r.source_that_can_reach_it_count *
+                             graph[r.v].cost.token_count;
+                });
+      for (const list_included_files::result &i : results) {
+        const cost c = i.source_that_can_reach_it_count * graph[i.v].cost;
+        const double percentage =
+            (100.0 * c.token_count) / total_project_cost.token_count;
+        std::cout << std::setprecision(2) << std::fixed << c.token_count << " ("
+                  << percentage << "%) " << graph[i.v].path.filename().string()
+                  << " x" << i.source_that_can_reach_it_count << "\n";
+      }
+    }
     return 0;
   }
   case output::most_expensive: {
