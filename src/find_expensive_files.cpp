@@ -33,7 +33,12 @@ std::vector<file_and_cost> find_expensive_files::from_graph(
   const auto [begin, end] = vertices(graph);
   std::for_each(
       std::execution::par, begin, end,
-      [&](const Graph::vertex_descriptor &file) {
+      [&](const Graph::vertex_descriptor file) {
+        // Ignore all files we have no control over
+        if (graph[file].is_external) {
+            return;
+        }
+
         const double reachable_count = std::accumulate(
             sources.begin(), sources.end(), 0.0,
             [&](const double count, const Graph::vertex_descriptor source) {

@@ -8,7 +8,7 @@ namespace IncludeGuardian {
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value) {
   return stream << value.path << ' ' << value.cost
-                << " [incoming=" << value.incoming << ']'
+                << " [incoming=" << value.internal_incoming << ']'
                 << (value.is_external ? " [external]" : "")
                 << (value.component ? " [linked]" : "");
 }

@@ -148,13 +148,13 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
   std::mutex m;
   std::vector<find_expensive_headers::result> results;
   const auto [begin, end] = vertices(graph);
-  std::for_each(begin, end, [&](const Graph::vertex_descriptor &file) {
-    if (graph[file].is_external) {
+  std::for_each(begin, end, [&](const Graph::vertex_descriptor file) {
+    // If we do not include this file ourselves, there is no point
+    // performing the analysis
+    if (graph[file].internal_incoming == 0) {
       return;
     }
-    if (graph[file].incoming == 0) {
-      return;
-    }
+
     DFSHelper helper(graph, reach);
     const auto [saving, extra] =
         helper.total_file_size_of_unreachable(sources, file);

@@ -39,6 +39,14 @@ find_unnecessary_sources::from_graph(
           return;
         }
 
+        // Skip external files as we don't have control over this and
+        // most likely if the library has sources, it is already
+        // compiled into a library and there is no additional cost when
+        // we compile our code
+        if (graph[source].is_external) {
+          return;
+        }
+
         std::vector<reachability> reachable(size, NONE);
         std::vector<Graph::vertex_descriptor> stack;
 

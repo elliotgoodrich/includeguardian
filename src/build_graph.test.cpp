@@ -86,7 +86,7 @@ template <typename T> void dump(T &out, const std::vector<include_edge> &v) {
 bool vertices_equal(const file_node &lhs, const Graph &lgraph,
                     const file_node &rhs, const Graph &rgraph) {
   if (lhs.path != rhs.path || lhs.is_external != rhs.is_external ||
-      lhs.cost != rhs.cost || lhs.incoming != rhs.incoming) {
+      lhs.cost != rhs.cost || lhs.internal_incoming != rhs.internal_incoming) {
     return false;
   }
 
@@ -239,8 +239,8 @@ TEST(BuildGraphTest, DifferentDirectories) {
   const std::filesystem::path include = "include";
   const Graph::vertex_descriptor main_cpp =
       add_vertex({src / "main1.cpp", not_external, 0u, {1, 100 * B}}, g);
-  const Graph::vertex_descriptor a_hpp = add_vertex(
-      {src / include / "a.hpp", not_external, 1u, {2, 1000 * B}}, g);
+  const Graph::vertex_descriptor a_hpp =
+      add_vertex({src / include / "a.hpp", not_external, 1u, {2, 1000 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
       add_vertex({src / "b.hpp", not_external, 1u, {4, 2000 * B}}, g);
 
