@@ -56,8 +56,13 @@ struct find_expensive_headers {
   struct result {
     Graph::vertex_descriptor v; //< The header file
     cost saving; //< The saving if it was removed from all headers
-    std::optional<cost> new_source_cost; //< The extra cost if `v` didn't have a source
-                                         //< and it was needed to be added
+    std::optional<cost>
+        new_source_cost; //< The extra cost if `v` didn't have a source
+                         //< and it was needed to be added
+
+    cost total_saving() const {
+      return saving - new_source_cost.value_or(cost{});
+    }
   };
 
   /// Return the list of header files along with the total cost if
