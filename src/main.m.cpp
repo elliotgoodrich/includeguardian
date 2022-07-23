@@ -178,7 +178,7 @@ int main(int argc, const char **argv) {
               << " total preprocessing tokens found in "
               << duration_cast<std::chrono::milliseconds>(timer.restart())
               << "\n";
-    const double percent_cut_off = 0.005;
+    const double percent_cut_off = 0.001;
     {
       std::vector<include_directive_and_cost> results =
           find_expensive_includes::from_graph(
