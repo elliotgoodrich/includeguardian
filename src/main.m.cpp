@@ -222,6 +222,25 @@ int main(int argc, const char **argv) {
                   << "%) removing " << graph[i.v].internal_incoming
                   << " references to " << graph[i.v].path << "\n";
       }
+
+      std::cout << "\nPrecompiled header suggestions\n";
+      std::sort(results.begin(), results.end(),
+                [](const find_expensive_headers::result &l,
+                   const find_expensive_headers::result &r) {
+                  return l.saving.token_count > r.saving.token_count;
+                });
+      for (const find_expensive_headers::result &i : results) {
+        // Don't try to add internal files to the precompiled header
+        if (!graph[i.v].is_external) {
+          continue;
+        }
+        const double percentage =
+            (100.0 * i.saving.token_count) / total_project_cost.token_count;
+        std::cout << std::setprecision(2) << std::fixed
+                  << i.total_saving().token_count << " (" << percentage
+                  << "%) adding " << graph[i.v].path
+                  << " to a precompiled header\n";
+      }
     }
 
     {

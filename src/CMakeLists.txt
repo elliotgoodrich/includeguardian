@@ -47,9 +47,7 @@ target_precompile_headers(common
     <boost/graph/adjacency_list.hpp>
     <algorithm>
     <chrono>
-    <filesystem>
-    <memory>
-    <utility>
+    <charconv>
 )
 target_link_libraries(common CONAN_PKG::boost)
 target_link_libraries(common clangTooling)
