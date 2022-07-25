@@ -67,8 +67,8 @@ find_unnecessary_sources::from_graph(
           }
 
           reachable[v] = static_cast<reachability>(reachable[v] | SOURCE);
-          saving += graph[v].cost;
-          reachable_from_source_only += graph[v].cost;
+          saving += graph[v].true_cost();
+          reachable_from_source_only += graph[v].true_cost();
           ++num_reachable_from_source_only;
 
           const auto [begin, end] = adjacent_vertices(v, graph);
@@ -91,7 +91,7 @@ find_unnecessary_sources::from_graph(
 
           reachable[v] = static_cast<reachability>(reachable[v] | HEADER);
           --num_reachable_from_source_only;
-          reachable_from_source_only -= graph[v].cost;
+          reachable_from_source_only -= graph[v].true_cost();
 
           const auto [begin, end] = adjacent_vertices(v, graph);
           stack.insert(stack.end(), begin, end);
@@ -138,7 +138,7 @@ find_unnecessary_sources::from_graph(
                 // files some other way, then we need to subtract its cost.
                 if (reachable[v] == SOURCE) {
                   --count;
-                  total -= graph[v].cost;
+                  total -= graph[v].true_cost();
                 }
 
                 const auto [begin, end] = adjacent_vertices(v, graph);

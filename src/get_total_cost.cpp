@@ -28,7 +28,7 @@ cost get_total_cost::from_graph(
                      }
 
                      seen[v] = true;
-                     total += graph[v].cost;
+                     total += graph[v].true_cost();
 
                      const auto [begin, end] = adjacent_vertices(v, graph);
                      stack.insert(stack.end(), begin, end);

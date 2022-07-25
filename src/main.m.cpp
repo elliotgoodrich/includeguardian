@@ -36,6 +36,7 @@ const std::pair<std::string_view, build_graph::file_type> lookup[] = {
     {"H", build_graph::file_type::header},
     {"hxx", build_graph::file_type::header},
     {"h++", build_graph::file_type::header},
+    {"pch", build_graph::file_type::precompiled_header},
     {"", build_graph::file_type::ignore},
 };
 build_graph::file_type map_ext(std::string_view file) {
@@ -155,12 +156,13 @@ int main(int argc, const char **argv) {
                 [&](const list_included_files::result &l,
                     const list_included_files::result &r) {
                   return l.source_that_can_reach_it_count *
-                             graph[l.v].cost.token_count >
+                             graph[l.v].true_cost().token_count >
                          r.source_that_can_reach_it_count *
-                             graph[r.v].cost.token_count;
+                             graph[r.v].true_cost().token_count;
                 });
       for (const list_included_files::result &i : results) {
-        const cost c = i.source_that_can_reach_it_count * graph[i.v].cost;
+        const cost c =
+            i.source_that_can_reach_it_count * graph[i.v].true_cost();
         const double percentage =
             (100.0 * c.token_count) / total_project_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed << c.token_count << " ("
@@ -252,16 +254,17 @@ int main(int argc, const char **argv) {
       std::cout << "\nFiles analyzed in "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())
                 << "\n";
-      std::sort(results.begin(), results.end(),
-                [](const file_and_cost &l, const file_and_cost &r) {
-                  return static_cast<std::size_t>(l.node->cost.token_count) *
-                             l.sources >
-                         static_cast<std::size_t>(r.node->cost.token_count) *
-                             r.sources;
-                });
+      std::sort(
+          results.begin(), results.end(),
+          [](const file_and_cost &l, const file_and_cost &r) {
+            return static_cast<std::size_t>(l.node->true_cost().token_count) *
+                       l.sources >
+                   static_cast<std::size_t>(r.node->true_cost().token_count) *
+                       r.sources;
+          });
       for (const file_and_cost &i : results) {
         const unsigned saving =
-            i.sources * assumed_reduction * i.node->cost.token_count;
+            i.sources * assumed_reduction * i.node->true_cost().token_count;
         const double percentage =
             (100.0 * saving) / total_project_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed << saving << " ("

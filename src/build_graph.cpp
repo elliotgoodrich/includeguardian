@@ -96,9 +96,9 @@ bool parse_pragma(clang::Lexer &lex, clang::Token &tok, unsigned &token_count,
       std::from_chars(arg_str.data(), arg_str.data() + arg_str.size(), arg);
   if (ec == std::errc()) {
     if (type == 0) {
-      f.cost.file_size = arg * boost::units::information::bytes;
+      f.underlying_cost.file_size = arg * boost::units::information::bytes;
     } else {
-      f.cost.token_count = arg;
+      f.underlying_cost.token_count = arg;
       token_count_overriden = true;
     }
     return false;
@@ -187,11 +187,13 @@ build_graph::from_dir(std::filesystem::path source_dir,
     }
 
     if (inserted) {
+      // Our sources by definition can't be external and can't be precompiled
       const bool is_external = false;
+      const bool is_precompiled = false;
       it->second.v = add_vertex(
           {source.lexically_relative(source_dir), is_external, 0u,
            cost{0u, file_entry->getSize() * boost::units::information::bytes},
-           std::nullopt},
+           std::nullopt, is_precompiled},
           r.graph);
       r.sources.emplace_back(it->second.v);
     }
@@ -246,6 +248,11 @@ build_graph::from_dir(std::filesystem::path source_dir,
                         is_external ? std::filesystem::path(std::string(
                                           current_directory->getName()))
                                     : source_dir;
+                    // We are also precompiled if the header including us is
+                    // precompiled
+                    const bool is_precompiled =
+                        r.graph[it->second.v].is_precompiled ||
+                        file_type(p.string()) == file_type::precompiled_header;
                     to_it->second.v = add_vertex(
                         {p.lexically_relative(dir), is_external, 0u,
                          cost{
@@ -253,7 +260,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
                              static_cast<double>(file_ref->getSize()) *
                                  boost::units::information::bytes,
                          },
-                         std::nullopt},
+                         std::nullopt, is_precompiled},
                         r.graph);
                   }
                 }
@@ -293,7 +300,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
       }
     }
     if (!token_count_overriden) {
-      r.graph[it->second.v].cost.token_count = token_count;
+      r.graph[it->second.v].underlying_cost.token_count = token_count;
     }
     it->second.fully_processed = true;
   }

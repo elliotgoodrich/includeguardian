@@ -67,7 +67,7 @@ public:
         continue;
       }
 
-      total_size += m_graph[v].cost;
+      total_size += m_graph[v].true_cost();
       m_reachable[v] = true;
       m_state[v] = seen;
       descendents.emplace_back(v);
@@ -114,7 +114,7 @@ public:
         if (m_reachable[v]) {
           // If we find something that's reachable not through `file`
           // then subtract it from our potential savings.
-          savings -= m_graph[v].cost;
+          savings -= m_graph[v].true_cost();
         }
 
         m_state[v] = seen;

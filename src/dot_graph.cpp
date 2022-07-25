@@ -43,10 +43,10 @@ void dot_graph::print(const Graph &graph, std::ostream &stream) {
              "[style=\"filled\"]"
              "[fontcolor=\"#ffffff\"]"
              "[fillcolor=\""
-          << colorForSize(n.cost.file_size)
+          << colorForSize(n.underlying_cost.file_size)
           << "\"]"
              "[fontsize=\""
-          << fontSizeForFileSize(n.cost.file_size) << "pt\"]";
+          << fontSizeForFileSize(n.underlying_cost.file_size) << "pt\"]";
     }
   } visitor{graph};
   write_graphviz(stream, graph, visitor);

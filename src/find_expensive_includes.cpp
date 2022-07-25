@@ -121,7 +121,7 @@ public:
       case search_state::not_seen:
         // If we didn't see this file when we skipped `removed_edge` then we
         // will get that saving
-        savings += m_graph[v].cost;
+        savings += m_graph[v].true_cost();
         [[fallthrough]];
       case search_state::seen_initial:
         // If we already saw this file, we don't get a saving but need to

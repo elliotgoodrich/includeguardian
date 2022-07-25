@@ -45,7 +45,7 @@ std::vector<file_and_cost> find_expensive_files::from_graph(
               return count + reach.is_reachable(source, file);
             });
 
-        if (reachable_count * graph[file].cost.token_count >=
+        if (reachable_count * graph[file].true_cost().token_count >=
             minimum_token_count_cut_off) {
           // There are ways to avoid this mutex, but if the
           // `minimum_size_cut_off` is large enough, it's relatively rare to

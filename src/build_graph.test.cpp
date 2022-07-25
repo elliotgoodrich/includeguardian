@@ -26,6 +26,8 @@ const std::function<build_graph::file_type(std::string_view)> get_file_type =
         return build_graph::file_type::source;
       } else if (file.ends_with(".hpp")) {
         return build_graph::file_type::header;
+      } else if (file.ends_with(".pch")) {
+        return build_graph::file_type::precompiled_header;
       } else {
         return build_graph::file_type::ignore;
       }
@@ -50,10 +52,10 @@ make_file_system(const Graph &graph,
       file_contents += '\n';
     }
     file_contents += "#pragma override_file_size(";
-    file_contents += std::to_string(file.cost.file_size.value());
+    file_contents += std::to_string(file.underlying_cost.file_size.value());
     file_contents += ")\n";
     file_contents += "#pragma override_token_count(";
-    file_contents += std::to_string(file.cost.token_count);
+    file_contents += std::to_string(file.underlying_cost.token_count);
     file_contents += ")\n";
     const std::filesystem::path p = working_directory / file.path;
     fs->addFile(p.string(), 0,
@@ -86,7 +88,8 @@ template <typename T> void dump(T &out, const std::vector<include_edge> &v) {
 bool vertices_equal(const file_node &lhs, const Graph &lgraph,
                     const file_node &rhs, const Graph &rgraph) {
   if (lhs.path != rhs.path || lhs.is_external != rhs.is_external ||
-      lhs.cost != rhs.cost || lhs.internal_incoming != rhs.internal_incoming) {
+      lhs.underlying_cost != rhs.underlying_cost || lhs.internal_incoming != rhs.internal_incoming ||
+      lhs.is_precompiled != rhs.is_precompiled) {
     return false;
   }
 
@@ -314,6 +317,27 @@ TEST(BuildGraphTest, UnremovableHeaders) {
   g[a_cpp].component = a_hpp;
   g[b_hpp].component = b_cpp;
   g[b_cpp].component = b_hpp;
+
+  const std::filesystem::path working_directory = root / "working_dir";
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
+      make_file_system(g, working_directory);
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+}
+
+TEST(BuildGraphTest, PrecompiledHeaders) {
+  Graph g;
+  const bool precompiled = true;
+  const std::filesystem::path include = "include";
+  const Graph::vertex_descriptor a_cpp =
+      add_vertex({"a.cpp", not_external, 0u, {1, 100 * B}}, g);
+  const Graph::vertex_descriptor all_pch = add_vertex(
+      {"all.pch", not_external, 1u, {2, 1000 * B}, std::nullopt, precompiled}, g);
+  const Graph::vertex_descriptor normal_h = add_vertex(
+      {"normal.h", not_external, 1u, {3, 10000 * B}, std::nullopt, precompiled}, g);
+  add_edge(a_cpp, all_pch, {"\"all.pch\"", 1, removable}, g).first;
+  add_edge(all_pch, normal_h, {"\"normal.h\"", 1, removable}, g).first;
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =

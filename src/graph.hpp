@@ -28,12 +28,17 @@ public:
                               //< as to what path it is relative to.
   bool is_external = false; //< Whether this file comes from an external library
   unsigned internal_incoming = 0; //< The number of times this file is included from non-external files
-  cost cost;
+  cost underlying_cost;
   std::optional<Graph::vertex_descriptor>
       component; //< If this is not null then this
                  //< either the corresponding source or header,
                  //< depending on whether this is the header or
                  //< source respectively.
+  bool is_precompiled = false;
+
+  cost true_cost() const {
+      return is_precompiled ? cost{} : underlying_cost;
+  }
 };
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value);

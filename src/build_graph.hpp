@@ -30,6 +30,7 @@ struct build_graph {
   enum class file_type {
     source,
     header,
+    precompiled_header,
     ignore,
   };
 
