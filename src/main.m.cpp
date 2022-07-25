@@ -279,7 +279,7 @@ int main(int argc, const char **argv) {
       std::vector<find_unnecessary_sources::result> results =
           find_unnecessary_sources::from_graph(
               graph, sources,
-              INT_MIN); // total_project_cost.token_count * percent_cut_off);
+              total_project_cost.token_count * percent_cut_off);
       std::cout << "\nSources analyzed in "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())
                 << "\n";
