@@ -34,20 +34,25 @@ struct build_graph {
     ignore,
   };
 
-  // Try to construct a `Graph` object from all files in the specified `source_dir`
-  // that return `source` from `file_type` (and files they include).  Use
-  // `include_dirs` to specify additional directories in which to find files
-  // and use the specified `fs` to perform all file actions.
+  // Try to construct a `Graph` object from all files in the specified
+  // `source_dir` that return `source` from `file_type` (and files they
+  // include).  Use `include_dirs` to specify additional directories in which to
+  // find files and use the specified `fs` to perform all file actions.  If
+  // `common_header` is set, then inject this as an include at the beginning of
+  // all source files.  This will commonly be used for precompiled headers.
   static llvm::Expected<result>
   from_dir(std::filesystem::path source_dir,
            std::span<const std::filesystem::path> include_dirs,
            llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
-           std::function<file_type(std::string_view)> file_type);
+           std::function<file_type(std::string_view)> file_type,
+           std::span<const std::filesystem::path> forced_includes =
+               std::span<const std::filesystem::path>());
   static llvm::Expected<result>
   from_dir(const std::filesystem::path &source_dir,
            std::initializer_list<std::filesystem::path> include_dirs,
            llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
-           std::function<file_type(std::string_view)> file_type);
+           std::function<file_type(std::string_view)> file_type,
+           std::initializer_list<std::filesystem::path> forced_includes = {});
 };
 
 } // namespace IncludeGuardian
