@@ -111,11 +111,12 @@ bool parse_pragma(clang::Lexer &lex, clang::Token &tok, unsigned &token_count,
 
 Graph::vertex_descriptor process(
     std::filesystem::path start, const std::filesystem::path &source_dir,
+    std::span<Graph::vertex_descriptor> forced_includes,
     std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher> &id_to_node,
     const std::function<build_graph::file_type(std::string_view)> &file_type,
     Graph &graph, clang::FileManager &file_manager, clang::SourceManager &sm,
     clang::HeaderSearch &header_search,
-    std::set<std::string> missing_includes) {
+    std::set<std::string> &missing_includes) {
   std::deque<std::filesystem::path> todo;
   todo.push_back(start);
   while (!todo.empty()) {
@@ -142,6 +143,29 @@ Graph::vertex_descriptor process(
            cost{0u, file_entry->getSize() * boost::units::information::bytes},
            std::nullopt, is_precompiled},
           graph);
+    }
+
+    if (file == start) {
+      // Reuse the memory for `include_text` (just because we can)
+      std::string include_text;
+      if (!forced_includes.empty()) {
+        include_text.reserve(512);
+      }
+      for (const Graph::vertex_descriptor forced_include : forced_includes) {
+        file_node &node = graph[forced_include];
+        include_text = '"';
+        // Forced includes must be absolute paths
+        include_text += node.path.string();
+        include_text += '"';
+        const bool is_removable = false;
+        // Use 0 to signify it's a forced include.
+        const unsigned line_number = 0;
+        add_edge(it->second.v, forced_include,
+                 {include_text, line_number, is_removable}, graph);
+        if (!graph[it->second.v].is_external) {
+          ++node.internal_incoming;
+        }
+      }
     }
 
     bool token_count_overriden = false;
@@ -268,8 +292,6 @@ build_graph::from_dir(std::filesystem::path source_dir,
   source_dir = std::filesystem::absolute(source_dir);
   assert(std::all_of(include_dirs.begin(), include_dirs.end(),
                      std::mem_fn(&std::filesystem::path::is_absolute)));
-  assert(std::all_of(forced_includes.begin(), forced_includes.end(),
-                     std::mem_fn(&std::filesystem::path::is_absolute)));
 
   auto diag_ids = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
   auto diag_options = llvm::makeIntrusiveRefCnt<clang::DiagnosticOptions>();
@@ -309,9 +331,9 @@ build_graph::from_dir(std::filesystem::path source_dir,
   // Process all forced includes first and store the results
   std::vector<Graph::vertex_descriptor> extra_includes;
   for (const std::filesystem::path &forced_include : forced_includes) {
-    extra_includes.emplace_back(process(forced_include, source_dir, id_to_node,
-                                        file_type, r.graph, *file_manager, *sm,
-                                        header_search, r.missing_includes));
+    extra_includes.emplace_back(
+        process(forced_include, source_dir, {}, id_to_node, file_type, r.graph,
+                *file_manager, *sm, header_search, r.missing_includes));
   }
 
   // Find all sources within the given directories
@@ -338,9 +360,9 @@ build_graph::from_dir(std::filesystem::path source_dir,
 
   // Process all sources, making sure to pass in our forced includes
   for (const std::filesystem::path &source : sources) {
-    r.sources.emplace_back(process(source, source_dir, id_to_node, file_type,
-                                   r.graph, *file_manager, *sm, header_search,
-                                   r.missing_includes));
+    r.sources.emplace_back(process(
+        source, source_dir, extra_includes, id_to_node, file_type, r.graph,
+        *file_manager, *sm, header_search, r.missing_includes));
   }
 
   return r;

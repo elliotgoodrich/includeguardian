@@ -48,6 +48,7 @@ target_precompile_headers(common
     <algorithm>
     <chrono>
     <charconv>
+    <filesystem>
 )
 target_link_libraries(common CONAN_PKG::boost)
 target_link_libraries(common clangTooling)

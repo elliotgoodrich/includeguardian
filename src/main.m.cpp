@@ -36,10 +36,13 @@ const std::pair<std::string_view, build_graph::file_type> lookup[] = {
     {"H", build_graph::file_type::header},
     {"hxx", build_graph::file_type::header},
     {"h++", build_graph::file_type::header},
-    {"pch", build_graph::file_type::precompiled_header},
     {"", build_graph::file_type::ignore},
 };
 build_graph::file_type map_ext(std::string_view file) {
+  // CMake generates precompiled headers with this name
+  if (file.ends_with("cmake_pch.hxx")) {
+    return build_graph::file_type::precompiled_header;
+  }
   const auto dot = std::find(file.rbegin(), file.rend(), '.').base();
   const std::string_view ext(dot, file.end());
   // Use end-1 because if we fail to find then the true last element is 'ignore'
@@ -90,6 +93,12 @@ int main(int argc, const char **argv) {
   llvm::cl::list<std::string> include_dirs(
       "i", llvm::cl::desc("Additional include directories"),
       llvm::cl::ZeroOrMore);
+
+  llvm::cl::list<std::string> forced_includes(
+      "forced-includes",
+      llvm::cl::desc("Forced includes (absolute path preferred)"),
+      llvm::cl::ZeroOrMore);
+
   if (!llvm::cl::ParseCommandLineOptions(argc, argv)) {
     return 1;
   }
@@ -101,9 +110,15 @@ int main(int argc, const char **argv) {
                  include_dir_paths.begin(),
                  [](const std::string &s) { return std::filesystem::path(s); });
 
-  llvm::Expected<build_graph::result> result =
-      build_graph::from_dir(dir.getValue(), include_dir_paths,
-                            llvm::vfs::getRealFileSystem(), map_ext);
+  std::vector<std::filesystem::path> forced_includes_files(
+      forced_includes.size());
+  std::transform(forced_includes.begin(), forced_includes.end(),
+                 forced_includes_files.begin(),
+                 [](const std::string &s) { return std::filesystem::path(s); });
+
+  llvm::Expected<build_graph::result> result = build_graph::from_dir(
+      dir.getValue(), include_dir_paths, llvm::vfs::getRealFileSystem(),
+      map_ext, forced_includes_files);
 
   if (!result) {
     // TODO: error message
@@ -120,12 +135,34 @@ int main(int argc, const char **argv) {
   const auto &missing = result->missing_includes;
   std::cout << "Found " << num_vertices(graph) << " files and "
             << num_edges(graph) << " include directives.\n";
+  std::cout << "\n" << sources.size() << " Sources:\n";
+  for (const Graph::vertex_descriptor v : sources) {
+    std::cout << "  * " << graph[v].path << '\n';
+  }
+  std::cout << '\n';
   if (!missing.empty()) {
     std::cout << "There are " << missing.size() << " missing files\n  ";
     std::copy(missing.begin(), missing.end(),
               std::ostream_iterator<std::string>(std::cout, "  \n  "));
   } else {
     std::cout << "All includes found :)";
+  }
+  std::cout << "\n";
+
+  const get_total_cost::result project_cost =
+      get_total_cost::from_graph(graph, sources);
+  std::cout << "Total file size found " << std::setprecision(2) << std::fixed
+            << boost::units::binary_prefix << project_cost.true_cost.file_size
+            << " and " << project_cost.true_cost.token_count
+            << " total preprocessing tokens found in "
+            << duration_cast<std::chrono::milliseconds>(timer.restart())
+            << "\n";
+  if (project_cost.precompiled.token_count > 0u) {
+    std::cout << "Total precompiled header size found " << std::setprecision(2)
+              << std::fixed << boost::units::binary_prefix
+              << project_cost.precompiled.file_size << " and "
+              << project_cost.precompiled.token_count
+              << " total preprocessing tokens found\n";
   }
   std::cout << "\n";
 
@@ -138,13 +175,6 @@ int main(int argc, const char **argv) {
     return 0;
   }
   case output::list_files: {
-    const cost total_project_cost = get_total_cost::from_graph(graph, sources);
-    std::cout << "Total file size found " << std::setprecision(2) << std::fixed
-              << boost::units::binary_prefix << total_project_cost.file_size
-              << " and " << total_project_cost.token_count
-              << " total preprocessing tokens found in "
-              << duration_cast<std::chrono::milliseconds>(timer.restart())
-              << "\n";
     const double percent_cut_off = 0.005;
     {
       std::vector<list_included_files::result> results =
@@ -164,7 +194,7 @@ int main(int argc, const char **argv) {
         const cost c =
             i.source_that_can_reach_it_count * graph[i.v].true_cost();
         const double percentage =
-            (100.0 * c.token_count) / total_project_cost.token_count;
+            (100.0 * c.token_count) / project_cost.true_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed << c.token_count << " ("
                   << percentage << "%) " << graph[i.v].path.filename().string()
                   << " x" << i.source_that_can_reach_it_count << "\n";
@@ -173,18 +203,12 @@ int main(int argc, const char **argv) {
     return 0;
   }
   case output::most_expensive: {
-    const cost total_project_cost = get_total_cost::from_graph(graph, sources);
-    std::cout << "Total file size found " << std::setprecision(2) << std::fixed
-              << boost::units::binary_prefix << total_project_cost.file_size
-              << " and " << total_project_cost.token_count
-              << " total preprocessing tokens found in "
-              << duration_cast<std::chrono::milliseconds>(timer.restart())
-              << "\n";
     const double percent_cut_off = 0.001;
     {
       std::vector<include_directive_and_cost> results =
           find_expensive_includes::from_graph(
-              graph, sources, total_project_cost.token_count * percent_cut_off);
+              graph, sources,
+              project_cost.true_cost.token_count * percent_cut_off);
       std::cout << "Includes analyzed in "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())
                 << "\n";
@@ -195,7 +219,7 @@ int main(int argc, const char **argv) {
                 });
       for (const include_directive_and_cost &i : results) {
         const double percentage =
-            (100.0 * i.saving.token_count) / total_project_cost.token_count;
+            (100.0 * i.saving.token_count) / project_cost.true_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed << i.saving.token_count
                   << " (" << percentage << "%) from "
                   << i.file.filename().string() << "L#" << i.include->lineNumber
@@ -206,7 +230,8 @@ int main(int argc, const char **argv) {
     {
       std::vector<find_expensive_headers::result> results =
           find_expensive_headers::from_graph(
-              graph, sources, total_project_cost.token_count * percent_cut_off);
+              graph, sources,
+              project_cost.true_cost.token_count * percent_cut_off);
       std::cout << "\nHeaders analyzed in "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())
                 << "\n";
@@ -218,7 +243,7 @@ int main(int argc, const char **argv) {
                 });
       for (const find_expensive_headers::result &i : results) {
         const double percentage = (100.0 * i.total_saving().token_count) /
-                                  total_project_cost.token_count;
+                                  project_cost.true_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed
                   << i.total_saving().token_count << " (" << percentage
                   << "%) removing " << graph[i.v].internal_incoming
@@ -237,7 +262,7 @@ int main(int argc, const char **argv) {
           continue;
         }
         const double percentage =
-            (100.0 * i.saving.token_count) / total_project_cost.token_count;
+            (100.0 * i.saving.token_count) / project_cost.true_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed
                   << i.total_saving().token_count << " (" << percentage
                   << "%) adding " << graph[i.v].path
@@ -250,7 +275,8 @@ int main(int argc, const char **argv) {
       const double assumed_reduction = 0.50;
       std::vector<file_and_cost> results = find_expensive_files::from_graph(
           graph, sources,
-          total_project_cost.token_count * percent_cut_off / assumed_reduction);
+          project_cost.true_cost.token_count * percent_cut_off /
+              assumed_reduction);
       std::cout << "\nFiles analyzed in "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())
                 << "\n";
@@ -266,7 +292,7 @@ int main(int argc, const char **argv) {
         const unsigned saving =
             i.sources * assumed_reduction * i.node->true_cost().token_count;
         const double percentage =
-            (100.0 * saving) / total_project_cost.token_count;
+            (100.0 * saving) / project_cost.true_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed << saving << " ("
                   << percentage << "%) from "
                   << std::filesystem::path(i.node->path).filename().string()
@@ -279,7 +305,7 @@ int main(int argc, const char **argv) {
       std::vector<find_unnecessary_sources::result> results =
           find_unnecessary_sources::from_graph(
               graph, sources,
-              total_project_cost.token_count * percent_cut_off);
+              project_cost.true_cost.token_count * percent_cut_off);
       std::cout << "\nSources analyzed in "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())
                 << "\n";
@@ -291,7 +317,7 @@ int main(int argc, const char **argv) {
                 });
       for (const find_unnecessary_sources::result &i : results) {
         const double percentage = (100.0 * i.total_saving().token_count) /
-                                  total_project_cost.token_count;
+                                  project_cost.true_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed
                   << i.total_saving().token_count << " (" << percentage
                   << "%) deleting " << graph[i.source].path

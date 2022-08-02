@@ -27,10 +27,14 @@ const cost J{1000000000, 2.0 * bytes};
 
 TEST(GetTotalCostTest, DiamondIncludes) {
   Graph graph;
-  const Graph::vertex_descriptor a = add_vertex({"a", not_external, 0u, A}, graph);
-  const Graph::vertex_descriptor b = add_vertex({"b", not_external, 1u, B}, graph);
-  const Graph::vertex_descriptor c = add_vertex({"c", not_external, 1u, C}, graph);
-  const Graph::vertex_descriptor d = add_vertex({"d", not_external, 2u, D}, graph);
+  const Graph::vertex_descriptor a =
+      add_vertex({"a", not_external, 0u, A}, graph);
+  const Graph::vertex_descriptor b =
+      add_vertex({"b", not_external, 1u, B}, graph);
+  const Graph::vertex_descriptor c =
+      add_vertex({"c", not_external, 1u, C}, graph);
+  const Graph::vertex_descriptor d =
+      add_vertex({"d", not_external, 2u, D}, graph);
 
   //      a
   //     / \
@@ -42,7 +46,7 @@ TEST(GetTotalCostTest, DiamondIncludes) {
   add_edge(b, d, {"b->d"}, graph);
   add_edge(c, d, {"c->d"}, graph);
 
-  EXPECT_EQ(get_total_cost::from_graph(graph, {a}), A + B + C + D);
+  EXPECT_EQ(get_total_cost::from_graph(graph, {a}).true_cost, A + B + C + D);
 }
 
 TEST(GetTotalCostTest, MultiLevel) {
@@ -82,7 +86,7 @@ TEST(GetTotalCostTest, MultiLevel) {
   add_edge(f, h, {"f->h"}, graph);
   add_edge(g, h, {"g->h"}, graph);
 
-  EXPECT_EQ(get_total_cost::from_graph(graph, {a, b}),
+  EXPECT_EQ(get_total_cost::from_graph(graph, {a, b}).true_cost,
             (A + C + D + F + H) + (B + D + E + F + G + H));
 }
 
@@ -136,7 +140,7 @@ TEST(GetTotalCostTest, LongChain) {
   add_edge(h, j, {"h->j"}, graph);
   add_edge(i, j, {"i->j"}, graph);
 
-  EXPECT_EQ(get_total_cost::from_graph(graph, {a}),
+  EXPECT_EQ(get_total_cost::from_graph(graph, {a}).true_cost,
             A + B + C + D + E + F + G + H + I + J);
 }
 

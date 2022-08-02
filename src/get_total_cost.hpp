@@ -11,9 +11,13 @@ namespace IncludeGuardian {
 /// This component will output the total number of bytes and preprocessing
 /// tokens if all the `source` were expanded after the preprocessing step.
 struct get_total_cost {
-  static cost from_graph(const Graph &graph,
-                         std::span<const Graph::vertex_descriptor> sources);
-  static cost
+  struct result {
+    cost true_cost;   //< The cost (excluding precompiled) of the graph
+    cost precompiled; //< The cost of the precompiled header
+  };
+  static result from_graph(const Graph &graph,
+                           std::span<const Graph::vertex_descriptor> sources);
+  static result
   from_graph(const Graph &graph,
              std::initializer_list<Graph::vertex_descriptor> sources);
 };

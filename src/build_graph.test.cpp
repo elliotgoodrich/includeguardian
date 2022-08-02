@@ -88,7 +88,8 @@ template <typename T> void dump(T &out, const std::vector<include_edge> &v) {
 bool vertices_equal(const file_node &lhs, const Graph &lgraph,
                     const file_node &rhs, const Graph &rgraph) {
   if (lhs.path != rhs.path || lhs.is_external != rhs.is_external ||
-      lhs.underlying_cost != rhs.underlying_cost || lhs.internal_incoming != rhs.internal_incoming ||
+      lhs.underlying_cost != rhs.underlying_cost ||
+      lhs.internal_incoming != rhs.internal_incoming ||
       lhs.is_precompiled != rhs.is_precompiled) {
     return false;
   }
@@ -333,9 +334,11 @@ TEST(BuildGraphTest, PrecompiledHeaders) {
   const Graph::vertex_descriptor a_cpp =
       add_vertex({"a.cpp", not_external, 0u, {1, 100 * B}}, g);
   const Graph::vertex_descriptor all_pch = add_vertex(
-      {"all.pch", not_external, 1u, {2, 1000 * B}, std::nullopt, precompiled}, g);
+      {"all.pch", not_external, 1u, {2, 1000 * B}, std::nullopt, precompiled},
+      g);
   const Graph::vertex_descriptor normal_h = add_vertex(
-      {"normal.h", not_external, 1u, {3, 10000 * B}, std::nullopt, precompiled}, g);
+      {"normal.h", not_external, 1u, {3, 10000 * B}, std::nullopt, precompiled},
+      g);
   add_edge(a_cpp, all_pch, {"\"all.pch\"", 1, removable}, g).first;
   add_edge(all_pch, normal_h, {"\"normal.h\"", 1, removable}, g).first;
 
@@ -344,6 +347,48 @@ TEST(BuildGraphTest, PrecompiledHeaders) {
       make_file_system(g, working_directory);
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+}
+
+TEST(BuildGraphTest, ForcedIncludes) {
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  const std::filesystem::path foo = "foo";
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  "#include \"include.hpp\"\n"
+                  "#pragma override_file_size(123)\n"
+                  "#pragma override_token_count(1)\n"));
+  fs->addFile((working_directory / "include.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma override_file_size(246)\n"
+                  "#pragma override_token_count(2)\n"));
+  fs->addFile((working_directory / foo / "forced.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  "#include \"forced_sub.hpp\"\n"
+                  "#pragma override_file_size(999)\n"
+                  "#pragma override_token_count(4)\n"));
+  fs->addFile((working_directory / foo / "forced_sub.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma override_file_size(1000)\n"
+                  "#pragma override_token_count(8)\n"));
+  Graph g;
+  const Graph::vertex_descriptor main_cpp =
+      add_vertex({"main.cpp", not_external, 0u, {1, 123 * B}}, g);
+  const Graph::vertex_descriptor include_hpp =
+      add_vertex({"include.hpp", not_external, 1u, {2, 246 * B}}, g);
+  const Graph::vertex_descriptor forced_hpp =
+      add_vertex({foo / "forced.hpp", not_external, 1u, {4, 999 * B}}, g);
+  const Graph::vertex_descriptor forced_sub_hpp =
+      add_vertex({foo / "forced_sub.hpp", not_external, 1u, {8, 1000 * B}}, g);
+  add_edge(main_cpp, forced_hpp, {"\"foo\\forced.hpp\"", 0, not_removable}, g);
+  add_edge(main_cpp, include_hpp, {"\"include.hpp\"", 1, removable}, g);
+  add_edge(forced_hpp, forced_sub_hpp, {"\"forced_sub.hpp\"", 1, removable}, g);
+
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_dir(working_directory, {}, fs, get_file_type,
+                            {working_directory / foo / "forced.hpp"});
+  auto &x = results->missing_includes;
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
 }
 
