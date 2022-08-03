@@ -41,7 +41,7 @@
 // the include inside.  That would add additional compilation work
 // since we would have an additional source.  It would only become
 // faster if there were enough source dependencies on `zorb.hpp`
-// compare to the size of `common.cpp`.
+// compared to the size of `common.cpp`.
 
 #include "graph.hpp"
 
