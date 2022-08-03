@@ -388,7 +388,6 @@ TEST(BuildGraphTest, ForcedIncludes) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type,
                             {working_directory / foo / "forced.hpp"});
-  auto &x = results->missing_includes;
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
 }
 
