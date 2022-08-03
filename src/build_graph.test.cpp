@@ -339,8 +339,8 @@ TEST(BuildGraphTest, PrecompiledHeaders) {
   const Graph::vertex_descriptor normal_h = add_vertex(
       {"normal.h", not_external, 1u, {3, 10000 * B}, std::nullopt, precompiled},
       g);
-  add_edge(a_cpp, all_pch, {"\"all.pch\"", 1, removable}, g).first;
-  add_edge(all_pch, normal_h, {"\"normal.h\"", 1, removable}, g).first;
+  add_edge(a_cpp, all_pch, {"\"all.pch\"", 1, removable}, g);
+  add_edge(all_pch, normal_h, {"\"normal.h\"", 1, removable}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
