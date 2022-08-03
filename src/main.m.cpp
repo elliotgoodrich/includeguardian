@@ -264,7 +264,7 @@ int main(int argc, const char **argv) {
         const double percentage =
             (100.0 * i.saving.token_count) / project_cost.true_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed
-                  << i.total_saving().token_count << " (" << percentage
+                  << i.saving.token_count << " (" << percentage
                   << "%) adding " << graph[i.v].path
                   << " to a precompiled header\n";
       }
