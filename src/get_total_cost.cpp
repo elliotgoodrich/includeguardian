@@ -8,11 +8,6 @@
 
 namespace IncludeGuardian {
 
-get_total_cost::result operator+(get_total_cost::result lhs,
-                                 get_total_cost::result rhs) {
-  return {lhs.true_cost + rhs.true_cost, lhs.precompiled + rhs.precompiled};
-}
-
 get_total_cost::result
 get_total_cost::from_graph(const Graph &graph,
                            std::span<const Graph::vertex_descriptor> sources) {
@@ -51,6 +46,11 @@ get_total_cost::result get_total_cost::from_graph(
     const Graph &graph,
     std::initializer_list<Graph::vertex_descriptor> sources) {
   return from_graph(graph, std::span(sources.begin(), sources.end()));
+}
+
+get_total_cost::result operator+(get_total_cost::result lhs,
+                                 get_total_cost::result rhs) {
+  return {lhs.true_cost + rhs.true_cost, lhs.precompiled + rhs.precompiled};
 }
 
 } // namespace IncludeGuardian

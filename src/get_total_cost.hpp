@@ -14,6 +14,9 @@ struct get_total_cost {
   struct result {
     cost true_cost;   //< The cost (excluding precompiled) of the graph
     cost precompiled; //< The cost of the precompiled header
+    cost total() const {
+        return true_cost + precompiled;
+    }
   };
   static result from_graph(const Graph &graph,
                            std::span<const Graph::vertex_descriptor> sources);
@@ -21,6 +24,9 @@ struct get_total_cost {
   from_graph(const Graph &graph,
              std::initializer_list<Graph::vertex_descriptor> sources);
 };
+
+get_total_cost::result operator+(get_total_cost::result lhs,
+                                 get_total_cost::result rhs);
 
 } // namespace IncludeGuardian
 

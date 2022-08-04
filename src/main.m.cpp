@@ -16,6 +16,7 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <string>
 #include <utility>
 
@@ -49,6 +50,21 @@ build_graph::file_type map_ext(std::string_view file) {
   return std::find_if(std::begin(lookup), std::end(lookup) - 1,
                       [=](auto p) { return p.first == ext; })
       ->second;
+}
+
+get_total_cost::result get_naive_cost(const Graph &g) {
+  const auto [begin, end] = vertices(g);
+  return std::accumulate(
+      begin, end, get_total_cost::result{},
+      [&](get_total_cost::result acc, const Graph::vertex_descriptor v) {
+        get_total_cost::result r;
+        if (g[v].is_precompiled) {
+          r.precompiled += g[v].underlying_cost;
+        } else {
+          r.true_cost += g[v].underlying_cost;
+        }
+        return acc + r;
+      });
 }
 
 class stopwatch {
@@ -149,20 +165,47 @@ int main(int argc, const char **argv) {
   }
   std::cout << "\n";
 
+  {
+    const get_total_cost::result naive_cost = get_naive_cost(graph);
+    std::cout << "Total file size found " << std::setprecision(2) << std::fixed
+              << boost::units::binary_prefix << naive_cost.total().file_size
+              << " and " << naive_cost.total().token_count
+              << " total preprocessing tokens found in "
+              << duration_cast<std::chrono::milliseconds>(timer.restart())
+              << "\n";
+    if (naive_cost.precompiled.token_count > 0u) {
+      std::cout << "of which " << std::setprecision(2) << std::fixed
+                << boost::units::binary_prefix
+                << naive_cost.precompiled.file_size << " ("
+                << (100.0 * naive_cost.precompiled.file_size /
+                    naive_cost.total().file_size)
+                       .value()
+                << "%) and " << naive_cost.precompiled.token_count << " ("
+                << (100.0 * naive_cost.precompiled.token_count /
+                    naive_cost.total().token_count)
+                << "%) preprocessing tokens are in the precompiled header\n";
+    }
+  }
+
   const get_total_cost::result project_cost =
       get_total_cost::from_graph(graph, sources);
-  std::cout << "Total file size found " << std::setprecision(2) << std::fixed
+  std::cout << "\nTotal file size processed among all " << sources.size()
+            << " sources is " << std::setprecision(2) << std::fixed
             << boost::units::binary_prefix << project_cost.true_cost.file_size
             << " and " << project_cost.true_cost.token_count
-            << " total preprocessing tokens found in "
-            << duration_cast<std::chrono::milliseconds>(timer.restart())
-            << "\n";
+            << " total preprocessing tokens\n";
   if (project_cost.precompiled.token_count > 0u) {
-    std::cout << "Total precompiled header size found " << std::setprecision(2)
-              << std::fixed << boost::units::binary_prefix
-              << project_cost.precompiled.file_size << " and "
-              << project_cost.precompiled.token_count
-              << " total preprocessing tokens found\n";
+    std::cout << "Precompiled header reduced total file size processed by "
+              << std::setprecision(2) << std::fixed
+              << boost::units::binary_prefix
+              << project_cost.precompiled.file_size << " ("
+              << (100.0 * project_cost.precompiled.file_size /
+                  project_cost.total().file_size)
+                     .value()
+              << "%) and " << project_cost.precompiled.token_count << " ("
+              << (100.0 * project_cost.precompiled.token_count /
+                  project_cost.total().token_count)
+              << " preprocessing tokens\n";
   }
   std::cout << "\n";
 
@@ -263,9 +306,8 @@ int main(int argc, const char **argv) {
         }
         const double percentage =
             (100.0 * i.saving.token_count) / project_cost.true_cost.token_count;
-        std::cout << std::setprecision(2) << std::fixed
-                  << i.saving.token_count << " (" << percentage
-                  << "%) adding " << graph[i.v].path
+        std::cout << std::setprecision(2) << std::fixed << i.saving.token_count
+                  << " (" << percentage << "%) adding " << graph[i.v].path
                   << " to a precompiled header\n";
       }
     }
