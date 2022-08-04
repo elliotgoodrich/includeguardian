@@ -148,26 +148,27 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
   std::mutex m;
   std::vector<find_expensive_headers::result> results;
   const auto [begin, end] = vertices(graph);
-  std::for_each(begin, end, [&](const Graph::vertex_descriptor file) {
-    // If we do not include this file ourselves, there is no point
-    // performing the analysis
-    if (graph[file].internal_incoming == 0) {
-      return;
-    }
+  std::for_each(std::execution::par, begin, end,
+                [&](const Graph::vertex_descriptor file) {
+                  // If we do not include this file ourselves, there is no point
+                  // performing the analysis
+                  if (graph[file].internal_incoming == 0) {
+                    return;
+                  }
 
-    DFSHelper helper(graph, reach);
-    const auto [saving, extra] =
-        helper.total_file_size_of_unreachable(sources, file);
+                  DFSHelper helper(graph, reach);
+                  const auto [saving, extra] =
+                      helper.total_file_size_of_unreachable(sources, file);
 
-    if (saving.token_count - extra.value_or(cost{}).token_count >=
-        minimum_token_count_cut_off) {
-      // There are ways to avoid this mutex, but if the
-      // `minimum_size_cut_off` is large enough, it's relatively
-      // rare to enter this if statement
-      std::lock_guard g(m);
-      results.emplace_back(file, saving, extra);
-    }
-  });
+                  if (saving.token_count - extra.value_or(cost{}).token_count >=
+                      minimum_token_count_cut_off) {
+                    // There are ways to avoid this mutex, but if the
+                    // `minimum_size_cut_off` is large enough, it's relatively
+                    // rare to enter this if statement
+                    std::lock_guard g(m);
+                    results.emplace_back(file, saving, extra);
+                  }
+                });
   return results;
 }
 
