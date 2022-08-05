@@ -41,14 +41,21 @@ add_library(
     find_unnecessary_sources.hpp find_unnecessary_sources.cpp
     get_total_cost.hpp get_total_cost.cpp
     reachability_graph.hpp
+    recommend_precompiled.hpp recommend_precompiled.cpp
 )
+
+find_package(GTest)
+include(GoogleTest)
+target_link_libraries(common CONAN_PKG::gtest)
+
 target_precompile_headers(common
   PRIVATE
     <boost/graph/adjacency_list.hpp>
-    <algorithm>
-    <chrono>
-    <charconv>
+    <boost/units/io.hpp>
+    <boost/units/quantity.hpp>
+    <gtest/gtest.h>
     <filesystem>
+    <execution>
 )
 target_link_libraries(common CONAN_PKG::boost)
 target_link_libraries(common clangTooling)
@@ -66,8 +73,6 @@ if(WIN32)
     target_compile_options(common PRIVATE /EHsc /FS)
 endif()
 
-find_package(GTest)
-include(GoogleTest)
 add_executable(
     tests
     build_graph.test.cpp

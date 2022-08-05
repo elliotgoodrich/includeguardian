@@ -7,11 +7,12 @@
 #include "get_total_cost.hpp"
 #include "graph.hpp"
 #include "list_included_files.hpp"
+#include "recommend_precompiled.hpp"
 
 #include <boost/units/io.hpp>
 
-#include <llvm/Support/CommandLine.h.>
-#include <llvm/Support/VirtualFileSystem.h.>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/VirtualFileSystem.h>
 
 #include <chrono>
 #include <iomanip>
@@ -292,18 +293,22 @@ int main(int argc, const char **argv) {
                   << "%) removing " << graph[i.v].internal_incoming
                   << " references to " << graph[i.v].path << "\n";
       }
+    }
 
-      std::cout << "\nPrecompiled header suggestions\n";
+    {
+      std::vector<recommend_precompiled::result> results =
+          recommend_precompiled::from_graph(
+              graph, sources,
+              project_cost.true_cost.token_count * percent_cut_off, 2.0);
+      std::cout << "\nPrecompiled header addition suggestions in "
+                << duration_cast<std::chrono::milliseconds>(timer.restart())
+                << "\n";
       std::sort(results.begin(), results.end(),
-                [](const find_expensive_headers::result &l,
-                   const find_expensive_headers::result &r) {
+                [](const recommend_precompiled::result &l,
+                   const recommend_precompiled::result &r) {
                   return l.saving.token_count > r.saving.token_count;
                 });
-      for (const find_expensive_headers::result &i : results) {
-        // Don't try to add internal files to the precompiled header
-        if (!graph[i.v].is_external) {
-          continue;
-        }
+      for (const recommend_precompiled::result &i : results) {
         const double percentage =
             (100.0 * i.saving.token_count) / project_cost.true_cost.token_count;
         std::cout << std::setprecision(2) << std::fixed << i.saving.token_count
