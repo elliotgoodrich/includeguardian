@@ -92,8 +92,6 @@ int main(int argc, const char **argv) {
   // Use the user's locale to format numbers etc.
   std::cout.imbue(std::locale(""));
 
-  llvm::cl::OptionCategory MyToolCategory("my-tool options");
-
   llvm::cl::opt<output> output(
       "output", llvm::cl::desc("Choose the output"),
       llvm::cl::values(
@@ -103,9 +101,12 @@ int main(int argc, const char **argv) {
               "list-files", static_cast<int>(output::list_files), "List files"),
           llvm::cl::OptionEnumValue(
               "most-expensive", static_cast<int>(output::most_expensive),
-              "List of most expensive include directives")));
+              "List of most expensive include directives (default)")),
+      llvm::cl::init(output::most_expensive));
 
-  llvm::cl::opt<std::string> dir("dir", llvm::cl::desc("Choose the directory"));
+  llvm::cl::opt<std::string> dir("dir", llvm::cl::desc("Choose the directory"),
+                                 llvm::cl::value_desc("directory"),
+                                 llvm::cl::Required);
 
   llvm::cl::list<std::string> include_dirs(
       "i", llvm::cl::desc("Additional include directories"),
@@ -116,7 +117,28 @@ int main(int argc, const char **argv) {
       llvm::cl::desc("Forced includes (absolute path preferred)"),
       llvm::cl::ZeroOrMore);
 
+  llvm::cl::opt<double> cutoff(
+      "cutoff", llvm::cl::desc("Cutoff percentage for suggestions"),
+      llvm::cl::value_desc("percentage"), llvm::cl::init(1.0));
+  llvm::cl::opt<double> pch_ratio(
+      "pch-ratio",
+      llvm::cl::desc(
+          "Require ratio of token reduction compared to pch file growth"),
+      llvm::cl::value_desc("ratio"), llvm::cl::init(2.0));
+
   if (!llvm::cl::ParseCommandLineOptions(argc, argv)) {
+    return 1;
+  }
+
+  if (cutoff.getValue() < 0.0 || cutoff.getValue() > 100.0) {
+    std::cerr << "'cutoff' must lie between [0, 100]\n";
+    return 1;
+  }
+
+  const double percent_cut_off = cutoff.getValue() / 100.0;
+
+  if (pch_ratio.getValue() <= 0.0) {
+    std::cerr << "'pch-ratio' must be positive\n";
     return 1;
   }
 
@@ -219,7 +241,6 @@ int main(int argc, const char **argv) {
     return 0;
   }
   case output::list_files: {
-    const double percent_cut_off = 0.005;
     {
       std::vector<list_included_files::result> results =
           list_included_files::from_graph(graph, sources);
@@ -247,7 +268,6 @@ int main(int argc, const char **argv) {
     return 0;
   }
   case output::most_expensive: {
-    const double percent_cut_off = 0.001;
     {
       std::vector<include_directive_and_cost> results =
           find_expensive_includes::from_graph(
@@ -297,9 +317,10 @@ int main(int argc, const char **argv) {
 
     {
       std::vector<recommend_precompiled::result> results =
-          recommend_precompiled::from_graph(
-              graph, sources,
-              project_cost.true_cost.token_count * percent_cut_off, 2.0);
+          recommend_precompiled::from_graph(graph, sources,
+                                            project_cost.true_cost.token_count *
+                                                percent_cut_off,
+                                            pch_ratio.getValue());
       std::cout << "\nPrecompiled header addition suggestions in "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())
                 << "\n";
