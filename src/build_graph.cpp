@@ -1,5 +1,8 @@
 #include "build_graph.hpp"
 
+#include <clang/Lex/Preprocessor.h>
+#include <clang/Lex/PreprocessorOptions.h>
+
 #include <clang/Basic/Diagnostic.h>
 #include <clang/Basic/DiagnosticIDs.h>
 #include <clang/Basic/TargetInfo.h>
@@ -27,6 +30,8 @@ namespace {
 const Graph::vertex_descriptor empty =
     boost::graph_traits<Graph>::null_vertex();
 
+clang::IgnoringDiagConsumer s_ignore;
+
 struct Hasher {
   std::size_t operator()(const llvm::sys::fs::UniqueID key) const noexcept {
     // NOTE: Not a good hash, but out devices should probably be the same
@@ -37,248 +42,258 @@ struct Hasher {
 struct FileState {
   Graph::vertex_descriptor v;
   bool fully_processed = false;
+  bool token_count_overridden = false;
 };
 
 using UniqueIdToNode =
     std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher>;
 
-struct Arguments {
-  const std::filesystem::path &source_dir;
-  UniqueIdToNode id_to_node;
-
-  Arguments(const std::filesystem::path &source_dir)
-      : source_dir(source_dir), id_to_node() {}
-};
-
-// Update `f`s `file_size` or `token_count` based on the `#pragma` stored in the
-// specified `tok`.  Return whether this is the end of the file.
-bool parse_pragma(clang::Lexer &lex, clang::Token &tok, unsigned &token_count,
-                  file_node &f, bool &token_count_overriden) {
-  assert(tok.getRawIdentifier() == "pragma");
-  if (lex.LexFromRawLexer(tok)) {
-    ++token_count;
-    return true;
-  }
-  if (!tok.is(clang::tok::raw_identifier)) {
-    return false;
-  }
-
-  const llvm::StringRef pragmas[] = {"override_file_size",
-                                     "override_token_count"};
-  const int type = std::find(std::begin(pragmas), std::end(pragmas),
-                             tok.getRawIdentifier()) -
-                   std::begin(pragmas);
-  if (type == 2) {
-    return false;
-  }
-
-  if (lex.LexFromRawLexer(tok)) {
-    ++token_count;
-    return true;
-  }
-
-  if (!tok.is(clang::tok::l_paren)) {
-    return false;
-  }
-
-  if (lex.LexFromRawLexer(tok)) {
-    ++token_count;
-    return true;
-  }
-
-  if (!tok.is(clang::tok::numeric_constant)) {
-    return false;
-  }
-
-  const std::string_view arg_str(tok.getLiteralData(), tok.getLength());
-  std::size_t arg;
-  const auto [ptr, ec] =
-      std::from_chars(arg_str.data(), arg_str.data() + arg_str.size(), arg);
-  if (ec == std::errc()) {
-    if (type == 0) {
-      f.underlying_cost.file_size = arg * boost::units::information::bytes;
-    } else {
-      f.underlying_cost.token_count = arg;
-      token_count_overriden = true;
+// For the specified path `file`, if it is located within `source_dir` then
+// return its relative path within it and `true`.  Otherwise look at
+// each element of `external_dirs` in turn and return the relative path for
+// the first element that `file` is found in and `false`.  Otherwise return
+// `{file, true}`.
+std::pair<std::filesystem::path, bool /*is_external*/>
+rel_to_one_of(const std::filesystem::path &file,
+              const std::filesystem::path &source_dir,
+              std::span<const std::filesystem::path> external_dirs) {
+  {
+    const auto [file_it, source_it] = std::mismatch(
+        file.begin(), file.end(), source_dir.begin(), source_dir.end());
+    if (source_it == source_dir.end()) {
+      return {file.lexically_relative(source_dir).make_preferred(),
+              /*is external=*/false};
     }
-    return false;
+  }
+  for (const std::filesystem::path &dir : external_dirs) {
+    const auto [file_it, dir_it] =
+        std::mismatch(file.begin(), file.end(), dir.begin(), dir.end());
+    if (dir_it == dir.end()) {
+      return {file.lexically_relative(dir).make_preferred(),
+              /*is external=*/true};
+    }
   }
 
-  // TODO, finish the closing paren
-
-  return false;
+  return {file, /*is external=*/true};
 }
 
-Graph::vertex_descriptor process(
-    std::filesystem::path start, const std::filesystem::path &source_dir,
-    std::span<Graph::vertex_descriptor> forced_includes,
-    std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher> &id_to_node,
-    const std::function<build_graph::file_type(std::string_view)> &file_type,
-    Graph &graph, clang::FileManager &file_manager, clang::SourceManager &sm,
-    clang::HeaderSearch &header_search,
-    std::set<std::string> &missing_includes) {
-  std::deque<std::filesystem::path> todo;
-  todo.push_back(start);
-  while (!todo.empty()) {
-    std::filesystem::path file = todo.front();
-    todo.pop_front();
-    llvm::ErrorOr<const clang::FileEntry *> opt_file_entry =
-        file_manager.getFile(file.string());
-    const clang::FileEntry *file_entry = opt_file_entry.get();
-    // FIXME, `it` becomes invalidated when we `emplace` later on
-    auto const [it, inserted] =
-        id_to_node.emplace(file_entry->getUniqueID(), empty);
-    if (it->second.fully_processed) {
-      continue;
-    }
+struct IncludeScanner : public clang::PPCallbacks {
+  clang::SourceManager *m_sm;
+  UniqueIdToNode &m_id_to_node;
+  build_graph::result &m_r;
+  const clang::LangOptions &m_options;
+  const std::filesystem::path &m_source_dir;
+  std::span<const std::filesystem::path> m_include_dirs;
+  const std::function<build_graph::file_type(std::string_view)> &m_file_type;
+  std::vector<UniqueIdToNode::iterator> m_stack;
 
-    if (inserted) {
-      // The files passed to `process` shouldn't be external files
-      // for now
-      const bool is_external = false;
-      const bool is_precompiled = file_type(file.string()) ==
-                                  build_graph::file_type::precompiled_header;
+  UniqueIdToNode::iterator lookup_or_insert(const clang::FileEntry *file) {
+    const llvm::sys::fs::UniqueID id =
+        file ? file->getUniqueID() : llvm::sys::fs::UniqueID();
+    auto const [it, inserted] = m_id_to_node.emplace(id, empty);
+    if (file && inserted) {
+      const unsigned internal_incoming = 0u;
+      const auto [p, is_external] =
+          rel_to_one_of(file->getName().str(), m_source_dir, m_include_dirs);
+
+      // We are also precompiled if the header including us is
+      // precompiled
+      const bool is_precompiled =
+          (!m_stack.empty() &&
+           m_r.graph[m_stack.back()->second.v].is_precompiled) ||
+          m_file_type(p.string()) == build_graph::file_type::precompiled_header;
+
       it->second.v = add_vertex(
-          {file.lexically_relative(source_dir), is_external, 0u,
-           cost{0u, file_entry->getSize() * boost::units::information::bytes},
+          {p, is_external, internal_incoming,
+           cost{0ull, file->getSize() * boost::units::information::bytes},
            std::nullopt, is_precompiled},
-          graph);
+          m_r.graph);
     }
 
-    if (file == start) {
-      // Reuse the memory for `include_text` (just because we can)
-      std::string include_text;
-      if (!forced_includes.empty()) {
-        include_text.reserve(512);
-      }
-      for (const Graph::vertex_descriptor forced_include : forced_includes) {
-        file_node &node = graph[forced_include];
-        include_text = '"';
-        // Forced includes must be absolute paths
-        include_text += node.path.string();
-        include_text += '"';
-        const bool is_removable = false;
-        // Use 0 to signify it's a forced include.
-        const unsigned line_number = 0;
-        add_edge(it->second.v, forced_include,
-                 {include_text, line_number, is_removable}, graph);
-        if (!graph[it->second.v].is_external) {
-          ++node.internal_incoming;
-        }
-      }
+    return it;
+  }
+
+public:
+  IncludeScanner(
+      clang::SourceManager &sm, const clang::LangOptions &options,
+      const std::filesystem::path &source_dir,
+      std::span<const std::filesystem::path> include_dirs,
+      const std::function<build_graph::file_type(std::string_view)> &file_type,
+      build_graph::result &r, UniqueIdToNode &id_to_node)
+      : m_r(r), m_sm(&sm), m_id_to_node(id_to_node), m_options(options),
+        m_source_dir(source_dir), m_include_dirs(include_dirs),
+        m_file_type(file_type) {}
+
+  long long &current_token_counter() {
+    if (m_stack.back()->second.token_count_overridden) {
+      static long long dummy = 0;
+      dummy = 0;
+      return dummy;
+    }
+    return m_r.graph[m_stack.back()->second.v].underlying_cost.token_count;
+  }
+
+  void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
+                   clang::SrcMgr::CharacteristicKind FileType,
+                   clang::FileID OptionalPrevFID) final {
+
+    const clang::FileID fileID = m_sm->getFileID(Loc);
+    const clang::FileEntry *file = m_sm->getFileEntryForID(fileID);
+
+    // If `file` is `nullptr` then we are processing some magic predefine
+    // file from clang that we can ignore for now.
+    if (!file) {
+      return;
     }
 
-    bool token_count_overriden = false;
-
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-        file_manager.getBufferForFile(file_entry);
-
-    const clang::LangOptions options;
-    clang::Lexer lex(sm.getOrCreateFileID(file_entry, clang::SrcMgr::C_User),
-                     **buffer, sm, options);
-    clang::Token tok;
-    unsigned token_count = 0u;
-    while (!lex.LexFromRawLexer(tok)) {
-      ++token_count;
-      if (tok.is(clang::tok::hash) && tok.isAtStartOfLine()) {
-        if (lex.LexFromRawLexer(tok)) {
-          ++token_count;
-          break;
-        }
-        if (tok.is(clang::tok::raw_identifier)) {
-          if (tok.getRawIdentifier() == "include") {
-            lex.LexIncludeFilename(tok);
-            if (tok.getKind() == clang::tok::header_name) {
-              const std::string_view include_text(tok.getLiteralData() + 1,
-                                                  tok.getLength() - 2);
-              const bool is_angled = *tok.getLiteralData() == '<';
-              const clang::DirectoryLookup *current_directory = nullptr;
-              llvm::Expected<clang::DirectoryEntryRef> current_dir_ref =
-                  file_manager.getDirectoryRef(file.string());
-              const clang::DirectoryEntry *y =
-                  *file_manager.getDirectory(file.parent_path().string());
-              const std::pair<const clang::FileEntry *,
-                              const clang::DirectoryEntry *>
-                  includer(file_entry, y);
-              llvm::Optional<clang::FileEntryRef> file_ref =
-                  header_search.LookupFile(
-                      include_text, tok.getLastLoc(), is_angled, nullptr,
-                      current_directory, llvm::ArrayRef(includer), nullptr,
-                      nullptr, nullptr, nullptr, nullptr, nullptr);
-              if (file_ref) {
-                auto const [to_it, inserted] =
-                    id_to_node.emplace(file_ref->getUniqueID(), empty);
-                if (inserted) {
-                  todo.emplace_back(std::string(
-                      file_ref.getValue().getFileEntry().getName()));
-                  if (!to_it->second.fully_processed) {
-                    const std::filesystem::path &p = todo.back();
-                    const bool is_external = current_directory != nullptr;
-                    const std::filesystem::path dir =
-                        is_external ? std::filesystem::path(std::string(
-                                          current_directory->getName()))
-                                    : source_dir;
-                    // We are also precompiled if the header including us is
-                    // precompiled
-                    const bool is_precompiled =
-                        graph[it->second.v].is_precompiled ||
-                        file_type(p.string()) ==
-                            build_graph::file_type::precompiled_header;
-                    to_it->second.v = add_vertex(
-                        {p.lexically_relative(dir), is_external, 0u,
-                         cost{
-                             0u,
-                             static_cast<double>(file_ref->getSize()) *
-                                 boost::units::information::bytes,
-                         },
-                         std::nullopt, is_precompiled},
-                        graph);
-                  }
-                }
-                const std::string include(tok.getLiteralData(),
-                                          tok.getLength());
-                const std::filesystem::path p(
-                    file_ref.getValue().getFileEntry().getName().str());
-                const bool is_removable = p.stem() != file.stem();
-                add_edge(it->second.v, to_it->second.v,
-                         {include, sm.getSpellingLineNumber(tok.getLocation()),
-                          is_removable},
-                         graph);
-                if (!graph[it->second.v].is_external) {
-                  ++graph[to_it->second.v].internal_incoming;
-                }
-
-                // If we haven't already guessed at a header-source connection
-                // then add it in.
-                if (!is_removable &&
-                    !graph[it->second.v].component.has_value()) {
-                  graph[to_it->second.v].component = it->second.v;
-                  graph[it->second.v].component = to_it->second.v;
-                }
-              } else {
-                missing_includes.emplace(tok.getLiteralData(), tok.getLength());
-              }
-            }
-          } else if (tok.getRawIdentifier() == "pragma") {
-            if (parse_pragma(lex, tok, token_count, graph[it->second.v],
-                             token_count_overriden)) {
-              break;
-            }
-          }
-        }
+    const auto it = lookup_or_insert(file);
+    if (Reason == FileChangeReason::ExitFile) {
+      // There are few quirks of clang's preprocessor that I have had to work
+      // around here.  First, we do not always get an `ExitFile` notification
+      // for files that do not have any include directives.  Second, we get
+      // the following series of callbacks for source files
+      //
+      // EnterFile main.cpp
+      // EnterFile (nullptr) Preprocessor.cpp#559 Predefines file
+      // RenameFile (nullptr clang::FileEntry) ExitFile (nullptr
+      // clang::FileEntry) ExitFile main.cpp
+      // ... rest of the callbacks
+      // ExitFile main.cpp
+      //
+      // Which means that we actually would have an empty stack if we blindly
+      // followed what we are told.
+      //
+      // To hack around both of these issues we have to do a search backwards
+      // in `m_stack` to perhaps pop off multiple elements - but we never pop
+      // off the last element and `assert(m_stack.size() == 1)` at the end.
+      const auto found = std::find(m_stack.rbegin(), m_stack.rend(), it);
+      const auto b = std::max(found.base(), m_stack.begin() + 1);
+      for (auto i = b; i != m_stack.end(); ++i) {
+        m_stack.back()->second.fully_processed = true;
       }
-      if (!token_count_overriden) {
-        graph[it->second.v].underlying_cost.token_count = token_count;
+      m_stack.erase(found.base(), m_stack.end());
+      return;
+    }
+
+    if (Reason == FileChangeReason::RenameFile) {
+      return;
+    }
+
+    if (m_stack.empty()) {
+      m_r.sources.push_back(it->second.v);
+    }
+
+    m_stack.push_back(it);
+  }
+
+  void FileSkipped(const clang::FileEntryRef &SkippedFile,
+                   const clang::Token &FilenameTok,
+                   clang::SrcMgr::CharacteristicKind FileType) final {}
+
+  void InclusionDirective(clang::SourceLocation HashLoc,
+                          const clang::Token &IncludeTok,
+                          clang::StringRef FileName, bool IsAngled,
+                          clang::CharSourceRange FilenameRange,
+                          const clang::FileEntry *File,
+                          clang::StringRef SearchPath,
+                          clang::StringRef RelativePath,
+                          const clang::Module *Imported,
+                          clang::SrcMgr::CharacteristicKind FileType) final {
+
+    const clang::FileID fromFileID = m_sm->getFileID(HashLoc);
+    const clang::FileEntry *fromFile = m_sm->getFileEntryForID(fromFileID);
+    if (fromFile) {
+      // `fromFile` is `nullptr` when the `HashLoc` comes from predefines
+      assert(m_id_to_node.find(fromFile->getUniqueID()) == m_stack.back());
+    }
+
+    if (m_stack.back()->second.fully_processed) {
+      return;
+    }
+
+    if (File) {
+      const clang::FileID fileID = m_sm->getFileID(HashLoc);
+      const char open = IsAngled ? '<' : '"';
+      std::string include(&open, 1);
+      include.insert(include.cend(), FileName.begin(), FileName.end());
+      const char close = IsAngled ? '>' : '"';
+      include.insert(include.cend(), &close, &close + 1);
+      const Graph::vertex_descriptor from = m_stack.back()->second.v;
+      const Graph::vertex_descriptor to = lookup_or_insert(File)->second.v;
+
+      const bool is_from_predefines = fromFile == nullptr;
+
+      // To differentiate includes coming from the predefines we use 0 instead
+      const unsigned line_number =
+          is_from_predefines ? 0 : m_sm->getSpellingLineNumber(HashLoc);
+
+      // Guess at whether this include is the interface for our source file
+      // TODO: Check we are a source file
+      const bool is_component =
+          m_r.graph[from].path.stem() == m_r.graph[to].path.stem();
+      auto l = m_r.graph[from].path;
+      auto r = m_r.graph[to].path;
+
+      // If we are in the predefines section assume this include cannot be
+      // removed
+      const bool is_removable = !is_from_predefines && !is_component;
+
+      add_edge(from, to, {include, line_number, is_removable}, m_r.graph);
+      m_r.graph[to].internal_incoming += !m_r.graph[from].is_external;
+
+      // If we haven't already guessed at a header-source connection
+      // then add it in.
+      if (is_component && !m_r.graph[from].component.has_value()) {
+        m_r.graph[to].component = from;
+        m_r.graph[from].component = to;
       }
-      it->second.fully_processed = true;
+    } else {
+      // File does not exist
+      m_r.missing_includes.emplace(FileName.str());
     }
   }
 
-  llvm::ErrorOr<const clang::FileEntry *> opt_file_entry =
-      file_manager.getFile(start.string());
-  const clang::FileEntry *file_entry = opt_file_entry.get();
-  return id_to_node[file_entry->getUniqueID()].v;
-}
+  /// Callback invoked when start reading any pragma directive.
+  void PragmaDirective(clang::SourceLocation Loc,
+                       clang::PragmaIntroducerKind Introducer) final {
+    clang::SmallVector<char> buffer;
+    const clang::StringRef pragma_text =
+        clang::Lexer::getSpelling(Loc, buffer, *m_sm, m_options);
+
+    // NOTE: Our files should all be null-terminated strings
+    {
+      const clang::StringRef prefix = "#pragma override_file_size(";
+      if (std::equal(prefix.begin(), prefix.end(), pragma_text.data())) {
+        std::size_t file_size;
+        const char *start = pragma_text.data() + prefix.size();
+        const char *end = std::strchr(start, ')');
+        const auto [ptr, ec] = std::from_chars(start, end, file_size);
+        if (ec == std::errc()) {
+          const Graph::vertex_descriptor v = m_stack.back()->second.v;
+          m_r.graph[v].underlying_cost.file_size =
+              file_size * boost::units::information::bytes;
+        }
+      }
+    }
+
+    {
+      const clang::StringRef prefix = "#pragma override_token_count(";
+      if (std::equal(prefix.begin(), prefix.end(), pragma_text.data())) {
+        std::size_t token_count;
+        const char *start = pragma_text.data() + prefix.size();
+        const char *end = std::strchr(start, ')');
+        const auto [ptr, ec] = std::from_chars(start, end, token_count);
+        if (ec == std::errc()) {
+          m_stack.back()->second.token_count_overridden = true;
+          const Graph::vertex_descriptor v = m_stack.back()->second.v;
+          m_r.graph[v].underlying_cost.token_count = token_count;
+        }
+      }
+    }
+  }
+
+  void EndOfMainFile() final { assert(m_stack.size() == 1); }
+};
 
 } // namespace
 
@@ -288,15 +303,17 @@ build_graph::from_dir(std::filesystem::path source_dir,
                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
                       std::function<file_type(std::string_view)> file_type,
                       std::span<const std::filesystem::path> forced_includes) {
-
   source_dir = std::filesystem::absolute(source_dir);
   assert(std::all_of(include_dirs.begin(), include_dirs.end(),
                      std::mem_fn(&std::filesystem::path::is_absolute)));
 
+  auto pp_opts = std::make_shared<clang::PreprocessorOptions>();
   auto diag_ids = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
   auto diag_options = llvm::makeIntrusiveRefCnt<clang::DiagnosticOptions>();
   auto diagnostics = llvm::makeIntrusiveRefCnt<clang::DiagnosticsEngine>(
       diag_ids, diag_options);
+  diagnostics->setClient(&s_ignore, false);
+  clang::LangOptions options;
   clang::FileSystemOptions file_options;
   auto file_manager =
       llvm::makeIntrusiveRefCnt<clang::FileManager>(file_options, fs);
@@ -310,7 +327,6 @@ build_graph::from_dir(std::filesystem::path source_dir,
   auto search_options = std::make_shared<clang::HeaderSearchOptions>();
 
   // Populate our `HeaderSearch` with the given include directories
-  const clang::LangOptions options;
   clang::HeaderSearch header_search(search_options, *sm, *diagnostics, options,
                                     target_info.get());
   for (const std::filesystem::path &include : include_dirs) {
@@ -325,18 +341,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
     }
   }
 
-  std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher> id_to_node;
-  build_graph::result r;
-
-  // Process all forced includes first and store the results
-  std::vector<Graph::vertex_descriptor> extra_includes;
-  for (const std::filesystem::path &forced_include : forced_includes) {
-    extra_includes.emplace_back(
-        process(forced_include, source_dir, {}, id_to_node, file_type, r.graph,
-                *file_manager, *sm, header_search, r.missing_includes));
-  }
-
-  // Find all sources within the given directories
+  clang::TrivialModuleLoader module_loader;
   std::vector<std::filesystem::path> sources;
 
   std::vector<std::string> directories;
@@ -358,11 +363,45 @@ build_graph::from_dir(std::filesystem::path source_dir,
     }
   }
 
-  // Process all sources, making sure to pass in our forced includes
+  const std::string predefines = std::accumulate(
+      forced_includes.begin(), forced_includes.end(), std::string(),
+      [](std::string &&acc, const std::filesystem::path &forced_include) {
+        acc += "#include \"";
+        acc += forced_include.string();
+        acc += "\"\n";
+        return std::move(acc);
+      });
+
+  std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher> id_to_node;
+  build_graph::result r;
+
+  // Process all sources
   for (const std::filesystem::path &source : sources) {
-    r.sources.emplace_back(process(
-        source, source_dir, extra_includes, id_to_node, file_type, r.graph,
-        *file_manager, *sm, header_search, r.missing_includes));
+    llvm::ErrorOr<const clang::FileEntry *> opt_file_entry =
+        file_manager->getFile(source.string());
+    sm->setMainFileID(
+        sm->getOrCreateFileID(opt_file_entry.get(), clang::SrcMgr::C_User));
+    clang::Preprocessor pp(pp_opts, *diagnostics, options, *sm, header_search,
+                           module_loader);
+    pp.setPredefines(predefines);
+    pp.Initialize(*target_info);
+
+    auto callback = std::make_unique<IncludeScanner>(
+        *sm, options, source_dir, include_dirs, file_type, r, id_to_node);
+    IncludeScanner &scanner = *callback;
+    pp.addPPCallbacks(std::move(callback));
+
+    // Don't use any pragma handlers other than our raw `PPCallbacks` one
+    pp.IgnorePragmas();
+
+    pp.EnterMainSourceFile();
+    clang::Token token;
+    do {
+      pp.Lex(token);
+      ++scanner.current_token_counter();
+    } while (token.isNot(clang::tok::eof));
+    pp.EndSourceFile();
+    r.sources.push_back(scanner.m_stack.back()->second.v);
   }
 
   return r;

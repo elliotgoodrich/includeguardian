@@ -169,6 +169,54 @@ TEST(BuildGraphTest, SimpleGraph) {
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
 }
 
+TEST(BuildGraphTest, FileStats) {
+  // TODO: Check that file stats (token count/file size) are
+  // computed correctly
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  const std::string_view main_cpp_code =
+      "#define TEN_BRACKETS (((((((((())))))))))\n"
+      "#include \"a.hpp\"\n"
+      "int main() {\n"
+      "    TEN_BRACKETS;\n"
+      "    TEN_BRACKETS;\n"
+      "    TEN_BRACKETS;\n"
+      "}\n";
+  fs->addFile(
+      (working_directory / "main.cpp").string(), 0,
+      llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  const std::string_view a_hpp_code =
+      "#if 100 > 99\n"
+      "    TEN_BRACKETS;\n"
+      "#else\n";
+      "    TEN_BRACKETS;\n"
+      "    TEN_BRACKETS;\n"
+      "    TEN_BRACKETS;\n"
+      "    TEN_BRACKETS;\n"
+      "    TEN_BRACKETS;\n"
+      "    TEN_BRACKETS;\n"
+      "    TEN_BRACKETS;\n"
+      "#endif\n";
+  fs->addFile(
+      (working_directory / "main.cpp").string(), 0,
+      llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  fs->addFile(
+      (working_directory / "a.hpp").string(), 0,
+      llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
+
+  Graph g;
+  const Graph::vertex_descriptor main_cpp =
+      add_vertex({"main.cpp", not_external, 0u, {70, main_cpp_code.size() * B}}, g);
+  const Graph::vertex_descriptor a_hpp =
+      add_vertex({"a.hpp", not_external, 1u, {21, a_hpp_code.size() * B}}, g);
+
+  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
+
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+}
+
 TEST(BuildGraphTest, MultipleChildren) {
   Graph g;
   const Graph::vertex_descriptor main_cpp =
@@ -263,18 +311,24 @@ TEST(BuildGraphTest, ExternalCode) {
   auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   const std::filesystem::path src = "src";
   const std::filesystem::path other = "other";
+  const std::filesystem::path sub = "sub";
   const std::filesystem::path include = "include";
   const std::filesystem::path working_directory = root / "working_dir";
   fs->addFile((working_directory / src / "main1.cpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
-                  "#include \"a.hpp\"\n"
+                  "#include \"sub/a.hpp\"\n"
                   "#include <b.hpp>\n"
                   "#pragma override_file_size(123)\n"
                   "#pragma override_token_count(1)\n"));
-  fs->addFile((working_directory / other / "a.hpp").string(), 0,
+  fs->addFile((working_directory / other / sub / "a.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
+                  "#include \"a_next.hpp\"\n"
                   "#pragma override_file_size(246)\n"
                   "#pragma override_token_count(2)\n"));
+  fs->addFile((working_directory / other / sub / "a_next.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma override_file_size(99)\n"
+                  "#pragma override_token_count(99)\n"));
   fs->addFile((working_directory / other / include / "b.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
                   "#pragma override_file_size(4812)\n"
@@ -284,11 +338,20 @@ TEST(BuildGraphTest, ExternalCode) {
   const Graph::vertex_descriptor main_cpp =
       add_vertex({"main1.cpp", not_external, 0u, {1, 123 * B}}, g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", external, 1u, {2, 246 * B}}, g);
-  const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", external, 1u, {4, 4812 * B}}, g);
+      add_vertex({sub / "a.hpp", external, 1u, {2, 246 * B}}, g);
+  const Graph::vertex_descriptor a_next_hpp =
+      add_vertex({sub / "a_next.hpp", external, 0u, {99, 99 * B}}, g);
 
-  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
+  // FIXME: Even though we find `b.hpp` through the additional include
+  // directory that includes `include`, our code to create the relative
+  // name just does a linear scan through the directories and it matches
+  // the first one.  In reality it's probably not common that additional
+  // include directories are nested.
+  const Graph::vertex_descriptor b_hpp =
+      add_vertex({include / "b.hpp", external, 1u, {4, 4812 * B}}, g);
+
+  add_edge(main_cpp, a_hpp, {"\"sub/a.hpp\"", 1}, g);
+  add_edge(a_hpp, a_next_hpp, {"\"a_next.hpp\"", 1}, g);
   add_edge(main_cpp, a_hpp, {"<b.hpp>", 2}, g);
 
   llvm::Expected<build_graph::result> results = build_graph::from_dir(
@@ -381,7 +444,8 @@ TEST(BuildGraphTest, ForcedIncludes) {
       add_vertex({foo / "forced.hpp", not_external, 1u, {4, 999 * B}}, g);
   const Graph::vertex_descriptor forced_sub_hpp =
       add_vertex({foo / "forced_sub.hpp", not_external, 1u, {8, 1000 * B}}, g);
-  add_edge(main_cpp, forced_hpp, {"\"foo\\forced.hpp\"", 0, not_removable}, g);
+  add_edge(main_cpp, forced_hpp,
+           {"\"C:\\working_dir\\foo\\forced.hpp\"", 0, not_removable}, g);
   add_edge(main_cpp, include_hpp, {"\"include.hpp\"", 1, removable}, g);
   add_edge(forced_hpp, forced_sub_hpp, {"\"forced_sub.hpp\"", 1, removable}, g);
 
