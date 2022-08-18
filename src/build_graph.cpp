@@ -136,54 +136,36 @@ public:
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
                    clang::SrcMgr::CharacteristicKind FileType,
                    clang::FileID OptionalPrevFID) final {
+    switch (Reason) {
+    case FileChangeReason::EnterFile: {
+      const clang::FileID fileID = m_sm->getFileID(Loc);
 
-    const clang::FileID fileID = m_sm->getFileID(Loc);
-    const clang::FileEntry *file = m_sm->getFileEntryForID(fileID);
-
-    // If `file` is `nullptr` then we are processing some magic predefine
-    // file from clang that we can ignore for now.
-    if (!file) {
-      return;
-    }
-
-    const auto it = lookup_or_insert(file);
-    if (Reason == FileChangeReason::ExitFile) {
-      // There are few quirks of clang's preprocessor that I have had to work
-      // around here.  First, we do not always get an `ExitFile` notification
-      // for files that do not have any include directives.  Second, we get
-      // the following series of callbacks for source files
-      //
-      // EnterFile main.cpp
-      // EnterFile (nullptr) Preprocessor.cpp#559 Predefines file
-      // RenameFile (nullptr clang::FileEntry) ExitFile (nullptr
-      // clang::FileEntry) ExitFile main.cpp
-      // ... rest of the callbacks
-      // ExitFile main.cpp
-      //
-      // Which means that we actually would have an empty stack if we blindly
-      // followed what we are told.
-      //
-      // To hack around both of these issues we have to do a search backwards
-      // in `m_stack` to perhaps pop off multiple elements - but we never pop
-      // off the last element and `assert(m_stack.size() == 1)` at the end.
-      const auto found = std::find(m_stack.rbegin(), m_stack.rend(), it);
-      const auto b = std::max(found.base(), m_stack.begin() + 1);
-      for (auto i = b; i != m_stack.end(); ++i) {
-        m_stack.back()->second.fully_processed = true;
+      const clang::FileEntry *file = m_sm->getFileEntryForID(fileID);
+      if (!file) {
+        // Ignore if this is the predefines
+        return;
       }
-      m_stack.erase(found.base(), m_stack.end());
+      const auto it = lookup_or_insert(file);
+      if (m_stack.empty()) {
+        m_r.sources.push_back(it->second.v);
+      }
+
+      m_stack.push_back(it);
       return;
     }
-
-    if (Reason == FileChangeReason::RenameFile) {
+    case FileChangeReason::ExitFile: {
+      if (m_sm->getFileEntryForID(OptionalPrevFID)) {
+        // Ignore the predefines
+        m_stack.back()->second.fully_processed = true;
+        m_stack.pop_back();
+      }
       return;
     }
-
-    if (m_stack.empty()) {
-      m_r.sources.push_back(it->second.v);
+    case FileChangeReason::RenameFile:
+      return;
+    case FileChangeReason::SystemHeaderPragma:
+      return;
     }
-
-    m_stack.push_back(it);
   }
 
   void FileSkipped(const clang::FileEntryRef &SkippedFile,
@@ -200,56 +182,51 @@ public:
                           const clang::Module *Imported,
                           clang::SrcMgr::CharacteristicKind FileType) final {
 
-    const clang::FileID fromFileID = m_sm->getFileID(HashLoc);
-    const clang::FileEntry *fromFile = m_sm->getFileEntryForID(fromFileID);
-    if (fromFile) {
-      // `fromFile` is `nullptr` when the `HashLoc` comes from predefines
-      assert(m_id_to_node.find(fromFile->getUniqueID()) == m_stack.back());
-    }
-
     if (m_stack.back()->second.fully_processed) {
       return;
     }
 
-    if (File) {
-      const clang::FileID fileID = m_sm->getFileID(HashLoc);
-      const char open = IsAngled ? '<' : '"';
-      std::string include(&open, 1);
-      include.insert(include.cend(), FileName.begin(), FileName.end());
-      const char close = IsAngled ? '>' : '"';
-      include.insert(include.cend(), &close, &close + 1);
-      const Graph::vertex_descriptor from = m_stack.back()->second.v;
-      const Graph::vertex_descriptor to = lookup_or_insert(File)->second.v;
-
-      const bool is_from_predefines = fromFile == nullptr;
-
-      // To differentiate includes coming from the predefines we use 0 instead
-      const unsigned line_number =
-          is_from_predefines ? 0 : m_sm->getSpellingLineNumber(HashLoc);
-
-      // Guess at whether this include is the interface for our source file
-      // TODO: Check we are a source file
-      const bool is_component =
-          m_r.graph[from].path.stem() == m_r.graph[to].path.stem();
-      auto l = m_r.graph[from].path;
-      auto r = m_r.graph[to].path;
-
-      // If we are in the predefines section assume this include cannot be
-      // removed
-      const bool is_removable = !is_from_predefines && !is_component;
-
-      add_edge(from, to, {include, line_number, is_removable}, m_r.graph);
-      m_r.graph[to].internal_incoming += !m_r.graph[from].is_external;
-
-      // If we haven't already guessed at a header-source connection
-      // then add it in.
-      if (is_component && !m_r.graph[from].component.has_value()) {
-        m_r.graph[to].component = from;
-        m_r.graph[from].component = to;
-      }
-    } else {
+    if (!File) {
       // File does not exist
       m_r.missing_includes.emplace(FileName.str());
+      return;
+    }
+    const clang::FileID fileID = m_sm->getFileID(HashLoc);
+    const char open = IsAngled ? '<' : '"';
+    std::string include(&open, 1);
+    include.insert(include.cend(), FileName.begin(), FileName.end());
+    const char close = IsAngled ? '>' : '"';
+    include.insert(include.cend(), &close, &close + 1);
+    const Graph::vertex_descriptor from = m_stack.back()->second.v;
+    const Graph::vertex_descriptor to = lookup_or_insert(File)->second.v;
+
+    const clang::FileID fromFileID = m_sm->getFileID(HashLoc);
+    const clang::FileEntry *fromFile = m_sm->getFileEntryForID(fromFileID);
+    const bool is_from_predefines = fromFile == nullptr;
+
+    // To differentiate includes coming from the predefines we use 0 instead
+    const unsigned line_number =
+        is_from_predefines ? 0 : m_sm->getSpellingLineNumber(HashLoc);
+
+    // Guess at whether this include is the interface for our source file
+    // TODO: Check we are a source file
+    const bool is_component =
+        m_r.graph[from].path.stem() == m_r.graph[to].path.stem();
+    auto l = m_r.graph[from].path;
+    auto r = m_r.graph[to].path;
+
+    // If we are in the predefines section assume this include cannot be
+    // removed
+    const bool is_removable = !is_from_predefines && !is_component;
+
+    add_edge(from, to, {include, line_number, is_removable}, m_r.graph);
+    m_r.graph[to].internal_incoming += !m_r.graph[from].is_external;
+
+    // If we haven't already guessed at a header-source connection
+    // then add it in.
+    if (is_component && !m_r.graph[from].component.has_value()) {
+      m_r.graph[to].component = from;
+      m_r.graph[from].component = to;
     }
   }
 
