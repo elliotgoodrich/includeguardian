@@ -86,6 +86,18 @@ struct IncludeScanner : public clang::PPCallbacks {
   std::span<const std::filesystem::path> m_include_dirs;
   const std::function<build_graph::file_type(std::string_view)> &m_file_type;
   std::vector<UniqueIdToNode::iterator> m_stack;
+  unsigned m_accounted_for_token_count;
+  clang::Preprocessor *m_pp;
+
+  // Add the number of preprocessing tokens seen since the last time
+  // this function was called to the top file on our stack.
+  void apply_token_count() {
+    if (!m_stack.back()->second.token_count_overridden) {
+      m_r.graph[m_stack.back()->second.v].underlying_cost.token_count +=
+          m_pp->getTokenCount() - m_accounted_for_token_count;
+    }
+    m_accounted_for_token_count = m_pp->getTokenCount();
+  }
 
   UniqueIdToNode::iterator lookup_or_insert(const clang::FileEntry *file) {
     const llvm::sys::fs::UniqueID id =
@@ -119,19 +131,11 @@ public:
       const std::filesystem::path &source_dir,
       std::span<const std::filesystem::path> include_dirs,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
-      build_graph::result &r, UniqueIdToNode &id_to_node)
+      build_graph::result &r, UniqueIdToNode &id_to_node,
+      clang::Preprocessor &pp)
       : m_r(r), m_sm(&sm), m_id_to_node(id_to_node), m_options(options),
         m_source_dir(source_dir), m_include_dirs(include_dirs),
-        m_file_type(file_type) {}
-
-  long long &current_token_counter() {
-    if (m_stack.back()->second.token_count_overridden) {
-      static long long dummy = 0;
-      dummy = 0;
-      return dummy;
-    }
-    return m_r.graph[m_stack.back()->second.v].underlying_cost.token_count;
-  }
+        m_file_type(file_type), m_pp(&pp), m_accounted_for_token_count{0u} {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
                    clang::SrcMgr::CharacteristicKind FileType,
@@ -148,8 +152,9 @@ public:
       const auto it = lookup_or_insert(file);
       if (m_stack.empty()) {
         m_r.sources.push_back(it->second.v);
+      } else {
+        apply_token_count();
       }
-
       m_stack.push_back(it);
       return;
     }
@@ -157,6 +162,7 @@ public:
       if (m_sm->getFileEntryForID(OptionalPrevFID)) {
         // Ignore the predefines
         m_stack.back()->second.fully_processed = true;
+        apply_token_count();
         m_stack.pop_back();
       }
       return;
@@ -269,7 +275,10 @@ public:
     }
   }
 
-  void EndOfMainFile() final { assert(m_stack.size() == 1); }
+  void EndOfMainFile() final {
+    assert(m_stack.size() == 1);
+    apply_token_count();
+  }
 };
 
 } // namespace
@@ -364,7 +373,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
     pp.Initialize(*target_info);
 
     auto callback = std::make_unique<IncludeScanner>(
-        *sm, options, source_dir, include_dirs, file_type, r, id_to_node);
+        *sm, options, source_dir, include_dirs, file_type, r, id_to_node, pp);
     IncludeScanner &scanner = *callback;
     pp.addPPCallbacks(std::move(callback));
 
@@ -375,7 +384,6 @@ build_graph::from_dir(std::filesystem::path source_dir,
     clang::Token token;
     do {
       pp.Lex(token);
-      ++scanner.current_token_counter();
     } while (token.isNot(clang::tok::eof));
     pp.EndSourceFile();
     r.sources.push_back(scanner.m_stack.back()->second.v);

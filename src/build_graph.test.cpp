@@ -170,47 +170,43 @@ TEST(BuildGraphTest, SimpleGraph) {
 }
 
 TEST(BuildGraphTest, FileStats) {
-  // TODO: Check that file stats (token count/file size) are
-  // computed correctly
   auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   const std::filesystem::path working_directory = root / "working_dir";
   const std::string_view main_cpp_code =
-      "#define TEN_BRACKETS (((((((((())))))))))\n"
+      "#define SUM 1+1+1+1+1+1+1+1+1\n"
+      "#define DEFINE_FOO int foo(int, int, int)\n"
+      "DEFINE_FOO;DEFINE_FOO;\n"
       "#include \"a.hpp\"\n"
       "int main() {\n"
-      "    TEN_BRACKETS;\n"
-      "    TEN_BRACKETS;\n"
-      "    TEN_BRACKETS;\n"
+      "    SUM;\n"
       "}\n";
   fs->addFile(
       (working_directory / "main.cpp").string(), 0,
       llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
   const std::string_view a_hpp_code =
       "#if 100 > 99\n"
-      "    TEN_BRACKETS;\n"
+      "    DEFINE_FOO;\n"
+      "    DEFINE_FOO;\n"
       "#else\n";
-      "    TEN_BRACKETS;\n"
-      "    TEN_BRACKETS;\n"
-      "    TEN_BRACKETS;\n"
-      "    TEN_BRACKETS;\n"
-      "    TEN_BRACKETS;\n"
-      "    TEN_BRACKETS;\n"
-      "    TEN_BRACKETS;\n"
+      "    DEFINE_FOO;\n"
+      "    DEFINE_FOO;\n"
+      "    DEFINE_FOO;\n"
+      "    DEFINE_FOO;\n"
+      "    DEFINE_FOO;\n"
+      "    DEFINE_FOO;\n"
+      "    DEFINE_FOO;\n"
       "#endif\n";
-  fs->addFile(
-      (working_directory / "main.cpp").string(), 0,
-      llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
   fs->addFile(
       (working_directory / "a.hpp").string(), 0,
       llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
 
   Graph g;
   const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main.cpp", not_external, 0u, {70, main_cpp_code.size() * B}}, g);
+      add_vertex({"main.cpp", not_external, 0u, {45, main_cpp_code.size() * B}}, g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {21, a_hpp_code.size() * B}}, g);
+      add_vertex({"a.hpp", not_external, 1u, {20, a_hpp_code.size() * B}}, g);
 
-  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
+  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 4}, g);
 
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
