@@ -98,6 +98,25 @@ strive to have a quick response on new pull requests.
 
 ## Alternative Ideas
 
+### `find_unused_components`
+
+Find a header/source pair where the header is not included by any other
+component
+
+### Conversion to modules
+
+Eventually IncludeGuardian is not going to be as useful as C++ projects would
+swap over to modules.  However, a lot of projects will probably be doing this
+bit-by-bit.  We should be able to recommend what's the best way to tackle
+this to get the most incremental benefit.
+
+### Automatic file editing
+
+We should have the ability to make edits directly to the file if the user
+wants to try a suggestion.  For example, if we recommend removing all
+includes to a particular header file, we can go through all those files
+including it and remove those directives.
+
 ### Rebuild Warning
 
 We can look at the history of the repository to figure out what the chances
@@ -105,7 +124,8 @@ are that a particular header file is modified and then look at how many
 files would need to be rebuilt if this was changed.  This would give us a list
 of header files that cause the most rebuilding when developers are working on
 changes.  This would continue to be useful even if an application moved to
-modules.
+modules.  We should weight the number of lines changed per file as that would
+be an indication on how often it was modified during development.
 
 ### Editor plugin
 
