@@ -99,32 +99,6 @@ struct IncludeScanner : public clang::PPCallbacks {
     m_accounted_for_token_count = m_pp->getTokenCount();
   }
 
-  UniqueIdToNode::iterator lookup_or_insert(const clang::FileEntry *file) {
-    const llvm::sys::fs::UniqueID id =
-        file ? file->getUniqueID() : llvm::sys::fs::UniqueID();
-    auto const [it, inserted] = m_id_to_node.emplace(id, empty);
-    if (file && inserted) {
-      const unsigned internal_incoming = 0u;
-      const auto [p, is_external] =
-          rel_to_one_of(file->getName().str(), m_source_dir, m_include_dirs);
-
-      // We are also precompiled if the header including us is
-      // precompiled
-      const bool is_precompiled =
-          (!m_stack.empty() &&
-           m_r.graph[m_stack.back()->second.v].is_precompiled) ||
-          m_file_type(p.string()) == build_graph::file_type::precompiled_header;
-
-      it->second.v = add_vertex(
-          {p, is_external, internal_incoming,
-           cost{0ull, file->getSize() * boost::units::information::bytes},
-           std::nullopt, is_precompiled},
-          m_r.graph);
-    }
-
-    return it;
-  }
-
 public:
   IncludeScanner(
       clang::SourceManager &sm, const clang::LangOptions &options,
@@ -149,7 +123,13 @@ public:
         // Ignore if this is the predefines
         return;
       }
-      const auto it = lookup_or_insert(file);
+
+      const auto it = m_id_to_node.find(file->getUniqueID());
+
+      // We should already have added this in `InclusionDirective` or
+      // it is a source file that was already added to the graph
+      assert(it != m_id_to_node.end());
+
       if (m_stack.empty()) {
         m_r.sources.push_back(it->second.v);
       } else {
@@ -204,7 +184,28 @@ public:
     const char close = IsAngled ? '>' : '"';
     include.insert(include.cend(), &close, &close + 1);
     const Graph::vertex_descriptor from = m_stack.back()->second.v;
-    const Graph::vertex_descriptor to = lookup_or_insert(File)->second.v;
+    auto const [it, inserted] =
+        m_id_to_node.emplace(File->getUniqueID(), empty);
+    if (inserted) {
+      const unsigned internal_incoming = 0u;
+      const auto [p, is_external] =
+          rel_to_one_of(File->getName().str(), m_source_dir, m_include_dirs);
+
+      // We are also precompiled if the header including us is
+      // precompiled
+      const bool is_precompiled =
+          (!m_stack.empty() &&
+           m_r.graph[m_stack.back()->second.v].is_precompiled) ||
+          m_file_type(p.string()) == build_graph::file_type::precompiled_header;
+
+      it->second.v = add_vertex(
+          {p, is_external, internal_incoming,
+           cost{0ull, File->getSize() * boost::units::information::bytes},
+           std::nullopt, is_precompiled},
+          m_r.graph);
+    }
+
+    const Graph::vertex_descriptor to = it->second.v;
 
     const clang::FileID fromFileID = m_sm->getFileID(HashLoc);
     const clang::FileEntry *fromFile = m_sm->getFileEntryForID(fromFileID);
@@ -218,8 +219,6 @@ public:
     // TODO: Check we are a source file
     const bool is_component =
         m_r.graph[from].path.stem() == m_r.graph[to].path.stem();
-    auto l = m_r.graph[from].path;
-    auto r = m_r.graph[to].path;
 
     // If we are in the predefines section assume this include cannot be
     // removed
@@ -363,8 +362,24 @@ build_graph::from_dir(std::filesystem::path source_dir,
 
   // Process all sources
   for (const std::filesystem::path &source : sources) {
+    // TODO: Check `opt_file_entry` exists
     llvm::ErrorOr<const clang::FileEntry *> opt_file_entry =
         file_manager->getFile(source.string());
+
+    auto const [it, inserted] =
+        id_to_node.emplace(opt_file_entry.get()->getUniqueID(), empty);
+    if (inserted) {
+      const bool is_external = false;
+      const unsigned internal_incoming = 0u;
+      const bool is_precompiled = false;
+      it->second.v =
+          add_vertex({rel_to_one_of(source, source_dir, include_dirs).first,
+                      is_external, internal_incoming,
+                      cost{0ull, opt_file_entry.get()->getSize() *
+                                     boost::units::information::bytes},
+                      std::nullopt, is_precompiled},
+                     r.graph);
+    }
     sm->setMainFileID(
         sm->getOrCreateFileID(opt_file_entry.get(), clang::SrcMgr::C_User));
     clang::Preprocessor pp(pp_opts, *diagnostics, options, *sm, header_search,
