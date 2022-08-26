@@ -41,6 +41,8 @@ struct Hasher {
 
 struct FileState {
   Graph::vertex_descriptor v;
+  std::filesystem::path angled_rel; //< This is the relative path of `v`
+                                    //< compared to the last angled include seen
   bool fully_processed = false;
   bool token_count_overridden = false;
 };
@@ -48,42 +50,10 @@ struct FileState {
 using UniqueIdToNode =
     std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher>;
 
-// For the specified path `file`, if it is located within `source_dir` then
-// return its relative path within it and `true`.  Otherwise look at
-// each element of `external_dirs` in turn and return the relative path for
-// the first element that `file` is found in and `false`.  Otherwise return
-// `{file, true}`.
-std::pair<std::filesystem::path, bool /*is_external*/>
-rel_to_one_of(const std::filesystem::path &file,
-              const std::filesystem::path &source_dir,
-              std::span<const std::filesystem::path> external_dirs) {
-  {
-    const auto [file_it, source_it] = std::mismatch(
-        file.begin(), file.end(), source_dir.begin(), source_dir.end());
-    if (source_it == source_dir.end()) {
-      return {file.lexically_relative(source_dir).make_preferred(),
-              /*is external=*/false};
-    }
-  }
-  for (const std::filesystem::path &dir : external_dirs) {
-    const auto [file_it, dir_it] =
-        std::mismatch(file.begin(), file.end(), dir.begin(), dir.end());
-    if (dir_it == dir.end()) {
-      return {file.lexically_relative(dir).make_preferred(),
-              /*is external=*/true};
-    }
-  }
-
-  return {file, /*is external=*/true};
-}
-
 struct IncludeScanner : public clang::PPCallbacks {
   clang::SourceManager *m_sm;
   UniqueIdToNode &m_id_to_node;
   build_graph::result &m_r;
-  const clang::LangOptions &m_options;
-  const std::filesystem::path &m_source_dir;
-  std::span<const std::filesystem::path> m_include_dirs;
   const std::function<build_graph::file_type(std::string_view)> &m_file_type;
   std::vector<UniqueIdToNode::iterator> m_stack;
   unsigned m_accounted_for_token_count;
@@ -101,14 +71,10 @@ struct IncludeScanner : public clang::PPCallbacks {
 
 public:
   IncludeScanner(
-      clang::SourceManager &sm, const clang::LangOptions &options,
-      const std::filesystem::path &source_dir,
-      std::span<const std::filesystem::path> include_dirs,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
       build_graph::result &r, UniqueIdToNode &id_to_node,
       clang::Preprocessor &pp)
-      : m_r(r), m_sm(&sm), m_id_to_node(id_to_node), m_options(options),
-        m_source_dir(source_dir), m_include_dirs(include_dirs),
+      : m_r(r), m_sm(&pp.getSourceManager()), m_id_to_node(id_to_node),
         m_file_type(file_type), m_pp(&pp), m_accounted_for_token_count{0u} {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
@@ -188,8 +154,15 @@ public:
         m_id_to_node.emplace(File->getUniqueID(), empty);
     if (inserted) {
       const unsigned internal_incoming = 0u;
-      const auto [p, is_external] =
-          rel_to_one_of(File->getName().str(), m_source_dir, m_include_dirs);
+      const bool is_external = clang::SrcMgr::isSystem(FileType);
+
+      // If we don't have an angled include, try and build up the relative
+      // path from the first angled include.
+      const std::filesystem::path p =
+          (IsAngled ? std::filesystem::path(RelativePath.str())
+                    : m_stack.back()->second.angled_rel / RelativePath.str())
+              .make_preferred()
+              .lexically_normal();
 
       // We are also precompiled if the header including us is
       // precompiled
@@ -203,6 +176,14 @@ public:
            cost{0ull, File->getSize() * boost::units::information::bytes},
            std::nullopt, is_precompiled},
           m_r.graph);
+
+      // If we have a non-angled include, then make it relative to the previous
+      // path we are storing.
+      const std::filesystem::path relative_path(RelativePath.str());
+      it->second.angled_rel =
+          (IsAngled ? relative_path
+                    : m_stack.back()->second.angled_rel / relative_path)
+              .parent_path();
     }
 
     const Graph::vertex_descriptor to = it->second.v;
@@ -240,7 +221,7 @@ public:
                        clang::PragmaIntroducerKind Introducer) final {
     clang::SmallVector<char> buffer;
     const clang::StringRef pragma_text =
-        clang::Lexer::getSpelling(Loc, buffer, *m_sm, m_options);
+        clang::Lexer::getSpelling(Loc, buffer, *m_sm, m_pp->getLangOpts());
 
     // NOTE: Our files should all be null-terminated strings
     {
@@ -320,7 +301,7 @@ build_graph::from_dir(std::filesystem::path source_dir,
         file_manager->getDirectoryRef(include.string());
     if (dir_ref) {
       clang::DirectoryLookup dir(
-          *dir_ref, clang::SrcMgr::CharacteristicKind::C_User, is_framework);
+          *dir_ref, clang::SrcMgr::CharacteristicKind::C_System, is_framework);
       const bool is_angled = true;
       header_search.AddSearchPath(dir, is_angled);
     }
@@ -372,13 +353,14 @@ build_graph::from_dir(std::filesystem::path source_dir,
       const bool is_external = false;
       const unsigned internal_incoming = 0u;
       const bool is_precompiled = false;
+      const std::filesystem::path rel = source.lexically_relative(source_dir);
       it->second.v =
-          add_vertex({rel_to_one_of(source, source_dir, include_dirs).first,
-                      is_external, internal_incoming,
+          add_vertex({rel, is_external, internal_incoming,
                       cost{0ull, opt_file_entry.get()->getSize() *
                                      boost::units::information::bytes},
                       std::nullopt, is_precompiled},
                      r.graph);
+      it->second.angled_rel = rel.parent_path();
     }
     sm->setMainFileID(
         sm->getOrCreateFileID(opt_file_entry.get(), clang::SrcMgr::C_User));
@@ -387,8 +369,8 @@ build_graph::from_dir(std::filesystem::path source_dir,
     pp.setPredefines(predefines);
     pp.Initialize(*target_info);
 
-    auto callback = std::make_unique<IncludeScanner>(
-        *sm, options, source_dir, include_dirs, file_type, r, id_to_node, pp);
+    auto callback =
+        std::make_unique<IncludeScanner>(file_type, r, id_to_node, pp);
     IncludeScanner &scanner = *callback;
     pp.addPPCallbacks(std::move(callback));
 

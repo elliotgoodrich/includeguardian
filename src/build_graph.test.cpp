@@ -180,29 +180,26 @@ TEST(BuildGraphTest, FileStats) {
       "int main() {\n"
       "    SUM;\n"
       "}\n";
-  fs->addFile(
-      (working_directory / "main.cpp").string(), 0,
-      llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
-  const std::string_view a_hpp_code =
-      "#if 100 > 99\n"
-      "    DEFINE_FOO;\n"
-      "    DEFINE_FOO;\n"
-      "#else\n";
-      "    DEFINE_FOO;\n"
-      "    DEFINE_FOO;\n"
-      "    DEFINE_FOO;\n"
-      "    DEFINE_FOO;\n"
-      "    DEFINE_FOO;\n"
-      "    DEFINE_FOO;\n"
-      "    DEFINE_FOO;\n"
-      "#endif\n";
-  fs->addFile(
-      (working_directory / "a.hpp").string(), 0,
-      llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  const std::string_view a_hpp_code = "#if 100 > 99\n"
+                                      "    DEFINE_FOO;\n"
+                                      "    DEFINE_FOO;\n"
+                                      "#else\n";
+  "    DEFINE_FOO;\n"
+  "    DEFINE_FOO;\n"
+  "    DEFINE_FOO;\n"
+  "    DEFINE_FOO;\n"
+  "    DEFINE_FOO;\n"
+  "    DEFINE_FOO;\n"
+  "    DEFINE_FOO;\n"
+  "#endif\n";
+  fs->addFile((working_directory / "a.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
 
   Graph g;
-  const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main.cpp", not_external, 0u, {45, main_cpp_code.size() * B}}, g);
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      {"main.cpp", not_external, 0u, {45, main_cpp_code.size() * B}}, g);
   const Graph::vertex_descriptor a_hpp =
       add_vertex({"a.hpp", not_external, 1u, {20, a_hpp_code.size() * B}}, g);
 
@@ -337,14 +334,8 @@ TEST(BuildGraphTest, ExternalCode) {
       add_vertex({sub / "a.hpp", external, 1u, {2, 246 * B}}, g);
   const Graph::vertex_descriptor a_next_hpp =
       add_vertex({sub / "a_next.hpp", external, 0u, {99, 99 * B}}, g);
-
-  // FIXME: Even though we find `b.hpp` through the additional include
-  // directory that includes `include`, our code to create the relative
-  // name just does a linear scan through the directories and it matches
-  // the first one.  In reality it's probably not common that additional
-  // include directories are nested.
   const Graph::vertex_descriptor b_hpp =
-      add_vertex({include / "b.hpp", external, 1u, {4, 4812 * B}}, g);
+      add_vertex({"b.hpp", external, 1u, {4, 4812 * B}}, g);
 
   add_edge(main_cpp, a_hpp, {"\"sub/a.hpp\"", 1}, g);
   add_edge(a_hpp, a_next_hpp, {"\"a_next.hpp\"", 1}, g);
@@ -424,7 +415,7 @@ TEST(BuildGraphTest, ForcedIncludes) {
                   "#pragma override_token_count(2)\n"));
   fs->addFile((working_directory / foo / "forced.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
-                  "#include \"forced_sub.hpp\"\n"
+                  "#include \"../foo/forced_sub.hpp\"\n"
                   "#pragma override_file_size(999)\n"
                   "#pragma override_token_count(4)\n"));
   fs->addFile((working_directory / foo / "forced_sub.hpp").string(), 0,
@@ -436,14 +427,19 @@ TEST(BuildGraphTest, ForcedIncludes) {
       add_vertex({"main.cpp", not_external, 0u, {1, 123 * B}}, g);
   const Graph::vertex_descriptor include_hpp =
       add_vertex({"include.hpp", not_external, 1u, {2, 246 * B}}, g);
-  const Graph::vertex_descriptor forced_hpp =
-      add_vertex({foo / "forced.hpp", not_external, 1u, {4, 999 * B}}, g);
+  const Graph::vertex_descriptor forced_hpp = add_vertex(
+      {working_directory / foo / "forced.hpp", not_external, 1u, {4, 999 * B}},
+      g);
   const Graph::vertex_descriptor forced_sub_hpp =
-      add_vertex({foo / "forced_sub.hpp", not_external, 1u, {8, 1000 * B}}, g);
+      add_vertex({working_directory / foo / "forced_sub.hpp",
+                  not_external,
+                  1u,
+                  {8, 1000 * B}},
+                 g);
   add_edge(main_cpp, forced_hpp,
            {"\"C:\\working_dir\\foo\\forced.hpp\"", 0, not_removable}, g);
   add_edge(main_cpp, include_hpp, {"\"include.hpp\"", 1, removable}, g);
-  add_edge(forced_hpp, forced_sub_hpp, {"\"forced_sub.hpp\"", 1, removable}, g);
+  add_edge(forced_hpp, forced_sub_hpp, {"\"../foo/forced_sub.hpp\"", 1, removable}, g);
 
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type,
