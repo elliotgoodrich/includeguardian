@@ -43,7 +43,7 @@ make_file_system(const Graph &graph,
   auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   for (const Graph::vertex_descriptor &v :
        boost::make_iterator_range(vertices(graph))) {
-    std::string file_contents;
+    std::string file_contents = "#pragma once\n";
     const file_node &file = graph[v];
     for (const Graph::edge_descriptor &edge :
          boost::make_iterator_range(out_edges(v, graph))) {
@@ -182,7 +182,8 @@ TEST(BuildGraphTest, FileStats) {
       "}\n";
   fs->addFile((working_directory / "main.cpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
-  const std::string_view a_hpp_code = "#if 100 > 99\n"
+  const std::string_view a_hpp_code = "#pragma once\n"
+                                      "#if 100 > 99\n"
                                       "    DEFINE_FOO;\n"
                                       "    DEFINE_FOO;\n"
                                       "#else\n";
@@ -218,8 +219,8 @@ TEST(BuildGraphTest, MultipleChildren) {
       add_vertex({"a.hpp", not_external, 1u, {2, 1000 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
       add_vertex({"b.hpp", not_external, 1u, {4, 2000 * B}}, g);
-  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
-  add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 2}, g);
+  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
+  add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 3}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
@@ -242,10 +243,10 @@ TEST(BuildGraphTest, DiamondIncludes) {
       (std::filesystem::path("common") / "c.hpp").string();
   const Graph::vertex_descriptor c_hpp =
       add_vertex({c_path, not_external, 2u, {8, 30000 * B}}, g);
-  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
-  add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 2}, g);
-  add_edge(a_hpp, c_hpp, {"\"" + c_path + "\"", 1}, g);
-  add_edge(b_hpp, c_hpp, {"\"" + c_path + "\"", 1}, g);
+  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
+  add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 3}, g);
+  add_edge(a_hpp, c_hpp, {"\"" + c_path + "\"", 2}, g);
+  add_edge(b_hpp, c_hpp, {"\"" + c_path + "\"", 2}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
@@ -266,9 +267,9 @@ TEST(BuildGraphTest, MultipleSources) {
   const Graph::vertex_descriptor b_hpp =
       add_vertex({"b.hpp", not_external, 1u, {8, 2000 * B}}, g);
 
-  add_edge(main1_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
-  add_edge(main2_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
-  add_edge(a_hpp, b_hpp, {"\"b.hpp\"", 1}, g);
+  add_edge(main1_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
+  add_edge(main2_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
+  add_edge(a_hpp, b_hpp, {"\"b.hpp\"", 2}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
@@ -289,8 +290,8 @@ TEST(BuildGraphTest, DifferentDirectories) {
   const Graph::vertex_descriptor b_hpp =
       add_vertex({src / "b.hpp", not_external, 1u, {4, 2000 * B}}, g);
 
-  add_edge(main_cpp, a_hpp, {"\"include/a.hpp\"", 1}, g);
-  add_edge(main_cpp, a_hpp, {"\"b.hpp\"", 2}, g);
+  add_edge(main_cpp, a_hpp, {"\"include/a.hpp\"", 2}, g);
+  add_edge(main_cpp, a_hpp, {"\"b.hpp\"", 3}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
@@ -359,10 +360,11 @@ TEST(BuildGraphTest, UnremovableHeaders) {
       add_vertex({"b.cpp", not_external, 0u, {4, 100 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
       add_vertex({include / "b.hpp", not_external, 1u, {8, 2000 * B}}, g);
+
   const Graph::edge_descriptor a_to_a =
-      add_edge(a_cpp, a_hpp, {"\"a.hpp\"", 1, not_removable}, g).first;
+      add_edge(a_cpp, a_hpp, {"\"a.hpp\"", 2, not_removable}, g).first;
   const Graph::edge_descriptor b_to_b =
-      add_edge(b_cpp, b_hpp, {"\"include/b.hpp\"", 1, not_removable}, g).first;
+      add_edge(b_cpp, b_hpp, {"\"include/b.hpp\"", 2, not_removable}, g).first;
 
   g[a_hpp].component = a_cpp;
   g[a_cpp].component = a_hpp;
@@ -389,8 +391,8 @@ TEST(BuildGraphTest, PrecompiledHeaders) {
   const Graph::vertex_descriptor normal_h = add_vertex(
       {"normal.h", not_external, 1u, {3, 10000 * B}, std::nullopt, precompiled},
       g);
-  add_edge(a_cpp, all_pch, {"\"all.pch\"", 1, removable}, g);
-  add_edge(all_pch, normal_h, {"\"normal.h\"", 1, removable}, g);
+  add_edge(a_cpp, all_pch, {"\"all.pch\"", 2, removable}, g);
+  add_edge(all_pch, normal_h, {"\"normal.h\"", 2, removable}, g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
@@ -439,7 +441,8 @@ TEST(BuildGraphTest, ForcedIncludes) {
   add_edge(main_cpp, forced_hpp,
            {"\"C:\\working_dir\\foo\\forced.hpp\"", 0, not_removable}, g);
   add_edge(main_cpp, include_hpp, {"\"include.hpp\"", 1, removable}, g);
-  add_edge(forced_hpp, forced_sub_hpp, {"\"../foo/forced_sub.hpp\"", 1, removable}, g);
+  add_edge(forced_hpp, forced_sub_hpp,
+           {"\"../foo/forced_sub.hpp\"", 1, removable}, g);
 
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type,
