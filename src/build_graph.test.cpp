@@ -200,9 +200,9 @@ TEST(BuildGraphTest, FileStats) {
 
   Graph g;
   const Graph::vertex_descriptor main_cpp = add_vertex(
-      {"main.cpp", not_external, 0u, {45, main_cpp_code.size() * B}}, g);
+      {"main.cpp", not_external, 0u, {25, main_cpp_code.size() * B}}, g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {20, a_hpp_code.size() * B}}, g);
+      add_vertex({"a.hpp", not_external, 1u, {40, a_hpp_code.size() * B}}, g);
 
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 4}, g);
 
@@ -447,6 +447,72 @@ TEST(BuildGraphTest, ForcedIncludes) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type,
                             {working_directory / foo / "forced.hpp"});
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+}
+
+TEST(BuildGraphTest, XMacros) {
+  // Test files that are unguarded and can be included multiple times
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  const std::string_view main_cpp_code =
+      "#include \"x_macro.hpp\"\n"
+      "#define X(name) \"#name\"\n"
+      "const char[] all = FRUITS;\n"
+      "#undef X\n"
+      "#include \"a.hpp\"\n"
+      "int main() {\n"
+      "#define X(name) const char *name = \"#name\";\n"
+      "{\n"
+      "    FRUITS\n"
+      "}\n"
+      "{\n"
+      "    FRUITS\n"
+      "}\n"
+      "#undef X\n"
+      "}\n";
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  const std::string_view a_hpp_code = "#pragma once\n"
+                                      "#include \"x_macro.hpp\"\n"
+                                      "enum class Fruits {\n"
+                                      "#define X(name) name,\n"
+                                      "}\n"
+                                      "#undef X\n";
+  fs->addFile((working_directory / "a.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
+  const std::string_view x_macro_hpp_code = "#define FRUITS \\\n"
+                                            "X(apple) \\\n"
+                                            "X(pear) \\\n"
+                                            "X(blueberry) \\\n"
+                                            "X(lemon) \\\n"
+                                            "X(peach) \\\n"
+                                            "X(orange) \\\n"
+                                            "X(banana) \\n";
+  fs->addFile((working_directory / "x_macro.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(x_macro_hpp_code));
+
+  Graph g;
+  const Graph::vertex_descriptor main_cpp =
+      add_vertex({"main.cpp",
+                  not_external,
+                  0u,
+                  {113, (main_cpp_code.size() + x_macro_hpp_code.size()) * B}},
+                 g);
+  const Graph::vertex_descriptor x_macro_hpp =
+      add_vertex({"x_macro.hpp", not_external, 2u, {0, 0.0 * B}}, g);
+  const Graph::vertex_descriptor a_hpp =
+      add_vertex({"a.hpp",
+                  not_external,
+                  1u,
+                  {21, (a_hpp_code.size() + x_macro_hpp_code.size()) * B}},
+                 g);
+
+  add_edge(main_cpp, x_macro_hpp, {"\"x_macro.hpp\"", 1}, g);
+  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 5}, g);
+  add_edge(a_hpp, x_macro_hpp, {"\"x_macro.hpp\"", 2}, g);
+
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
 }
 

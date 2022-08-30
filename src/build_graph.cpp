@@ -44,6 +44,7 @@ struct FileState {
   std::filesystem::path angled_rel; //< This is the relative path of `v`
                                     //< compared to the last angled include seen
   bool fully_processed = false;
+  bool file_size_overridden = false;
   bool token_count_overridden = false;
 };
 
@@ -61,12 +62,18 @@ struct IncludeScanner : public clang::PPCallbacks {
 
   // Add the number of preprocessing tokens seen since the last time
   // this function was called to the top file on our stack.
-  void apply_token_count() {
+  // Apply the costs (preprocessing tokens/file size) as we leave the
+  // specified `finished` file.
+  void apply_costs(const clang::FileEntry *finished) {
     if (!m_stack.back()->second.token_count_overridden) {
       m_r.graph[m_stack.back()->second.v].underlying_cost.token_count +=
           m_pp->getTokenCount() - m_accounted_for_token_count;
     }
     m_accounted_for_token_count = m_pp->getTokenCount();
+    if (!m_stack.back()->second.file_size_overridden) {
+      m_r.graph[m_stack.back()->second.v].underlying_cost.file_size +=
+          finished->getSize() * boost::units::information::bytes;
+    }
   }
 
 public:
@@ -96,20 +103,30 @@ public:
       // it is a source file that was already added to the graph
       assert(it != m_id_to_node.end());
 
-      if (m_stack.empty()) {
-        m_r.sources.push_back(it->second.v);
-      } else {
-        apply_token_count();
-      }
       m_stack.push_back(it);
       return;
     }
     case FileChangeReason::ExitFile: {
-      if (m_sm->getFileEntryForID(OptionalPrevFID)) {
-        // Ignore the predefines
-        m_stack.back()->second.fully_processed = true;
-        apply_token_count();
-        m_stack.pop_back();
+      if (const clang::FileEntry *file =
+              m_sm->getFileEntryForID(OptionalPrevFID)) {
+        // If we are unguarded, then don't set the 'fully_processed' stuff
+        // and move the total cost into the includer.
+        const bool guarded =
+            m_pp->getHeaderSearchInfo().isFileMultipleIncludeGuarded(file);
+        if (guarded) {
+          // If we're guarded then we are fully processed and we won't need
+          // to enter this file again.
+          m_stack.back()->second.fully_processed = true;
+
+          // Apply the costs to ourselves
+          apply_costs(file);
+          m_stack.pop_back();
+        } else {
+          // If we're not guarded then we `pop_back` and attribute the token
+          // count to the file that included us.
+          m_stack.pop_back();
+          apply_costs(file);
+        }
       }
       return;
     }
@@ -171,11 +188,11 @@ public:
            m_r.graph[m_stack.back()->second.v].is_precompiled) ||
           m_file_type(p.string()) == build_graph::file_type::precompiled_header;
 
-      it->second.v = add_vertex(
-          {p, is_external, internal_incoming,
-           cost{0ull, File->getSize() * boost::units::information::bytes},
-           std::nullopt, is_precompiled},
-          m_r.graph);
+      it->second.v =
+          add_vertex({p, is_external, internal_incoming,
+                      cost{0ull, 0.0 * boost::units::information::bytes},
+                      std::nullopt, is_precompiled},
+                     m_r.graph);
 
       // If we have a non-angled include, then make it relative to the previous
       // path we are storing.
@@ -232,6 +249,7 @@ public:
         const char *end = std::strchr(start, ')');
         const auto [ptr, ec] = std::from_chars(start, end, file_size);
         if (ec == std::errc()) {
+          m_stack.back()->second.file_size_overridden = true;
           const Graph::vertex_descriptor v = m_stack.back()->second.v;
           m_r.graph[v].underlying_cost.file_size =
               file_size * boost::units::information::bytes;
@@ -257,7 +275,7 @@ public:
 
   void EndOfMainFile() final {
     assert(m_stack.size() == 1);
-    apply_token_count();
+    apply_costs(m_sm->getFileEntryForID(m_sm->getMainFileID()));
   }
 };
 
@@ -356,11 +374,11 @@ build_graph::from_dir(std::filesystem::path source_dir,
       const std::filesystem::path rel = source.lexically_relative(source_dir);
       it->second.v =
           add_vertex({rel, is_external, internal_incoming,
-                      cost{0ull, opt_file_entry.get()->getSize() *
-                                     boost::units::information::bytes},
+                      cost{0ull, 0.0 * boost::units::information::bytes},
                       std::nullopt, is_precompiled},
                      r.graph);
       it->second.angled_rel = rel.parent_path();
+      r.sources.push_back(it->second.v);
     }
     sm->setMainFileID(
         sm->getOrCreateFileID(opt_file_entry.get(), clang::SrcMgr::C_User));
