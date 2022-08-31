@@ -322,7 +322,13 @@ public:
     const clang::StringRef pragma_text =
         clang::Lexer::getSpelling(Loc, buffer, *m_sm, m_pp->getLangOpts());
 
-    // NOTE: Our files should all be null-terminated strings
+    // We can get a `nullptr` for `data()`, otherwise our files should
+    // always be null-terminated strings and we can access `data()`
+    // without a corresponding call to `size()`.
+    if (pragma_text.empty()) {
+        return;
+    }
+
     {
       const clang::StringRef prefix = "#pragma override_file_size(";
       if (std::equal(prefix.begin(), prefix.end(), pragma_text.data())) {
