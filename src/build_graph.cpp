@@ -1,14 +1,19 @@
 #include "build_graph.hpp"
 
-#include <clang/Lex/Preprocessor.h>
-#include <clang/Lex/PreprocessorOptions.h>
-
+#include <clang/AST/ASTConsumer.h>
+#include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/Basic/Diagnostic.h>
 #include <clang/Basic/DiagnosticIDs.h>
 #include <clang/Basic/TargetInfo.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/FrontendActions.h>
 #include <clang/Lex/HeaderSearch.h>
 #include <clang/Lex/HeaderSearchOptions.h>
 #include <clang/Lex/Lexer.h>
+#include <clang/Lex/Preprocessor.h>
+#include <clang/Lex/PreprocessorOptions.h>
+#include <clang/Tooling/CompilationDatabase.h>
+#include <clang/Tooling/Tooling.h>
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/Triple.h>
@@ -26,6 +31,58 @@
 namespace IncludeGuardian {
 
 namespace {
+
+class FakeCompilationDatabase : public clang::tooling::CompilationDatabase {
+public:
+  std::filesystem::path m_working_directory;
+  std::vector<std::filesystem::path> m_sources;
+  std::span<const std::filesystem::path> m_include_dirs;
+  std::span<const std::filesystem::path> m_force_includes;
+
+  FakeCompilationDatabase(const std::filesystem::path &working_directory)
+      : m_working_directory(working_directory), m_force_includes(), m_sources(),
+        m_include_dirs() {}
+
+  /// Returns all compile commands in which the specified file was
+  /// compiled.
+  ///
+  /// This includes compile commands that span multiple source files.
+  /// For example, consider a project with the following compilations:
+  /// $ clang++ -o test a.cc b.cc t.cc
+  /// $ clang++ -o production a.cc b.cc -DPRODUCTION
+  /// A compilation database representing the project would return both command
+  /// lines for a.cc and b.cc and only the first command line for t.cc.
+  std::vector<clang::tooling::CompileCommand>
+  getCompileCommands(clang::StringRef FilePath) const final {
+    // Note for the preprocessor we do not need `-o` flags and it is
+    // specifically stripped out by an `ArgumentAdjuster`.
+    using namespace std::string_literals;
+
+    std::vector<std::string> things;
+    things.emplace_back("/usr/bin/clang++");
+    things.emplace_back(FilePath.str());
+    for (const std::filesystem::path &include : m_include_dirs) {
+      things.emplace_back("-isystem");
+      things.emplace_back(include.string());
+    }
+    for (const std::filesystem::path &forced : m_force_includes) {
+      things.emplace_back("-include");
+      things.emplace_back(forced.string());
+    }
+    return {{m_working_directory.string(), FilePath, std::move(things), "out"}};
+  }
+
+  /// Returns the list of all files available in the compilation database.
+  ///
+  /// By default, returns nothing. Implementations should override this if they
+  /// can enumerate their source files.
+  std::vector<std::string> getAllFiles() const final {
+    std::vector<std::string> result(m_sources.size());
+    std::transform(m_sources.cbegin(), m_sources.cend(), result.begin(),
+                   [](const std::filesystem::path &p) { return p.string(); });
+    return result;
+  }
+};
 
 const Graph::vertex_descriptor empty =
     boost::graph_traits<Graph>::null_vertex();
@@ -55,10 +112,11 @@ struct IncludeScanner : public clang::PPCallbacks {
   clang::SourceManager *m_sm;
   UniqueIdToNode &m_id_to_node;
   build_graph::result &m_r;
-  const std::function<build_graph::file_type(std::string_view)> &m_file_type;
+  std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::vector<UniqueIdToNode::iterator> m_stack;
   unsigned m_accounted_for_token_count;
   clang::Preprocessor *m_pp;
+  std::filesystem::path m_working_dir;
 
   // Add the number of preprocessing tokens seen since the last time
   // this function was called to the top file on our stack.
@@ -80,9 +138,10 @@ public:
   IncludeScanner(
       const std::function<build_graph::file_type(std::string_view)> &file_type,
       build_graph::result &r, UniqueIdToNode &id_to_node,
-      clang::Preprocessor &pp)
+      clang::Preprocessor &pp, const std::filesystem::path &working_dir)
       : m_r(r), m_sm(&pp.getSourceManager()), m_id_to_node(id_to_node),
-        m_file_type(file_type), m_pp(&pp), m_accounted_for_token_count{0u} {}
+        m_file_type(file_type), m_pp(&pp), m_accounted_for_token_count{0u},
+        m_working_dir(working_dir) {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
                    clang::SrcMgr::CharacteristicKind FileType,
@@ -97,13 +156,36 @@ public:
         return;
       }
 
-      const auto it = m_id_to_node.find(file->getUniqueID());
+      if (m_stack.empty()) {
+        // If our stack's empty, then this is our source file
+        auto const [it, inserted] =
+            m_id_to_node.emplace(file->getUniqueID(), empty);
+        if (inserted) {
+          const bool is_external = false;
+          const unsigned internal_incoming = 0u;
+          const bool is_precompiled = false;
+          const std::filesystem::path rel =
+              std::filesystem::path(file->getName().str())
+                  .lexically_relative(m_working_dir);
+          it->second.v =
+              add_vertex({rel, is_external, internal_incoming,
+                          cost{0ull, 0.0 * boost::units::information::bytes},
+                          std::nullopt, is_precompiled},
+                         m_r.graph);
+          it->second.angled_rel = rel.parent_path();
+          m_r.sources.push_back(it->second.v);
+        } else {
+          // TODO: Warn that a source is being included
+          assert(false);
+        }
+        m_stack.push_back(it);
+      } else {
+        // We should already have added this in `InclusionDirective` or
+        // it is a source file that was already added to the graph
+        assert(m_id_to_node.count(file->getUniqueID()) > 0);
+        m_stack.push_back(m_id_to_node.find(file->getUniqueID()));
+      }
 
-      // We should already have added this in `InclusionDirective` or
-      // it is a source file that was already added to the graph
-      assert(it != m_id_to_node.end());
-
-      m_stack.push_back(it);
       return;
     }
     case FileChangeReason::ExitFile: {
@@ -194,8 +276,8 @@ public:
                       std::nullopt, is_precompiled},
                      m_r.graph);
 
-      // If we have a non-angled include, then make it relative to the previous
-      // path we are storing.
+      // If we have a non-angled include, then make it relative to the
+      // previous path we are storing.
       const std::filesystem::path relative_path(RelativePath.str());
       it->second.angled_rel =
           (IsAngled ? relative_path
@@ -279,7 +361,107 @@ public:
   }
 };
 
+class ExpensiveAction : public clang::PreprocessOnlyAction {
+  clang::ast_matchers::MatchFinder m_f;
+  clang::CompilerInstance *m_ci;
+  build_graph::result &m_r;
+  UniqueIdToNode &m_id_to_node;
+  std::function<build_graph::file_type(std::string_view)> m_file_type;
+  std::filesystem::path m_working_dir;
+
+public:
+  ExpensiveAction(
+      build_graph::result &r, UniqueIdToNode &id_to_node,
+      const std::function<build_graph::file_type(std::string_view)> &file_type,
+      const std::filesystem::path &working_dir)
+      : m_f(), m_ci(nullptr), m_r(r), m_id_to_node(id_to_node),
+        m_file_type(file_type), m_working_dir(working_dir) {}
+
+  bool BeginInvocation(clang::CompilerInstance &ci) final {
+    ci.getDiagnostics().setClient(&s_ignore, /*TakeOwnership=*/false);
+    ci.getDiagnostics().setErrorLimit(0u);
+    m_ci = &ci;
+    return true;
+  }
+
+  std::unique_ptr<clang::ASTConsumer>
+  CreateASTConsumer(clang::CompilerInstance &CI,
+                    clang::StringRef InFile) final {
+    return m_f.newASTConsumer();
+  }
+
+  void ExecuteAction() final {
+    getCompilerInstance().getPreprocessor().addPPCallbacks(
+        std::make_unique<IncludeScanner>(m_file_type, m_r, m_id_to_node,
+                                         m_ci->getPreprocessor(),
+                                         m_working_dir));
+
+    clang::PreprocessOnlyAction::ExecuteAction();
+  }
+};
+
+/// This component is a concrete implementation of a `FrontEndActionFactory`
+/// that will output the include directives along with the total file size
+/// that would be saved if it was deleted.
+class find_graph_factory : public clang::tooling::FrontendActionFactory {
+  build_graph::result &m_r;
+  UniqueIdToNode &m_id_to_node;
+  std::function<build_graph::file_type(std::string_view)> m_file_type;
+  std::filesystem::path m_working_dir;
+
+public:
+  /// Create a `print_graph_factory`.
+  find_graph_factory(
+      build_graph::result &r, UniqueIdToNode &id_to_node,
+      const std::function<build_graph::file_type(std::string_view)> &file_type,
+      const std::filesystem::path &working_dir)
+      : m_r(r), m_id_to_node(id_to_node), m_working_dir(working_dir),
+        m_file_type(file_type) {}
+
+  /// Returns a new `clang::FrontendAction`.
+  std::unique_ptr<clang::FrontendAction> create() final {
+    return std::make_unique<ExpensiveAction>(m_r, m_id_to_node, m_file_type,
+                                             m_working_dir);
+  }
+};
+
 } // namespace
+
+llvm::Expected<build_graph::result> build_graph::from_compilation_db(
+    const clang::tooling::CompilationDatabase &compilation_db,
+    const std::filesystem::path &working_dir,
+    std::span<const std::filesystem::path> source_paths,
+    std::function<build_graph::file_type(std::string_view)> file_type,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs) {
+  std::vector<std::string> source_path_strings(source_paths.size());
+  std::transform(source_paths.begin(), source_paths.end(),
+                 source_path_strings.begin(),
+                 [](const std::filesystem::path &p) { return p.string(); });
+  clang::tooling::ClangTool tool(
+      compilation_db, source_path_strings,
+      std::make_shared<clang::PCHContainerOperations>(), fs);
+
+  UniqueIdToNode id_to_node;
+  result r;
+  find_graph_factory f(r, id_to_node, file_type, working_dir);
+  const int rc = tool.run(&f);
+  if (rc != 0) {
+    return llvm::createStringError(std::error_code(rc, std::generic_category()),
+                                   "oops");
+  }
+  return r;
+}
+
+llvm::Expected<build_graph::result> build_graph::from_compilation_db(
+    const clang::tooling::CompilationDatabase &compilation_db,
+    const std::filesystem::path &working_dir,
+    std::initializer_list<const std::filesystem::path> source_paths,
+    std::function<build_graph::file_type(std::string_view)> file_type,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs) {
+  return from_compilation_db(
+      compilation_db, working_dir,
+      std::span(source_paths.begin(), source_paths.end()), file_type, fs);
+}
 
 llvm::Expected<build_graph::result>
 build_graph::from_dir(std::filesystem::path source_dir,
@@ -291,42 +473,9 @@ build_graph::from_dir(std::filesystem::path source_dir,
   assert(std::all_of(include_dirs.begin(), include_dirs.end(),
                      std::mem_fn(&std::filesystem::path::is_absolute)));
 
-  auto pp_opts = std::make_shared<clang::PreprocessorOptions>();
-  auto diag_ids = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
-  auto diag_options = llvm::makeIntrusiveRefCnt<clang::DiagnosticOptions>();
-  auto diagnostics = llvm::makeIntrusiveRefCnt<clang::DiagnosticsEngine>(
-      diag_ids, diag_options);
-  diagnostics->setClient(&s_ignore, false);
-  clang::LangOptions options;
-  clang::FileSystemOptions file_options;
-  auto file_manager =
-      llvm::makeIntrusiveRefCnt<clang::FileManager>(file_options, fs);
-  auto sm = llvm::makeIntrusiveRefCnt<clang::SourceManager>(*diagnostics,
-                                                            *file_manager);
-  auto target_options = std::make_shared<clang::TargetOptions>();
-  target_options->Triple = llvm::sys::getDefaultTargetTriple();
-  target_options->CodeModel = "default";
-  llvm::IntrusiveRefCntPtr<clang::TargetInfo> target_info =
-      clang::TargetInfo::CreateTargetInfo(*diagnostics, target_options);
-  auto search_options = std::make_shared<clang::HeaderSearchOptions>();
-
-  // Populate our `HeaderSearch` with the given include directories
-  clang::HeaderSearch header_search(search_options, *sm, *diagnostics, options,
-                                    target_info.get());
-  for (const std::filesystem::path &include : include_dirs) {
-    const bool is_framework = false;
-    llvm::Expected<clang::DirectoryEntryRef> dir_ref =
-        file_manager->getDirectoryRef(include.string());
-    if (dir_ref) {
-      clang::DirectoryLookup dir(
-          *dir_ref, clang::SrcMgr::CharacteristicKind::C_System, is_framework);
-      const bool is_angled = true;
-      header_search.AddSearchPath(dir, is_angled);
-    }
-  }
-
-  clang::TrivialModuleLoader module_loader;
-  std::vector<std::filesystem::path> sources;
+  FakeCompilationDatabase db(source_dir);
+  db.m_include_dirs = include_dirs;
+  db.m_force_includes = forced_includes;
 
   std::vector<std::string> directories;
   directories.push_back(source_dir.string());
@@ -341,70 +490,13 @@ build_graph::from_dir(std::filesystem::path source_dir,
         directories.push_back(it->path().str());
       } else if (it->type() == llvm::sys::fs::file_type::regular_file &&
                  file_type(it->path()) == file_type::source) {
-        sources.emplace_back(it->path().str());
+        db.m_sources.emplace_back(it->path().str());
       }
       it.increment(ec);
     }
   }
 
-  const std::string predefines = std::accumulate(
-      forced_includes.begin(), forced_includes.end(), std::string(),
-      [](std::string &&acc, const std::filesystem::path &forced_include) {
-        acc += "#include \"";
-        acc += forced_include.string();
-        acc += "\"\n";
-        return std::move(acc);
-      });
-
-  std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher> id_to_node;
-  build_graph::result r;
-
-  // Process all sources
-  for (const std::filesystem::path &source : sources) {
-    // TODO: Check `opt_file_entry` exists
-    llvm::ErrorOr<const clang::FileEntry *> opt_file_entry =
-        file_manager->getFile(source.string());
-
-    auto const [it, inserted] =
-        id_to_node.emplace(opt_file_entry.get()->getUniqueID(), empty);
-    if (inserted) {
-      const bool is_external = false;
-      const unsigned internal_incoming = 0u;
-      const bool is_precompiled = false;
-      const std::filesystem::path rel = source.lexically_relative(source_dir);
-      it->second.v =
-          add_vertex({rel, is_external, internal_incoming,
-                      cost{0ull, 0.0 * boost::units::information::bytes},
-                      std::nullopt, is_precompiled},
-                     r.graph);
-      it->second.angled_rel = rel.parent_path();
-      r.sources.push_back(it->second.v);
-    }
-    sm->setMainFileID(
-        sm->getOrCreateFileID(opt_file_entry.get(), clang::SrcMgr::C_User));
-    clang::Preprocessor pp(pp_opts, *diagnostics, options, *sm, header_search,
-                           module_loader);
-    pp.setPredefines(predefines);
-    pp.Initialize(*target_info);
-
-    auto callback =
-        std::make_unique<IncludeScanner>(file_type, r, id_to_node, pp);
-    IncludeScanner &scanner = *callback;
-    pp.addPPCallbacks(std::move(callback));
-
-    // Don't use any pragma handlers other than our raw `PPCallbacks` one
-    pp.IgnorePragmas();
-
-    pp.EnterMainSourceFile();
-    clang::Token token;
-    do {
-      pp.Lex(token);
-    } while (token.isNot(clang::tok::eof));
-    pp.EndSourceFile();
-    r.sources.push_back(scanner.m_stack.back()->second.v);
-  }
-
-  return r;
+  return from_compilation_db(db, source_dir, db.m_sources, file_type, fs);
 }
 
 llvm::Expected<build_graph::result> build_graph::from_dir(

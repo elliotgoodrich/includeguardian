@@ -14,6 +14,9 @@
 #include <string_view>
 #include <vector>
 
+namespace clang::tooling {
+class CompilationDatabase;
+}
 namespace llvm::vfs {
 class FileSystem;
 }
@@ -33,6 +36,19 @@ struct build_graph {
     precompiled_header,
     ignore,
   };
+
+  static llvm::Expected<result>
+  from_compilation_db(const clang::tooling::CompilationDatabase &compilation_db,
+                      const std::filesystem::path& working_dir,
+                      std::span<const std::filesystem::path> source_paths,
+                      std::function<file_type(std::string_view)> file_type,
+                      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
+  static llvm::Expected<result>
+  from_compilation_db(const clang::tooling::CompilationDatabase &compilation_db,
+                      const std::filesystem::path& working_dir,
+                      std::initializer_list<const std::filesystem::path> source_paths,
+                      std::function<file_type(std::string_view)> file_type,
+                      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
 
   // Try to construct a `Graph` object from all files in the specified
   // `source_dir` that return `source` from `file_type` (and files they
