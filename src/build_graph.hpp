@@ -28,6 +28,7 @@ struct build_graph {
     Graph graph;
     std::vector<Graph::vertex_descriptor> sources;
     std::set<std::string> missing_includes;
+    std::unordered_set<Graph::vertex_descriptor> unguarded_files;
   };
 
   enum class file_type {

@@ -204,6 +204,8 @@ public:
           apply_costs(file);
           m_stack.pop_back();
         } else {
+          m_r.unguarded_files.insert(m_stack.back()->second.v);
+
           // If we're not guarded then we `pop_back` and attribute the token
           // count to the file that included us.
           m_stack.pop_back();

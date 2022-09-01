@@ -172,6 +172,7 @@ int main(int argc, const char **argv) {
   const auto &graph = result->graph;
   const auto &sources = result->sources;
   const auto &missing = result->missing_includes;
+  const auto &unguarded = result->unguarded_files;
   std::cout << "Found " << num_vertices(graph) << " files and "
             << num_edges(graph) << " include directives.\n";
   std::cout << "\n" << sources.size() << " Sources:\n";
@@ -180,13 +181,27 @@ int main(int argc, const char **argv) {
   }
   std::cout << '\n';
   if (!missing.empty()) {
-    std::cout << "There are " << missing.size() << " missing files\n  ";
+    std::cout << "There are " << missing.size() << " missing files\n";
     std::copy(missing.begin(), missing.end(),
               std::ostream_iterator<std::string>(std::cout, "  \n  "));
   } else {
     std::cout << "All includes found :)";
   }
-  std::cout << "\n";
+  std::cout << '\n';
+
+  if (!unguarded.empty()) {
+    std::cout << "There are " << unguarded.size() << " unguarded files\n";
+    std::vector<std::string> files(unguarded.size());
+    std::transform(
+        unguarded.begin(), unguarded.end(), files.begin(),
+        [&](Graph::vertex_descriptor v) { return graph[v].path.string(); });
+    std::sort(files.begin(), files.end());
+    std::copy(files.begin(), files.end(),
+              std::ostream_iterator<std::string>(std::cout, "  \n  "));
+  } else {
+    std::cout << "All files are properly guarded :)";
+  }
+  std::cout << '\n';
 
   {
     const get_total_cost::result naive_cost = get_naive_cost(graph);

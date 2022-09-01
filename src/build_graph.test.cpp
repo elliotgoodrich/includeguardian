@@ -13,6 +13,8 @@ using namespace IncludeGuardian;
 
 namespace {
 
+using namespace testing;
+
 const auto B = boost::units::information::byte;
 
 const bool external = true;
@@ -167,6 +169,8 @@ TEST(BuildGraphTest, SimpleGraph) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, FileStats) {
@@ -209,6 +213,8 @@ TEST(BuildGraphTest, FileStats) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, MultipleChildren) {
@@ -228,6 +234,8 @@ TEST(BuildGraphTest, MultipleChildren) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, DiamondIncludes) {
@@ -254,6 +262,8 @@ TEST(BuildGraphTest, DiamondIncludes) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, MultipleSources) {
@@ -277,6 +287,8 @@ TEST(BuildGraphTest, MultipleSources) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, DifferentDirectories) {
@@ -299,6 +311,8 @@ TEST(BuildGraphTest, DifferentDirectories) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, ExternalCode) {
@@ -316,15 +330,18 @@ TEST(BuildGraphTest, ExternalCode) {
                   "#pragma override_token_count(1)\n"));
   fs->addFile((working_directory / other / sub / "a.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma once\n"
                   "#include \"a_next.hpp\"\n"
                   "#pragma override_file_size(246)\n"
                   "#pragma override_token_count(2)\n"));
   fs->addFile((working_directory / other / sub / "a_next.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma once\n"
                   "#pragma override_file_size(99)\n"
                   "#pragma override_token_count(99)\n"));
   fs->addFile((working_directory / other / include / "b.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma once\n"
                   "#pragma override_file_size(4812)\n"
                   "#pragma override_token_count(4)\n"));
 
@@ -339,7 +356,7 @@ TEST(BuildGraphTest, ExternalCode) {
       add_vertex({"b.hpp", external, 1u, {4, 4812 * B}}, g);
 
   add_edge(main_cpp, a_hpp, {"\"sub/a.hpp\"", 1}, g);
-  add_edge(a_hpp, a_next_hpp, {"\"a_next.hpp\"", 1}, g);
+  add_edge(a_hpp, a_next_hpp, {"\"a_next.hpp\"", 2}, g);
   add_edge(main_cpp, a_hpp, {"<b.hpp>", 2}, g);
 
   llvm::Expected<build_graph::result> results = build_graph::from_dir(
@@ -347,6 +364,8 @@ TEST(BuildGraphTest, ExternalCode) {
       {working_directory / other, working_directory / other / include}, fs,
       get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, UnremovableHeaders) {
@@ -377,6 +396,8 @@ TEST(BuildGraphTest, UnremovableHeaders) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, PrecompiledHeaders) {
@@ -400,6 +421,8 @@ TEST(BuildGraphTest, PrecompiledHeaders) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
 TEST(BuildGraphTest, ForcedIncludes) {
@@ -448,6 +471,9 @@ TEST(BuildGraphTest, ForcedIncludes) {
       build_graph::from_dir(working_directory, {}, fs, get_file_type,
                             {working_directory / foo / "forced.hpp"});
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files,
+              UnorderedElementsAre(forced_hpp, forced_sub_hpp, include_hpp));
 }
 
 TEST(BuildGraphTest, XMacros) {
@@ -514,6 +540,8 @@ TEST(BuildGraphTest, XMacros) {
   llvm::Expected<build_graph::result> results =
       build_graph::from_dir(working_directory, {}, fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, UnorderedElementsAre(x_macro_hpp));
 }
 
 } // namespace
