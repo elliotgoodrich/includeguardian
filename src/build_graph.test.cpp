@@ -321,11 +321,13 @@ TEST(BuildGraphTest, ExternalCode) {
   const std::filesystem::path other = "other";
   const std::filesystem::path sub = "sub";
   const std::filesystem::path include = "include";
+  const std::filesystem::path ours = "ours";
   const std::filesystem::path working_directory = root / "working_dir";
   fs->addFile((working_directory / src / "main1.cpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
                   "#include \"sub/a.hpp\"\n"
                   "#include <b.hpp>\n"
+                  "#include \"internal.hpp\"\n"
                   "#pragma override_file_size(123)\n"
                   "#pragma override_token_count(1)\n"));
   fs->addFile((working_directory / other / sub / "a.hpp").string(), 0,
@@ -344,6 +346,11 @@ TEST(BuildGraphTest, ExternalCode) {
                   "#pragma once\n"
                   "#pragma override_file_size(4812)\n"
                   "#pragma override_token_count(4)\n"));
+  fs->addFile((working_directory / other / ours / "internal.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma once\n"
+                  "#pragma override_file_size(999)\n"
+                  "#pragma override_token_count(999)\n"));
 
   Graph g;
   const Graph::vertex_descriptor main_cpp =
@@ -354,15 +361,20 @@ TEST(BuildGraphTest, ExternalCode) {
       add_vertex({sub / "a_next.hpp", external, 0u, {99, 99 * B}}, g);
   const Graph::vertex_descriptor b_hpp =
       add_vertex({"b.hpp", external, 1u, {4, 4812 * B}}, g);
+  const Graph::vertex_descriptor internal_hpp =
+      add_vertex({"internal.hpp", not_external, 1u, {999, 999 * B}}, g);
 
   add_edge(main_cpp, a_hpp, {"\"sub/a.hpp\"", 1}, g);
   add_edge(a_hpp, a_next_hpp, {"\"a_next.hpp\"", 2}, g);
   add_edge(main_cpp, a_hpp, {"<b.hpp>", 2}, g);
+  add_edge(main_cpp, internal_hpp, {"\"internal.hpp\"", 3}, g);
 
   llvm::Expected<build_graph::result> results = build_graph::from_dir(
       working_directory / src,
-      {working_directory / other, working_directory / other / include}, fs,
-      get_file_type);
+      {{working_directory / other, clang::SrcMgr::C_System},
+       {working_directory / other / include, clang::SrcMgr::C_System},
+       {working_directory / other / ours, clang::SrcMgr::C_User}},
+      fs, get_file_type);
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());

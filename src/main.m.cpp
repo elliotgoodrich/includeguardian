@@ -14,6 +14,8 @@
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/VirtualFileSystem.h>
 
+#include <clang/Basic/SourceManager.h>
+
 #include <chrono>
 #include <iomanip>
 #include <iostream>
@@ -68,6 +70,43 @@ get_total_cost::result get_naive_cost(const Graph &g) {
       });
 }
 
+std::vector<std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
+parse_include_dirs(const llvm::cl::list<std::string> &include_dirs,
+                   const llvm::cl::list<std::string> &system_include_dirs) {
+  std::vector<std::tuple<std::filesystem::path,
+                         clang::SrcMgr::CharacteristicKind, unsigned>>
+      tmp(include_dirs.size() + system_include_dirs.size());
+
+  auto out = tmp.begin();
+
+  for (auto it = include_dirs.begin(); it != include_dirs.end(); ++it, ++out) {
+    *out = std::make_tuple(std::filesystem::path(*it), clang::SrcMgr::C_User,
+                           include_dirs.getPosition(it - include_dirs.begin()));
+  }
+
+  for (auto it = system_include_dirs.begin(); it != system_include_dirs.end();
+       ++it, ++out) {
+    *out = std::make_tuple(
+        std::filesystem::path(*it), clang::SrcMgr::C_System,
+        system_include_dirs.getPosition(it - system_include_dirs.begin()));
+  }
+
+  std::inplace_merge(tmp.begin(), tmp.begin() + include_dirs.size(), tmp.end(),
+                     [](const auto &l, const auto &r) {
+                       return std::get<unsigned>(l) < std::get<unsigned>(r);
+                     });
+
+  std::vector<
+      std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
+      result;
+  std::transform(
+      tmp.begin(), tmp.end(), std::back_inserter(result), [](const auto &t) {
+        return std::make_pair(std::get<std::filesystem::path>(t),
+                              std::get<clang::SrcMgr::CharacteristicKind>(t));
+      });
+  return result;
+}
+
 class stopwatch {
   std::chrono::steady_clock::time_point m_start;
 
@@ -109,7 +148,11 @@ int main(int argc, const char **argv) {
                                  llvm::cl::Required);
 
   llvm::cl::list<std::string> include_dirs(
-      "i", llvm::cl::desc("Additional include directories"),
+      "I", llvm::cl::desc("Additional include directories"),
+      llvm::cl::ZeroOrMore);
+
+  llvm::cl::list<std::string> system_include_dirs(
+      "isystem", llvm::cl::desc("Additional system include directories"),
       llvm::cl::ZeroOrMore);
 
   llvm::cl::list<std::string> forced_includes(
@@ -144,11 +187,6 @@ int main(int argc, const char **argv) {
 
   stopwatch timer;
 
-  std::vector<std::filesystem::path> include_dir_paths(include_dirs.size());
-  std::transform(include_dirs.begin(), include_dirs.end(),
-                 include_dir_paths.begin(),
-                 [](const std::string &s) { return std::filesystem::path(s); });
-
   std::vector<std::filesystem::path> forced_includes_files(
       forced_includes.size());
   std::transform(forced_includes.begin(), forced_includes.end(),
@@ -156,8 +194,8 @@ int main(int argc, const char **argv) {
                  [](const std::string &s) { return std::filesystem::path(s); });
 
   llvm::Expected<build_graph::result> result = build_graph::from_dir(
-      dir.getValue(), include_dir_paths, llvm::vfs::getRealFileSystem(),
-      map_ext, forced_includes_files);
+      dir.getValue(), parse_include_dirs(include_dirs, system_include_dirs),
+      llvm::vfs::getRealFileSystem(), map_ext, forced_includes_files);
 
   if (!result) {
     // TODO: error message

@@ -6,12 +6,15 @@
 #include <llvm/ADT/IntrusiveRefCntPtr.h>
 #include <llvm/Support/Error.h>
 
+#include <clang/Basic/SourceManager.h>
+
 #include <filesystem>
 #include <functional>
 #include <set>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace clang::tooling {
@@ -40,16 +43,16 @@ struct build_graph {
 
   static llvm::Expected<result>
   from_compilation_db(const clang::tooling::CompilationDatabase &compilation_db,
-                      const std::filesystem::path& working_dir,
+                      const std::filesystem::path &working_dir,
                       std::span<const std::filesystem::path> source_paths,
                       std::function<file_type(std::string_view)> file_type,
                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
-  static llvm::Expected<result>
-  from_compilation_db(const clang::tooling::CompilationDatabase &compilation_db,
-                      const std::filesystem::path& working_dir,
-                      std::initializer_list<const std::filesystem::path> source_paths,
-                      std::function<file_type(std::string_view)> file_type,
-                      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
+  static llvm::Expected<result> from_compilation_db(
+      const clang::tooling::CompilationDatabase &compilation_db,
+      const std::filesystem::path &working_dir,
+      std::initializer_list<const std::filesystem::path> source_paths,
+      std::function<file_type(std::string_view)> file_type,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
 
   // Try to construct a `Graph` object from all files in the specified
   // `source_dir` that return `source` from `file_type` (and files they
@@ -59,17 +62,21 @@ struct build_graph {
   // all source files.  This will commonly be used for precompiled headers.
   static llvm::Expected<result>
   from_dir(std::filesystem::path source_dir,
-           std::span<const std::filesystem::path> include_dirs,
+           std::span<const std::pair<std::filesystem::path,
+                                     clang::SrcMgr::CharacteristicKind>>
+               include_dirs,
            llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
            std::function<file_type(std::string_view)> file_type,
            std::span<const std::filesystem::path> forced_includes =
                std::span<const std::filesystem::path>());
-  static llvm::Expected<result>
-  from_dir(const std::filesystem::path &source_dir,
-           std::initializer_list<std::filesystem::path> include_dirs,
-           llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
-           std::function<file_type(std::string_view)> file_type,
-           std::initializer_list<std::filesystem::path> forced_includes = {});
+  static llvm::Expected<result> from_dir(
+      const std::filesystem::path &source_dir,
+      std::initializer_list<
+          std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
+          include_dirs,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
+      std::function<file_type(std::string_view)> file_type,
+      std::initializer_list<std::filesystem::path> forced_includes = {});
 };
 
 } // namespace IncludeGuardian

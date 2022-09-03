@@ -36,7 +36,9 @@ class FakeCompilationDatabase : public clang::tooling::CompilationDatabase {
 public:
   std::filesystem::path m_working_directory;
   std::vector<std::filesystem::path> m_sources;
-  std::span<const std::filesystem::path> m_include_dirs;
+  std::span<
+      const std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
+      m_include_dirs;
   std::span<const std::filesystem::path> m_force_includes;
 
   FakeCompilationDatabase(const std::filesystem::path &working_directory)
@@ -61,9 +63,9 @@ public:
     std::vector<std::string> things;
     things.emplace_back("/usr/bin/clang++");
     things.emplace_back(FilePath.str());
-    for (const std::filesystem::path &include : m_include_dirs) {
-      things.emplace_back("-isystem");
-      things.emplace_back(include.string());
+    for (const auto &[path, type] : m_include_dirs) {
+      things.emplace_back(clang::SrcMgr::isSystem(type) ? "-isystem" : "-I");
+      things.emplace_back(path.string());
     }
     for (const std::filesystem::path &forced : m_force_includes) {
       things.emplace_back("-include");
@@ -328,7 +330,7 @@ public:
     // always be null-terminated strings and we can access `data()`
     // without a corresponding call to `size()`.
     if (pragma_text.empty()) {
-        return;
+      return;
     }
 
     {
@@ -471,15 +473,17 @@ llvm::Expected<build_graph::result> build_graph::from_compilation_db(
       std::span(source_paths.begin(), source_paths.end()), file_type, fs);
 }
 
-llvm::Expected<build_graph::result>
-build_graph::from_dir(std::filesystem::path source_dir,
-                      std::span<const std::filesystem::path> include_dirs,
-                      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
-                      std::function<file_type(std::string_view)> file_type,
-                      std::span<const std::filesystem::path> forced_includes) {
+llvm::Expected<build_graph::result> build_graph::from_dir(
+    std::filesystem::path source_dir,
+    std::span<const std::pair<std::filesystem::path,
+                              clang::SrcMgr::CharacteristicKind>>
+        include_dirs,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
+    std::function<file_type(std::string_view)> file_type,
+    std::span<const std::filesystem::path> forced_includes) {
   source_dir = std::filesystem::absolute(source_dir);
   assert(std::all_of(include_dirs.begin(), include_dirs.end(),
-                     std::mem_fn(&std::filesystem::path::is_absolute)));
+                     [](const auto &p) { return p.first.is_absolute(); }));
 
   FakeCompilationDatabase db(source_dir);
   db.m_include_dirs = include_dirs;
@@ -509,7 +513,9 @@ build_graph::from_dir(std::filesystem::path source_dir,
 
 llvm::Expected<build_graph::result> build_graph::from_dir(
     const std::filesystem::path &source_dir,
-    std::initializer_list<std::filesystem::path> include_dirs,
+    std::initializer_list<
+        std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
+        include_dirs,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
     std::function<file_type(std::string_view)> file_type,
     std::initializer_list<std::filesystem::path> forced_includes) {
