@@ -96,6 +96,7 @@ gtest_add_tests(TARGET      tests
                 TEST_LIST   noArgsTests
 )
 
+# IncludeGuardian
 add_executable(
     includeguardian
     main.m.cpp
@@ -103,5 +104,18 @@ add_executable(
 if(WIN32)
     target_compile_options(includeguardian PRIVATE /EHsc /FS)
 endif()
-target_link_libraries(includeguardian common)
-target_precompile_headers(tests REUSE_FROM common)
+find_package(benchmark CONFIG REQUIRED)
+target_link_libraries(includeguardian PRIVATE common)
+target_precompile_headers(includeguardian REUSE_FROM common)
+
+# benchmarks
+add_executable(
+    benchmarks
+    benchmarks.m.cpp
+)
+if(WIN32)
+    target_compile_options(benchmarks PRIVATE /EHsc /FS)
+endif()
+find_package(benchmark CONFIG REQUIRED)
+target_link_libraries(benchmarks PRIVATE common benchmark::benchmark)
+target_precompile_headers(benchmarks REUSE_FROM common)
