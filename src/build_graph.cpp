@@ -163,17 +163,10 @@ public:
         auto const [it, inserted] =
             m_id_to_node.emplace(file->getUniqueID(), empty);
         if (inserted) {
-          const bool is_external = false;
-          const unsigned internal_incoming = 0u;
-          const bool is_precompiled = false;
           const std::filesystem::path rel =
               std::filesystem::path(file->getName().str())
                   .lexically_relative(m_working_dir);
-          it->second.v =
-              add_vertex({rel, is_external, internal_incoming,
-                          cost{0ull, 0.0 * boost::units::information::bytes},
-                          std::nullopt, is_precompiled},
-                         m_r.graph);
+          it->second.v = add_vertex(rel, m_r.graph);
           it->second.angled_rel = rel.parent_path();
           m_r.sources.push_back(it->second.v);
         } else {
@@ -256,9 +249,6 @@ public:
     auto const [it, inserted] =
         m_id_to_node.emplace(File->getUniqueID(), empty);
     if (inserted) {
-      const unsigned internal_incoming = 0u;
-      const bool is_external = clang::SrcMgr::isSystem(FileType);
-
       // If we don't have an angled include, try and build up the relative
       // path from the first angled include.
       const std::filesystem::path p =
@@ -275,9 +265,9 @@ public:
           m_file_type(p.string()) == build_graph::file_type::precompiled_header;
 
       it->second.v =
-          add_vertex({p, is_external, internal_incoming,
-                      cost{0ull, 0.0 * boost::units::information::bytes},
-                      std::nullopt, is_precompiled},
+          add_vertex(file_node(p)
+                         .set_external(clang::SrcMgr::isSystem(FileType))
+                         .set_precompiled(is_precompiled),
                      m_r.graph);
 
       // If we have a non-angled include, then make it relative to the

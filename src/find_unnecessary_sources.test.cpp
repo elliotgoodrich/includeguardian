@@ -34,16 +34,16 @@ const cost MAIN{12345, 98765.0 * bytes};
 
 TEST(FindUnnecessarySourcesTest, WInclude) {
   Graph graph;
-  const Graph::vertex_descriptor a_h =
-      add_vertex({"a.h", not_external, 2u, A_H}, graph);
+  const Graph::vertex_descriptor a_h = add_vertex(
+      file_node("a.h").with_cost(A_H).set_internal_parents(2), graph);
   const Graph::vertex_descriptor a_c =
-      add_vertex({"a.c", not_external, 0u, A_C}, graph);
-  const Graph::vertex_descriptor b_h =
-      add_vertex({"b.h", not_external, 2u, B_H}, graph);
+      add_vertex(file_node("a.c").with_cost(A_C), graph);
+  const Graph::vertex_descriptor b_h = add_vertex(
+      file_node("b.h").with_cost(B_H).set_internal_parents(2), graph);
   const Graph::vertex_descriptor b_c =
-      add_vertex({"b.c", not_external, 0u, B_C}, graph);
+      add_vertex(file_node("b.c").with_cost(B_C), graph);
   const Graph::vertex_descriptor main =
-      add_vertex({"main.c", not_external, 0u, MAIN}, graph);
+      add_vertex(file_node("main.c").with_cost(MAIN), graph);
 
   //   a.c  main.c  b.c
   //    |  /      \  |
@@ -75,24 +75,24 @@ TEST(FindUnnecessarySourcesTest, WInclude) {
 
 TEST(FindUnnecessarySourcesTest, CascadingInclude) {
   Graph graph;
-  const Graph::vertex_descriptor a_h =
-      add_vertex({"a.h", not_external, 2u, A_H}, graph);
+  const Graph::vertex_descriptor a_h = add_vertex(
+      file_node("a.h").with_cost(A_H).set_internal_parents(2), graph);
   const Graph::vertex_descriptor a_c =
-      add_vertex({"a.c", not_external, 0u, A_C}, graph);
-  const Graph::vertex_descriptor b_h =
-      add_vertex({"b.h", not_external, 3u, B_H}, graph);
+      add_vertex(file_node("a.c").with_cost(A_C), graph);
+  const Graph::vertex_descriptor b_h = add_vertex(
+      file_node("b.h").with_cost(B_H).set_internal_parents(3), graph);
   const Graph::vertex_descriptor b_c =
-      add_vertex({"b.c", not_external, 0u, B_C}, graph);
-  const Graph::vertex_descriptor c_h =
-      add_vertex({"c.h", not_external, 3u, C_H}, graph);
+      add_vertex(file_node("b.c").with_cost(B_C), graph);
+  const Graph::vertex_descriptor c_h = add_vertex(
+      file_node("c.h").with_cost(C_H).set_internal_parents(3), graph);
   const Graph::vertex_descriptor c_c =
-      add_vertex({"c.c", not_external, 0u, C_C}, graph);
-  const Graph::vertex_descriptor d_h =
-      add_vertex({"d.h", not_external, 3u, D_H}, graph);
+      add_vertex(file_node("c.c").with_cost(C_C), graph);
+  const Graph::vertex_descriptor d_h = add_vertex(
+      file_node("d.h").with_cost(D_H).set_internal_parents(3), graph);
   const Graph::vertex_descriptor d_c =
-      add_vertex({"d.c", not_external, 0u, D_C}, graph);
+      add_vertex(file_node("d.c").with_cost(D_C), graph);
   const Graph::vertex_descriptor main =
-      add_vertex({"main.c", not_external, 0u, MAIN}, graph);
+      add_vertex(file_node("main.c").with_cost(MAIN), graph);
 
   //   main.c  a.c
   //       \  /
@@ -145,18 +145,25 @@ TEST(FindUnnecessarySourcesTest, CascadingInclude) {
 
 TEST(FindUnnecessarySourcesTest, ComplexCascadingInclude) {
   Graph graph;
-  const auto a_h = add_vertex({"a.h", not_external, 2u, A_H}, graph);
-  const auto a_c = add_vertex({"a.c", not_external, 0u, A_C}, graph);
-  const auto b_h = add_vertex({"b.h", not_external, 3u, B_H}, graph);
-  const auto b_c = add_vertex({"b.c", not_external, 0u, B_C}, graph);
-  const auto c_h = add_vertex({"c.h", not_external, 3u, C_H}, graph);
-  const auto c_c = add_vertex({"c.c", not_external, 0u, C_C}, graph);
-  const auto d_h = add_vertex({"d.h", not_external, 3u, D_H}, graph);
-  const auto d_c = add_vertex({"d.c", not_external, 0u, D_C}, graph);
-  const auto e_h = add_vertex({"e.h", not_external, 1u, E_H}, graph);
-  const auto f_h = add_vertex({"f.h", not_external, 1u, F_H}, graph);
-  const auto s_h = add_vertex({"s.h", not_external, 1u, S_H}, graph);
-  const auto main = add_vertex({"main.c", not_external, 0u, MAIN}, graph);
+  const auto a_h = add_vertex(
+      file_node("a.h").with_cost(A_H).set_internal_parents(2), graph);
+  const auto a_c = add_vertex(file_node("a.c").with_cost(A_C), graph);
+  const auto b_h = add_vertex(
+      file_node("b.h").with_cost(B_H).set_internal_parents(3), graph);
+  const auto b_c = add_vertex(file_node("b.c").with_cost(B_C), graph);
+  const auto c_h = add_vertex(
+      file_node("c.h").with_cost(C_H).set_internal_parents(3), graph);
+  const auto c_c = add_vertex(file_node("c.c").with_cost(C_C), graph);
+  const auto d_h = add_vertex(
+      file_node("d.h").with_cost(D_H).set_internal_parents(3), graph);
+  const auto d_c = add_vertex(file_node("d.c").with_cost(D_C), graph);
+  const auto e_h = add_vertex(
+      file_node("e.h").with_cost(E_H).set_internal_parents(1), graph);
+  const auto f_h = add_vertex(
+      file_node("f.h").with_cost(F_H).set_internal_parents(1), graph);
+  const auto s_h = add_vertex(
+      file_node("s.h").with_cost(S_H).set_internal_parents(1), graph);
+  const auto main = add_vertex(file_node("main.c").with_cost(MAIN), graph);
 
   //   main.c  a.c
   //     | \   /

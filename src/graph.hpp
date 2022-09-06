@@ -27,7 +27,8 @@ public:
                               //< it will be unknown and generally unnecessary
                               //< as to what path it is relative to.
   bool is_external = false; //< Whether this file comes from an external library
-  unsigned internal_incoming = 0; //< The number of times this file is included from non-external files
+  unsigned internal_incoming =
+      0; //< The number of times this file is included from non-external files
   cost underlying_cost;
   std::optional<Graph::vertex_descriptor>
       component; //< If this is not null then this
@@ -36,9 +37,25 @@ public:
                  //< source respectively.
   bool is_precompiled = false;
 
-  cost true_cost() const {
-      return is_precompiled ? cost{} : underlying_cost;
-  }
+  file_node();
+  file_node(const std::filesystem::path &path);
+
+  file_node &with_cost(
+      long long int token_count,
+      boost::units::quantity<boost::units::information::info> file_size) &;
+  file_node &&with_cost(
+      long long int token_count,
+      boost::units::quantity<boost::units::information::info> file_size) &&;
+  file_node &with_cost(cost c) &;
+  file_node &&with_cost(cost c) &&;
+  file_node &set_external(bool is_external) &;
+  file_node &&set_external(bool is_external) &&;
+  file_node &set_internal_parents(unsigned count) &;
+  file_node &&set_internal_parents(unsigned count) &&;
+  file_node &set_precompiled(bool is_precompiled) &;
+  file_node &&set_precompiled(bool is_precompiled) &&;
+
+  cost true_cost() const;
 };
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value);

@@ -6,6 +6,67 @@
 
 namespace IncludeGuardian {
 
+file_node::file_node() = default;
+
+file_node::file_node(const std::filesystem::path &path) : path(path) {}
+
+file_node &file_node::with_cost(
+    long long int token_count,
+    boost::units::quantity<boost::units::information::info> file_size) & {
+  underlying_cost = cost{token_count, file_size};
+  return *this;
+}
+
+file_node &&file_node::with_cost(
+    long long int token_count,
+    boost::units::quantity<boost::units::information::info> file_size) && {
+  underlying_cost = cost{token_count, file_size};
+  return std::move(*this);
+}
+
+file_node &file_node::with_cost(cost c) & {
+  underlying_cost = c;
+  return *this;
+}
+file_node &&file_node::with_cost(cost c) && {
+  underlying_cost = c;
+  return std::move(*this);
+}
+
+file_node &file_node::set_external(bool v) & {
+  is_external = v;
+  return *this;
+}
+
+file_node &&file_node::set_external(bool v) && {
+  is_external = v;
+  return std::move(*this);
+}
+
+file_node &file_node::set_internal_parents(unsigned v) & {
+  this->internal_incoming = v;
+  return *this;
+}
+
+file_node &&file_node::set_internal_parents(unsigned v) && {
+  this->internal_incoming = v;
+  return std::move(*this);
+}
+
+file_node &file_node::set_precompiled(bool v) & {
+  this->is_precompiled = v;
+  return *this;
+}
+
+file_node &&file_node::set_precompiled(bool v) && {
+  this->is_precompiled = v;
+  return std::move(*this);
+}
+
+cost file_node::true_cost() const {
+  return is_precompiled ? cost{} : underlying_cost;
+}
+
 std::ostream &operator<<(std::ostream &stream, const file_node &value) {
   return stream << value.path << ' ' << value.underlying_cost
                 << " [incoming=" << value.internal_incoming << ']'

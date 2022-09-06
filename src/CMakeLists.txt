@@ -75,6 +75,7 @@ endif()
 
 add_executable(
     tests
+    analysis_test_fixtures.hpp analysis_test_fixtures.cpp
     build_graph.test.cpp
     dot_graph.test.cpp
     find_expensive_files.test.cpp

@@ -161,7 +161,7 @@ MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
 
 TEST(BuildGraphTest, SimpleGraph) {
   Graph g;
-  add_vertex({"main.cpp", not_external, 0u, {1, 100 * B}}, g);
+  add_vertex(file_node("main.cpp").with_cost(1, 100 * B), g);
 
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
@@ -204,9 +204,12 @@ TEST(BuildGraphTest, FileStats) {
 
   Graph g;
   const Graph::vertex_descriptor main_cpp = add_vertex(
-      {"main.cpp", not_external, 0u, {25, main_cpp_code.size() * B}}, g);
+      file_node("main.cpp").with_cost(25, main_cpp_code.size() * B), g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {40, a_hpp_code.size() * B}}, g);
+      add_vertex(file_node("a.hpp")
+                     .with_cost(40, a_hpp_code.size() * B)
+                     .set_internal_parents(1),
+                 g);
 
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 4}, g);
 
@@ -220,11 +223,11 @@ TEST(BuildGraphTest, FileStats) {
 TEST(BuildGraphTest, MultipleChildren) {
   Graph g;
   const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main.cpp", not_external, 0u, {1, 100 * B}}, g);
-  const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {2, 1000 * B}}, g);
-  const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", not_external, 1u, {4, 2000 * B}}, g);
+      add_vertex(file_node("main.cpp").with_cost(1, 100 * B), g);
+  const Graph::vertex_descriptor a_hpp = add_vertex(
+      file_node("a.hpp").with_cost(2, 1000 * B).set_internal_parents(1), g);
+  const Graph::vertex_descriptor b_hpp = add_vertex(
+      file_node("b.hpp").with_cost(4, 2000 * B).set_internal_parents(1), g);
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
   add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 3}, g);
 
@@ -241,16 +244,16 @@ TEST(BuildGraphTest, MultipleChildren) {
 TEST(BuildGraphTest, DiamondIncludes) {
   Graph g;
   const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main.cpp", not_external, 0u, {1, 100 * B}}, g);
-  const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {2, 1000 * B}}, g);
-  const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", not_external, 1u, {4, 2000 * B}}, g);
+      add_vertex(file_node("main.cpp").with_cost(1, 100 * B), g);
+  const Graph::vertex_descriptor a_hpp = add_vertex(
+      file_node("a.hpp").with_cost(2, 1000 * B).set_internal_parents(1), g);
+  const Graph::vertex_descriptor b_hpp = add_vertex(
+      file_node("b.hpp").with_cost(4, 2000 * B).set_internal_parents(1), g);
 
   const std::string c_path =
       (std::filesystem::path("common") / "c.hpp").string();
-  const Graph::vertex_descriptor c_hpp =
-      add_vertex({c_path, not_external, 2u, {8, 30000 * B}}, g);
+  const Graph::vertex_descriptor c_hpp = add_vertex(
+      file_node(c_path).with_cost(8, 30000 * B).set_internal_parents(2), g);
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
   add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 3}, g);
   add_edge(a_hpp, c_hpp, {"\"" + c_path + "\"", 2}, g);
@@ -268,14 +271,14 @@ TEST(BuildGraphTest, DiamondIncludes) {
 
 TEST(BuildGraphTest, MultipleSources) {
   Graph g;
-  const Graph::vertex_descriptor main1_cpp =
-      add_vertex({"main1.cpp", not_external, 0u, {1, 100 * B}}, g);
-  const Graph::vertex_descriptor main2_cpp =
-      add_vertex({"main2.cpp", not_external, 0u, {2, 150 * B}}, g);
-  const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 2u, {4, 1000 * B}}, g);
-  const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", not_external, 1u, {8, 2000 * B}}, g);
+  const Graph::vertex_descriptor main1_cpp = add_vertex(
+      file_node("main1.cpp").with_cost(1, 100 * B).set_internal_parents(0), g);
+  const Graph::vertex_descriptor main2_cpp = add_vertex(
+      file_node("main2.cpp").with_cost(2, 150 * B).set_internal_parents(0), g);
+  const Graph::vertex_descriptor a_hpp = add_vertex(
+      file_node("a.hpp").with_cost(4, 1000 * B).set_internal_parents(2), g);
+  const Graph::vertex_descriptor b_hpp = add_vertex(
+      file_node("b.hpp").with_cost(8, 2000 * B).set_internal_parents(1), g);
 
   add_edge(main1_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
   add_edge(main2_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
@@ -296,11 +299,18 @@ TEST(BuildGraphTest, DifferentDirectories) {
   const std::filesystem::path src = "src";
   const std::filesystem::path include = "include";
   const Graph::vertex_descriptor main_cpp =
-      add_vertex({src / "main1.cpp", not_external, 0u, {1, 100 * B}}, g);
+      add_vertex(file_node(src / "main1.cpp")
+                     .with_cost(1, 100 * B)
+                     .set_internal_parents(0),
+                 g);
   const Graph::vertex_descriptor a_hpp =
-      add_vertex({src / include / "a.hpp", not_external, 1u, {2, 1000 * B}}, g);
-  const Graph::vertex_descriptor b_hpp =
-      add_vertex({src / "b.hpp", not_external, 1u, {4, 2000 * B}}, g);
+      add_vertex(file_node(src / include / "a.hpp")
+                     .with_cost(2, 1000 * B)
+                     .set_internal_parents(1),
+                 g);
+  const Graph::vertex_descriptor b_hpp = add_vertex(
+      file_node(src / "b.hpp").with_cost(4, 2000 * B).set_internal_parents(1),
+      g);
 
   add_edge(main_cpp, a_hpp, {"\"include/a.hpp\"", 2}, g);
   add_edge(main_cpp, a_hpp, {"\"b.hpp\"", 3}, g);
@@ -353,16 +363,27 @@ TEST(BuildGraphTest, ExternalCode) {
                   "#pragma override_token_count(999)\n"));
 
   Graph g;
-  const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main1.cpp", not_external, 0u, {1, 123 * B}}, g);
-  const Graph::vertex_descriptor a_hpp =
-      add_vertex({sub / "a.hpp", external, 1u, {2, 246 * B}}, g);
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      file_node("main1.cpp").with_cost(1, 123 * B).set_internal_parents(0), g);
+  const Graph::vertex_descriptor a_hpp = add_vertex(file_node(sub / "a.hpp")
+                                                        .with_cost(2, 246 * B)
+                                                        .set_internal_parents(1)
+                                                        .set_external(true),
+                                                    g);
   const Graph::vertex_descriptor a_next_hpp =
-      add_vertex({sub / "a_next.hpp", external, 0u, {99, 99 * B}}, g);
-  const Graph::vertex_descriptor b_hpp =
-      add_vertex({"b.hpp", external, 1u, {4, 4812 * B}}, g);
-  const Graph::vertex_descriptor internal_hpp =
-      add_vertex({"internal.hpp", not_external, 1u, {999, 999 * B}}, g);
+      add_vertex(file_node(sub / "a_next.hpp")
+                     .with_cost(99, 99 * B)
+                     .set_internal_parents(0)
+                     .set_external(true),
+                 g);
+  const Graph::vertex_descriptor b_hpp = add_vertex(file_node("b.hpp")
+                                                        .with_cost(4, 4812 * B)
+                                                        .set_internal_parents(1)
+                                                        .set_external(true),
+                                                    g);
+  const Graph::vertex_descriptor internal_hpp = add_vertex(
+      file_node("internal.hpp").with_cost(999, 999 * B).set_internal_parents(1),
+      g);
 
   add_edge(main_cpp, a_hpp, {"\"sub/a.hpp\"", 1}, g);
   add_edge(a_hpp, a_next_hpp, {"\"a_next.hpp\"", 2}, g);
@@ -383,14 +404,17 @@ TEST(BuildGraphTest, ExternalCode) {
 TEST(BuildGraphTest, UnremovableHeaders) {
   Graph g;
   const std::filesystem::path include = "include";
-  const Graph::vertex_descriptor a_cpp =
-      add_vertex({"a.cpp", not_external, 0u, {1, 100 * B}}, g);
-  const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp", not_external, 1u, {2, 1000 * B}}, g);
-  const Graph::vertex_descriptor b_cpp =
-      add_vertex({"b.cpp", not_external, 0u, {4, 100 * B}}, g);
+  const Graph::vertex_descriptor a_cpp = add_vertex(
+      file_node("a.cpp").with_cost(1, 100 * B).set_internal_parents(0), g);
+  const Graph::vertex_descriptor a_hpp = add_vertex(
+      file_node("a.hpp").with_cost(2, 1000 * B).set_internal_parents(1), g);
+  const Graph::vertex_descriptor b_cpp = add_vertex(
+      file_node("b.cpp").with_cost(4, 100 * B).set_internal_parents(0), g);
   const Graph::vertex_descriptor b_hpp =
-      add_vertex({include / "b.hpp", not_external, 1u, {8, 2000 * B}}, g);
+      add_vertex(file_node(include / "b.hpp")
+                     .with_cost(8, 2000 * B)
+                     .set_internal_parents(1),
+                 g);
 
   const Graph::edge_descriptor a_to_a =
       add_edge(a_cpp, a_hpp, {"\"a.hpp\"", 2, not_removable}, g).first;
@@ -416,14 +440,20 @@ TEST(BuildGraphTest, PrecompiledHeaders) {
   Graph g;
   const bool precompiled = true;
   const std::filesystem::path include = "include";
-  const Graph::vertex_descriptor a_cpp =
-      add_vertex({"a.cpp", not_external, 0u, {1, 100 * B}}, g);
-  const Graph::vertex_descriptor all_pch = add_vertex(
-      {"all.pch", not_external, 1u, {2, 1000 * B}, std::nullopt, precompiled},
-      g);
-  const Graph::vertex_descriptor normal_h = add_vertex(
-      {"normal.h", not_external, 1u, {3, 10000 * B}, std::nullopt, precompiled},
-      g);
+  const Graph::vertex_descriptor a_cpp = add_vertex(
+      file_node("a.cpp").with_cost(1, 100 * B).set_internal_parents(0), g);
+  const Graph::vertex_descriptor all_pch =
+      add_vertex(file_node("all.pch")
+                     .with_cost(2, 1000 * B)
+                     .set_internal_parents(1)
+                     .set_precompiled(true),
+                 g);
+  const Graph::vertex_descriptor normal_h =
+      add_vertex(file_node("normal.h")
+                     .with_cost(3, 10000 * B)
+                     .set_internal_parents(1)
+                     .set_precompiled(true),
+                 g);
   add_edge(a_cpp, all_pch, {"\"all.pch\"", 2, removable}, g);
   add_edge(all_pch, normal_h, {"\"normal.h\"", 2, removable}, g);
 
@@ -460,18 +490,20 @@ TEST(BuildGraphTest, ForcedIncludes) {
                   "#pragma override_file_size(1000)\n"
                   "#pragma override_token_count(8)\n"));
   Graph g;
-  const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main.cpp", not_external, 0u, {1, 123 * B}}, g);
-  const Graph::vertex_descriptor include_hpp =
-      add_vertex({"include.hpp", not_external, 1u, {2, 246 * B}}, g);
-  const Graph::vertex_descriptor forced_hpp = add_vertex(
-      {working_directory / foo / "forced.hpp", not_external, 1u, {4, 999 * B}},
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      file_node("main.cpp").with_cost(1, 123 * B).set_internal_parents(0), g);
+  const Graph::vertex_descriptor include_hpp = add_vertex(
+      file_node("include.hpp").with_cost(2, 246 * B).set_internal_parents(1),
       g);
+  const Graph::vertex_descriptor forced_hpp =
+      add_vertex(file_node(working_directory / foo / "forced.hpp")
+                     .with_cost(4, 999 * B)
+                     .set_internal_parents(1),
+                 g);
   const Graph::vertex_descriptor forced_sub_hpp =
-      add_vertex({working_directory / foo / "forced_sub.hpp",
-                  not_external,
-                  1u,
-                  {8, 1000 * B}},
+      add_vertex(file_node(working_directory / foo / "forced_sub.hpp")
+                     .with_cost(8, 1000 * B)
+                     .set_internal_parents(1),
                  g);
   add_edge(main_cpp, forced_hpp,
            {"\"C:\\working_dir\\foo\\forced.hpp\"", 0, not_removable}, g);
@@ -530,20 +562,19 @@ TEST(BuildGraphTest, XMacros) {
               llvm::MemoryBuffer::getMemBufferCopy(x_macro_hpp_code));
 
   Graph g;
-  const Graph::vertex_descriptor main_cpp =
-      add_vertex({"main.cpp",
-                  not_external,
-                  0u,
-                  {113, (main_cpp_code.size() + x_macro_hpp_code.size()) * B}},
-                 g);
-  const Graph::vertex_descriptor x_macro_hpp =
-      add_vertex({"x_macro.hpp", not_external, 2u, {0, 0.0 * B}}, g);
-  const Graph::vertex_descriptor a_hpp =
-      add_vertex({"a.hpp",
-                  not_external,
-                  1u,
-                  {21, (a_hpp_code.size() + x_macro_hpp_code.size()) * B}},
-                 g);
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      file_node("main.cpp")
+          .with_cost(113, (main_cpp_code.size() + x_macro_hpp_code.size()) * B)
+          .set_internal_parents(0),
+      g);
+  const Graph::vertex_descriptor x_macro_hpp = add_vertex(
+      file_node("x_macro.hpp").with_cost(0, 0.0 * B).set_internal_parents(2),
+      g);
+  const Graph::vertex_descriptor a_hpp = add_vertex(
+      file_node("a.hpp")
+          .with_cost(21, (a_hpp_code.size() + x_macro_hpp_code.size()) * B)
+          .set_internal_parents(1),
+      g);
 
   add_edge(main_cpp, x_macro_hpp, {"\"x_macro.hpp\"", 1}, g);
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 5}, g);
