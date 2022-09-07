@@ -4,8 +4,6 @@
 
 #include <gtest/gtest.h>
 
-#include <utility>
-
 using namespace IncludeGuardian;
 
 namespace {

@@ -2,65 +2,54 @@
 
 #include "analysis_test_fixtures.hpp"
 
+#include <gmock/gmock-matchers.h>
 #include <gtest/gtest.h>
 
-#include <utility>
-
 using namespace IncludeGuardian;
+using namespace testing;
 
 namespace {
 
-bool test_sort(const list_included_files::result &lhs,
-               const list_included_files::result &rhs) {
-  return lhs.v < rhs.v;
-}
+using result = list_included_files::result;
 
 TEST_F(DiamondGraph, ListIncludedFiles) {
-  std::vector<list_included_files::result> actual =
-      list_included_files::from_graph(graph, sources());
-  std::sort(actual.begin(), actual.end(), test_sort);
-  const std::vector<list_included_files::result> expected = {
-      {a, 1u},
-      {b, 1u},
-      {c, 1u},
-      {d, 1u},
-  };
-  EXPECT_EQ(actual, expected);
+  EXPECT_THAT(list_included_files::from_graph(graph, sources()),
+              UnorderedElementsAreArray({
+                  result{a, 1u},
+                  result{b, 1u},
+                  result{c, 1u},
+                  result{d, 1u},
+              }));
 }
 
 TEST_F(MultiLevel, ListIncludedFiles) {
-  std::vector<list_included_files::result> actual =
-      list_included_files::from_graph(graph, sources());
-  std::sort(actual.begin(), actual.end(), test_sort);
-  const std::vector<list_included_files::result> expected = {
-      {a, 1u},
-      {b, 1u},
-      {c, 1u},
-      {d, 2u},
-      {e, 1u},
-      {f, 2u},
-      {g, 1u},
-      {h, 2u},
-  };
-  EXPECT_EQ(actual, expected);
+  EXPECT_THAT(list_included_files::from_graph(graph, sources()),
+              UnorderedElementsAreArray({
+                  result{a, 1u},
+                  result{b, 1u},
+                  result{c, 1u},
+                  result{d, 2u},
+                  result{e, 1u},
+                  result{f, 2u},
+                  result{g, 1u},
+                  result{h, 2u},
+              }));
 }
 
 TEST_F(LongChain, ListIncludedFiles) {
-  std::vector<list_included_files::result> actual =
-      list_included_files::from_graph(graph, sources());
-  std::sort(actual.begin(), actual.end(), test_sort);
-  const std::vector<list_included_files::result> expected = {
-      {a, 1u},
-      {b, 1u},
-      {c, 1u},
-      {d, 1u},
-      {e, 1u},
-      {f, 1u},
-      {g, 1u},
-      {h, 1u},
-      {i, 1u},
-      {j, 1u},
-  };
+  EXPECT_THAT(list_included_files::from_graph(graph, sources()),
+              UnorderedElementsAreArray({
+                  result{a, 1u},
+                  result{b, 1u},
+                  result{c, 1u},
+                  result{d, 1u},
+                  result{e, 1u},
+                  result{f, 1u},
+                  result{g, 1u},
+                  result{h, 1u},
+                  result{i, 1u},
+                  result{j, 1u},
+              }));
 }
 
 } // namespace
