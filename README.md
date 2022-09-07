@@ -129,6 +129,12 @@ wants to try a suggestion.  For example, if we recommend removing all
 includes to a particular header file, we can go through all those files
 including it and remove those directives.
 
+### Seamless PCH
+
+We can scan the existing code and recommend 1 file to precompile (e.g. `<vector>`) based on the number of sources it is included in and the size.  Then perhaps we can inject this one file into only those sources that already include it (perhaps this will need to be maintained server-side and have a CMake module pick it up).  I don't know what the
+benefit will be, but it could be a cheap way to gain 10-15% without the
+risk of adding having transitive includes.  I think we can actually have several PCH files and choose one per source.
+
 ### Rebuild Warning
 
 We can look at the history of the repository to figure out what the chances
