@@ -228,11 +228,24 @@ int main(int argc, const char **argv) {
   std::cout << '\n';
 
   if (!unguarded.empty()) {
-    std::cout << "There are " << unguarded.size() << " unguarded files\n";
-    std::vector<std::string> files(unguarded.size());
-    std::transform(
-        unguarded.begin(), unguarded.end(), files.begin(),
-        [&](Graph::vertex_descriptor v) { return graph[v].path.string(); });
+    std::cout << "There are " << unguarded.size()
+              << " unguarded files that are included more than once\n";
+    std::vector<Graph::vertex_descriptor> unguarded_copy;
+    std::copy_if(
+        unguarded.begin(), unguarded.end(), std::back_inserter(unguarded_copy),
+        [&](const Graph::vertex_descriptor v) {
+          return graph[v].internal_incoming + graph[v].external_incoming > 1;
+        });
+    std::vector<std::string> files(unguarded_copy.size());
+    std::transform(unguarded_copy.begin(), unguarded_copy.end(), files.begin(),
+                   [&](Graph::vertex_descriptor v) {
+                     std::string result = graph[v].path.string();
+                     result += " included by ";
+                     result += std::to_string(graph[v].internal_incoming +
+                                              graph[v].external_incoming);
+                     result += " files";
+                     return result;
+                   });
     std::sort(files.begin(), files.end());
     std::copy(files.begin(), files.end(),
               std::ostream_iterator<std::string>(std::cout, "  \n  "));
