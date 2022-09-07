@@ -92,6 +92,7 @@ bool vertices_equal(const file_node &lhs, const Graph &lgraph,
   if (lhs.path != rhs.path || lhs.is_external != rhs.is_external ||
       lhs.underlying_cost != rhs.underlying_cost ||
       lhs.internal_incoming != rhs.internal_incoming ||
+      lhs.external_incoming != rhs.external_incoming ||
       lhs.is_precompiled != rhs.is_precompiled) {
     return false;
   }
@@ -373,7 +374,7 @@ TEST(BuildGraphTest, ExternalCode) {
   const Graph::vertex_descriptor a_next_hpp =
       add_vertex(file_node(sub / "a_next.hpp")
                      .with_cost(99, 99 * B)
-                     .set_internal_parents(0)
+                     .set_external_parents(1)
                      .set_external(true),
                  g);
   const Graph::vertex_descriptor b_hpp = add_vertex(file_node("b.hpp")

@@ -300,6 +300,7 @@ public:
 
     add_edge(from, to, {include, line_number, is_removable}, m_r.graph);
     m_r.graph[to].internal_incoming += !m_r.graph[from].is_external;
+    m_r.graph[to].external_incoming += m_r.graph[from].is_external;
 
     // If we haven't already guessed at a header-source connection
     // then add it in.

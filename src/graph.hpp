@@ -27,8 +27,6 @@ public:
                               //< it will be unknown and generally unnecessary
                               //< as to what path it is relative to.
   bool is_external = false; //< Whether this file comes from an external library
-  unsigned internal_incoming =
-      0; //< The number of times this file is included from non-external files
   cost underlying_cost;
   std::optional<Graph::vertex_descriptor>
       component; //< If this is not null then this
@@ -36,6 +34,10 @@ public:
                  //< depending on whether this is the header or
                  //< source respectively.
   bool is_precompiled = false;
+  unsigned internal_incoming =
+      0; //< The number of times this file is included from non-external files
+  unsigned external_incoming =
+      0; //< The number of times this file is included from external files
 
   file_node();
   file_node(const std::filesystem::path &path);
@@ -52,6 +54,8 @@ public:
   file_node &&set_external(bool is_external) &&;
   file_node &set_internal_parents(unsigned count) &;
   file_node &&set_internal_parents(unsigned count) &&;
+  file_node &set_external_parents(unsigned count) &;
+  file_node &&set_external_parents(unsigned count) &&;
   file_node &set_precompiled(bool is_precompiled) &;
   file_node &&set_precompiled(bool is_precompiled) &&;
 

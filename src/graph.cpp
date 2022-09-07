@@ -53,6 +53,16 @@ file_node &&file_node::set_internal_parents(unsigned v) && {
   return std::move(*this);
 }
 
+file_node &file_node::set_external_parents(unsigned v) & {
+  this->external_incoming = v;
+  return *this;
+}
+
+file_node &&file_node::set_external_parents(unsigned v) && {
+  this->external_incoming = v;
+  return std::move(*this);
+}
+
 file_node &file_node::set_precompiled(bool v) & {
   this->is_precompiled = v;
   return *this;
@@ -69,7 +79,8 @@ cost file_node::true_cost() const {
 
 std::ostream &operator<<(std::ostream &stream, const file_node &value) {
   return stream << value.path << ' ' << value.underlying_cost
-                << " [incoming=" << value.internal_incoming << ']'
+                << " [incoming (int)=" << value.internal_incoming << ']'
+                << " [incoming (ext)=" << value.external_incoming << ']'
                 << (value.is_external ? " [external]" : "")
                 << (value.component ? " [linked]" : "")
                 << (value.is_precompiled ? " [precompiled]" : "");
