@@ -27,12 +27,26 @@ build_graph::file_type map_ext(std::string_view file) {
 
 std::string int_to_file(int n) { return std::to_string(n) + ".hpp"; }
 
+// Append a function to the specified `out` that is unique based on `i` and `j`.
+void append_function(std::string &out, int i, int j) {
+  out += "inline int *do_nothing_";
+  out += std::to_string(i);
+  out += '_';
+  out += std::to_string(j);
+  out += "(int *ptr) { return ptr[";
+  out += std::to_string(i);
+  out += " + ";
+  out += std::to_string(j);
+  out += "]; }";
+}
+
 // Create an in-memory file system that would create the specified `graph`.
 std::tuple<std::vector<std::filesystem::path>,
            llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>,
            boost::units::quantity<boost::units::information::info>>
 make_file_system(const std::filesystem::path &working_directory,
-                 int source_count, double rough_probability_to_include) {
+                 int source_count, double rough_probability_to_include,
+                 int function_count) {
   auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   std::vector<std::filesystem::path> sources;
 
@@ -70,8 +84,9 @@ make_file_system(const std::filesystem::path &working_directory,
         }
       }
 
-      file_contents += "#pragma override_file_size(1000)\n";
-      file_contents += "#pragma override_token_count(100)\n";
+      for (int f = 0; f < function_count; ++f) {
+        append_function(file_contents, i, f);
+      }
 
       const char *extension = is_source ? ".cpp" : ".hpp";
       const std::filesystem::path p =
@@ -88,8 +103,10 @@ make_file_system(const std::filesystem::path &working_directory,
 }
 
 static void BM_SomeFunction(benchmark::State &state) {
+  const auto function_count = state.range(0);
   const std::filesystem::path root = "C:\\";
-  auto [sources, fs, total_size] = make_file_system(root, 1000, 0.1);
+  auto [sources, fs, total_size] =
+      make_file_system(root, 1000, 0.1, function_count);
 
   for (auto _ : state) {
     [[maybe_unused]] auto r = build_graph::from_dir(root, {}, fs, &map_ext);
@@ -102,7 +119,7 @@ static void BM_SomeFunction(benchmark::State &state) {
 } // namespace
 
 // Register the function as a benchmark
-BENCHMARK(BM_SomeFunction);
+BENCHMARK(BM_SomeFunction)->Arg(0)->Arg(10)->Arg(100)->Arg(1000);
 
 // Run the benchmark
 BENCHMARK_MAIN();
