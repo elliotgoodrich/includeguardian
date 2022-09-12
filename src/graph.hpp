@@ -17,8 +17,9 @@ namespace IncludeGuardian {
 class file_node;
 class include_edge;
 
-using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
-                                    file_node, include_edge>;
+using Graph =
+    boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
+                          file_node, include_edge>;
 
 class file_node {
 public:

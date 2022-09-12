@@ -13,8 +13,8 @@ namespace IncludeGuardian {
 template <typename NODE, typename EDGE> class reachability_graph {
 public:
   using handle =
-      boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, NODE,
-                            EDGE>::vertex_descriptor;
+      boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
+                            NODE, EDGE>::vertex_descriptor;
 
 private:
   std::size_t m_size;
@@ -35,17 +35,17 @@ private:
       const auto v = vs.front();
       vs.pop_front();
       if (vis(v)) {
-		  const auto [begin, end] = adjacent_vertices(v, g);
-		  vs.insert(vs.end(), begin, end);
-	  }
+        const auto [begin, end] = adjacent_vertices(v, g);
+        vs.insert(vs.end(), begin, end);
+      }
     }
   }
 
 public:
   // Create a `reachability_matrix`.
   explicit reachability_graph(
-      const boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
-                                  NODE, EDGE> &dag);
+      const boost::adjacency_list<boost::vecS, boost::vecS,
+                                  boost::bidirectionalS, NODE, EDGE> &dag);
 
   reachability_graph(const reachability_graph &) = delete;
 
@@ -55,10 +55,9 @@ public:
 
 template <typename NODE, typename EDGE>
 reachability_graph<NODE, EDGE>::reachability_graph(
-    const boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
+    const boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
                                 NODE, EDGE> &dag)
-    : m_size(num_vertices(dag))
-    , m_paths(m_size * m_size) {
+    : m_size(num_vertices(dag)), m_paths(m_size * m_size) {
   const auto [begin, end] = vertices(dag);
   std::for_each(std::execution::par, begin, end, [&](const handle v) {
     // THINKING: It would be very good if we can reuse information
@@ -74,7 +73,7 @@ reachability_graph<NODE, EDGE>::reachability_graph(
 
 template <typename NODE, typename EDGE>
 bool reachability_graph<NODE, EDGE>::is_reachable(handle from,
-                                                            handle to) const {
+                                                  handle to) const {
   return m_paths[from * m_size + to];
 }
 

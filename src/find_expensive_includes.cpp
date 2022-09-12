@@ -163,8 +163,12 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
   std::mutex m;
   std::vector<include_directive_and_cost> results;
   const auto [begin, end] = edges(graph);
+
+  // edge iterators fail the `forward iterator` concept check when using
+  // parallel `for_each` so we must first take a copy.
+  std::vector<Graph::edge_descriptor> edges(begin, end);
   std::for_each(
-      std::execution::par, begin, end,
+      std::execution::par, edges.begin(), edges.end(),
       [&](const Graph::edge_descriptor &include) {
         // Skip files that come from external libraries
         if (graph[source(include, graph)].is_external) {
