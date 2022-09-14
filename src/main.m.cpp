@@ -4,6 +4,7 @@
 #include "find_expensive_headers.hpp"
 #include "find_expensive_includes.hpp"
 #include "find_unnecessary_sources.hpp"
+#include "find_unused_components.hpp"
 #include "get_total_cost.hpp"
 #include "graph.hpp"
 #include "list_included_files.hpp"
@@ -314,7 +315,6 @@ int main(int argc, const char **argv) {
     std::copy(files.begin(), files.end(),
               std::ostream_iterator<std::string>(std::cout));
   }
-  std::cout << '\n';
 
   switch (output) {
   case output::dot_graph: {
@@ -353,11 +353,31 @@ int main(int argc, const char **argv) {
   }
   case output::most_expensive: {
     {
+      std::vector<component_and_cost> results =
+          find_unused_components::from_graph(graph, sources, 0u);
+      std::cout << "\nThis is a list of all source files that should be "
+                   "considered for removal as no other files include "
+                   "their header file. This analysis took "
+                << duration_cast<std::chrono::milliseconds>(timer.restart())
+                << "\n";
+      std::sort(results.begin(), results.end(),
+                [](const component_and_cost &l, const component_and_cost &r) {
+                  return l.saving.token_count > r.saving.token_count;
+                });
+      for (const component_and_cost &i : results) {
+        const double percentage =
+            (100.0 * i.saving.token_count) / project_cost.true_cost.token_count;
+        std::cout << "  - " << std::setprecision(2) << std::fixed
+                  << i.saving.token_count << " (" << percentage
+                  << "%) removing " << pretty_path(*i.source) << '\n';
+      }
+    }
+    {
       std::vector<include_directive_and_cost> results =
           find_expensive_includes::from_graph(
               graph, sources,
               project_cost.true_cost.token_count * percent_cut_off);
-      std::cout << "This is a list of all #include directives that should be "
+      std::cout << "\nThis is a list of all #include directives that should be "
                    "considered for removal, ordered by benefit. "
                    "This analysis took "
                 << duration_cast<std::chrono::milliseconds>(timer.restart())

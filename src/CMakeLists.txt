@@ -39,6 +39,7 @@ add_library(
     find_expensive_includes.hpp find_expensive_includes.cpp
     list_included_files.hpp list_included_files.cpp
     find_unnecessary_sources.hpp find_unnecessary_sources.cpp
+    find_unused_components.hpp find_unused_components.cpp
     get_total_cost.hpp get_total_cost.cpp
     reachability_graph.hpp
     recommend_precompiled.hpp recommend_precompiled.cpp
@@ -83,6 +84,7 @@ add_executable(
     find_expensive_includes.test.cpp
     list_included_files.test.cpp
     find_unnecessary_sources.test.cpp
+    find_unused_components.test.cpp
     get_total_cost.test.cpp
     reachability_graph.test.cpp
 )
