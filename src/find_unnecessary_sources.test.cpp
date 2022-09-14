@@ -1,231 +1,45 @@
 #include "find_unnecessary_sources.hpp"
 
-#include "graph.hpp"
+#include "analysis_test_fixtures.hpp"
 
+#include <gmock/gmock-matchers.h>
 #include <gtest/gtest.h>
-
-#include <utility>
-
-using namespace IncludeGuardian;
 
 namespace {
 
-using namespace boost::units::information;
+using namespace IncludeGuardian;
+using namespace testing;
 
-const bool not_external = false;
+using result = find_unnecessary_sources::result;
 
-bool test_sort(const find_unnecessary_sources::result &lhs,
-               const find_unnecessary_sources::result &rhs) {
-  return lhs.source < rhs.source;
+TEST_F(WInclude, FindUnnecessarySourcesTest) {
+  EXPECT_THAT(find_unnecessary_sources::from_graph(graph, sources(), INT_MIN),
+              UnorderedElementsAreArray({
+                  result{a_c, A_C + A_H, A_C},
+                  result{b_c, B_C + B_H, B_C},
+              }));
 }
 
-const cost A_H{1, 20000000000.0 * bytes};
-const cost A_C{10, 2000000000.0 * bytes};
-const cost B_H{100, 200000000.0 * bytes};
-const cost B_C{1000, 20000000.0 * bytes};
-const cost C_H{10000, 2000000.0 * bytes};
-const cost C_C{100000, 200000.0 * bytes};
-const cost D_H{1000000, 20000.0 * bytes};
-const cost D_C{10000000, 2000.0 * bytes};
-const cost E_H{100000000, 200.0 * bytes};
-const cost F_H{1000000000, 20.0 * bytes};
-const cost S_H{99, 2.0 * bytes};
-const cost MAIN{12345, 98765.0 * bytes};
-
-TEST(FindUnnecessarySourcesTest, WInclude) {
-  Graph graph;
-  const Graph::vertex_descriptor a_h = add_vertex(
-      file_node("a.h").with_cost(A_H).set_internal_parents(2), graph);
-  const Graph::vertex_descriptor a_c =
-      add_vertex(file_node("a.c").with_cost(A_C), graph);
-  const Graph::vertex_descriptor b_h = add_vertex(
-      file_node("b.h").with_cost(B_H).set_internal_parents(2), graph);
-  const Graph::vertex_descriptor b_c =
-      add_vertex(file_node("b.c").with_cost(B_C), graph);
-  const Graph::vertex_descriptor main =
-      add_vertex(file_node("main.c").with_cost(MAIN), graph);
-
-  //   a.c  main.c  b.c
-  //    |  /      \  |
-  //   a.h          b.h
-
-  const Graph::edge_descriptor a_link =
-      add_edge(a_c, a_h, {"a->a"}, graph).first;
-  const Graph::edge_descriptor b_link =
-      add_edge(b_c, b_h, {"b->b"}, graph).first;
-  const Graph::edge_descriptor main_to_a =
-      add_edge(main, a_h, {"main->a"}, graph).first;
-  const Graph::edge_descriptor main_to_b =
-      add_edge(main, b_h, {"main->b"}, graph).first;
-
-  graph[a_h].component = a_c;
-  graph[a_c].component = a_h;
-  graph[b_h].component = b_c;
-  graph[b_c].component = b_h;
-
-  std::vector<find_unnecessary_sources::result> actual =
-      find_unnecessary_sources::from_graph(graph, {main, a_c, b_c}, INT_MIN);
-  std::sort(actual.begin(), actual.end(), test_sort);
-  const std::vector<find_unnecessary_sources::result> expected = {
-      {a_c, A_C + A_H, A_C},
-      {b_c, B_C + B_H, B_C},
-  };
-  EXPECT_EQ(actual, expected);
+TEST_F(CascadingInclude, FindUnnecessarySourcesTest) {
+  EXPECT_THAT(find_unnecessary_sources::from_graph(graph, sources(), INT_MIN),
+              UnorderedElementsAreArray({
+                  result{a_c, A_C + A_H + B_H + C_H + D_H, A_C},
+                  result{b_c, B_C + B_H + C_H + D_H, 2 * B_C},
+                  result{c_c, C_C + C_H + D_H, 3 * C_C},
+                  result{d_c, D_C + D_H, 4 * D_C},
+              }));
 }
 
-TEST(FindUnnecessarySourcesTest, CascadingInclude) {
-  Graph graph;
-  const Graph::vertex_descriptor a_h = add_vertex(
-      file_node("a.h").with_cost(A_H).set_internal_parents(2), graph);
-  const Graph::vertex_descriptor a_c =
-      add_vertex(file_node("a.c").with_cost(A_C), graph);
-  const Graph::vertex_descriptor b_h = add_vertex(
-      file_node("b.h").with_cost(B_H).set_internal_parents(3), graph);
-  const Graph::vertex_descriptor b_c =
-      add_vertex(file_node("b.c").with_cost(B_C), graph);
-  const Graph::vertex_descriptor c_h = add_vertex(
-      file_node("c.h").with_cost(C_H).set_internal_parents(3), graph);
-  const Graph::vertex_descriptor c_c =
-      add_vertex(file_node("c.c").with_cost(C_C), graph);
-  const Graph::vertex_descriptor d_h = add_vertex(
-      file_node("d.h").with_cost(D_H).set_internal_parents(3), graph);
-  const Graph::vertex_descriptor d_c =
-      add_vertex(file_node("d.c").with_cost(D_C), graph);
-  const Graph::vertex_descriptor main =
-      add_vertex(file_node("main.c").with_cost(MAIN), graph);
-
-  //   main.c  a.c
-  //       \  /
-  //       a.h  b.c
-  //         \  /
-  //         b.h  c.c
-  //           \  /
-  //           c.h  d.c
-  //             \  /
-  //             d.h
-
-  const Graph::edge_descriptor a_link =
-      add_edge(a_c, a_h, {"a->a"}, graph).first;
-  const Graph::edge_descriptor b_link =
-      add_edge(b_c, b_h, {"b->b"}, graph).first;
-  const Graph::edge_descriptor c_link =
-      add_edge(c_c, c_h, {"c->c"}, graph).first;
-  const Graph::edge_descriptor d_link =
-      add_edge(d_c, d_h, {"d->d"}, graph).first;
-  const Graph::edge_descriptor a_to_b =
-      add_edge(a_h, b_h, {"a->b"}, graph).first;
-  const Graph::edge_descriptor b_to_c =
-      add_edge(b_h, c_h, {"b->c"}, graph).first;
-  const Graph::edge_descriptor c_to_d =
-      add_edge(c_h, d_h, {"c->d"}, graph).first;
-  const Graph::edge_descriptor main_to_a =
-      add_edge(main, a_h, {"main->a"}, graph).first;
-
-  graph[a_h].component = a_c;
-  graph[a_c].component = a_h;
-  graph[b_h].component = b_c;
-  graph[b_c].component = b_h;
-  graph[c_h].component = c_c;
-  graph[c_c].component = c_h;
-  graph[d_h].component = d_c;
-  graph[d_c].component = d_h;
-
-  std::vector<find_unnecessary_sources::result> actual =
-      find_unnecessary_sources::from_graph(graph, {main, a_c, b_c, c_c, d_c},
-                                           INT_MIN);
-  std::sort(actual.begin(), actual.end(), test_sort);
-  const std::vector<find_unnecessary_sources::result> expected = {
-      {a_c, A_C + A_H + B_H + C_H + D_H, A_C},
-      {b_c, B_C + B_H + C_H + D_H, 2 * B_C},
-      {c_c, C_C + C_H + D_H, 3 * C_C},
-      {d_c, D_C + D_H, 4 * D_C},
-  };
-  EXPECT_EQ(actual, expected);
-}
-
-TEST(FindUnnecessarySourcesTest, ComplexCascadingInclude) {
-  Graph graph;
-  const auto a_h = add_vertex(
-      file_node("a.h").with_cost(A_H).set_internal_parents(2), graph);
-  const auto a_c = add_vertex(file_node("a.c").with_cost(A_C), graph);
-  const auto b_h = add_vertex(
-      file_node("b.h").with_cost(B_H).set_internal_parents(3), graph);
-  const auto b_c = add_vertex(file_node("b.c").with_cost(B_C), graph);
-  const auto c_h = add_vertex(
-      file_node("c.h").with_cost(C_H).set_internal_parents(3), graph);
-  const auto c_c = add_vertex(file_node("c.c").with_cost(C_C), graph);
-  const auto d_h = add_vertex(
-      file_node("d.h").with_cost(D_H).set_internal_parents(3), graph);
-  const auto d_c = add_vertex(file_node("d.c").with_cost(D_C), graph);
-  const auto e_h = add_vertex(
-      file_node("e.h").with_cost(E_H).set_internal_parents(1), graph);
-  const auto f_h = add_vertex(
-      file_node("f.h").with_cost(F_H).set_internal_parents(1), graph);
-  const auto s_h = add_vertex(
-      file_node("s.h").with_cost(S_H).set_internal_parents(1), graph);
-  const auto main = add_vertex(file_node("main.c").with_cost(MAIN), graph);
-
-  //   main.c  a.c
-  //     | \   /
-  //     |  a.h   b.c ---.
-  //     |   \   /        \
-  //     |    b.h   c.c   s.h
-  //     |   / \   /
-  //     |  |   c.h   d.c
-  //     |   \   \   /   \
-  //     |    \   d.h     |
-  //     |     \          |
-  //     +------+------- e.h
-  //             \        |
-  //              '----- f.h
-
-  const Graph::edge_descriptor a_link =
-      add_edge(a_c, a_h, {"a->a"}, graph).first;
-  const Graph::edge_descriptor b_link =
-      add_edge(b_c, b_h, {"b->b"}, graph).first;
-  const Graph::edge_descriptor c_link =
-      add_edge(c_c, c_h, {"c->c"}, graph).first;
-  const Graph::edge_descriptor d_link =
-      add_edge(d_c, d_h, {"d->d"}, graph).first;
-  const Graph::edge_descriptor a_to_b =
-      add_edge(a_h, b_h, {"a->b"}, graph).first;
-  const Graph::edge_descriptor b_to_c =
-      add_edge(b_h, c_h, {"b->c"}, graph).first;
-  const Graph::edge_descriptor b_to_s =
-      add_edge(b_c, s_h, {"b->s"}, graph).first;
-  const Graph::edge_descriptor b_to_f =
-      add_edge(b_h, f_h, {"b->f"}, graph).first;
-  const Graph::edge_descriptor c_to_d =
-      add_edge(c_h, d_h, {"c->d"}, graph).first;
-  const Graph::edge_descriptor d_to_e =
-      add_edge(d_c, e_h, {"d->e"}, graph).first;
-  const Graph::edge_descriptor e_to_f =
-      add_edge(e_h, f_h, {"e->f"}, graph).first;
-  const Graph::edge_descriptor main_to_a =
-      add_edge(main, a_h, {"main->a"}, graph).first;
-  const Graph::edge_descriptor main_to_e =
-      add_edge(main, e_h, {"main->e"}, graph).first;
-
-  graph[a_h].component = a_c;
-  graph[a_c].component = a_h;
-  graph[b_h].component = b_c;
-  graph[b_c].component = b_h;
-  graph[c_h].component = c_c;
-  graph[c_c].component = c_h;
-  graph[d_h].component = d_c;
-  graph[d_c].component = d_h;
-
-  std::vector<find_unnecessary_sources::result> actual =
-      find_unnecessary_sources::from_graph(graph, {main, a_c, b_c, c_c, d_c},
-                                           INT_MIN);
-  std::sort(actual.begin(), actual.end(), test_sort);
-  const std::vector<find_unnecessary_sources::result> expected = {
-      {a_c, A_C + A_H + B_H + C_H + D_H + F_H, A_C},
-      {b_c, B_C + S_H + B_H + C_H + D_H + F_H, 2 * (B_C + S_H)},
-      {c_c, C_C + C_H + D_H, 3 * C_C},
-      {d_c, D_C + D_H + E_H + F_H, D_C + 2 * (D_C + E_H) + (D_C + E_H + F_H)},
-  };
-  EXPECT_EQ(actual, expected);
+TEST_F(ComplexCascadingInclude, FindUnnecessarySourcesTest) {
+  EXPECT_THAT(
+      find_unnecessary_sources::from_graph(graph, sources(), INT_MIN),
+      UnorderedElementsAreArray({
+          result{a_c, A_C + A_H + B_H + C_H + D_H + F_H, A_C},
+          result{b_c, B_C + S_H + B_H + C_H + D_H + F_H, 2 * (B_C + S_H)},
+          result{c_c, C_C + C_H + D_H, 3 * C_C},
+          result{d_c, D_C + D_H + E_H + F_H,
+                 D_C + 2 * (D_C + E_H) + (D_C + E_H + F_H)},
+      }));
 }
 
 } // namespace
