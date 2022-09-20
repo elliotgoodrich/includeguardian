@@ -588,4 +588,65 @@ TEST(BuildGraphTest, XMacros) {
   EXPECT_THAT(results->unguarded_files, UnorderedElementsAre(x_macro_hpp));
 }
 
+// We want to test that for our generated files:
+//   - Any defines are kept
+//   - Guarded files are still guarded
+//   - Unguarded files are not guarded
+//   - Included files are still included
+TEST(BuildGraphTest, ReducedFileOptimization) {
+  const std::string_view good_file_hpp_code = "#pragma once\n"
+                                              "#define GOOD_FILE\n";
+  const std::string_view common_hpp_code = "#pragma once\n"
+                                           "#define FOO BAR\n";
+  const std::string_view guarded_hpp_code = "#pragma once\n"
+                                            "#define BAR 1\n"
+                                            "#include \"common.hpp\"\n"
+                                            "#if FOO == 1\n"
+                                            "  #include \"good_file.hpp\"\n"
+                                            "#else\n"
+                                            "  #include \"bad_file.hpp\"\n"
+                                            "#endif\n";
+  const std::string_view main_cpp_code = "#include \"guarded.hpp\"\n";
+
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  fs->addFile((working_directory / "good_file.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(good_file_hpp_code));
+  fs->addFile((working_directory / "common.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(common_hpp_code));
+  fs->addFile((working_directory / "guarded.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(guarded_hpp_code));
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+
+  Graph g;
+  const Graph::vertex_descriptor good_file_hpp =
+      add_vertex(file_node("good_file.hpp")
+                     .with_cost(0, good_file_hpp_code.size() * B)
+                     .set_internal_parents(1),
+                 g);
+  const Graph::vertex_descriptor common_hpp =
+      add_vertex(file_node("common.hpp")
+                     .with_cost(0, common_hpp_code.size() * B)
+                     .set_internal_parents(1),
+                 g);
+  const Graph::vertex_descriptor guarded_hpp =
+      add_vertex(file_node("guarded.hpp")
+                     .with_cost(0, guarded_hpp_code.size() * B)
+                     .set_internal_parents(1),
+                 g);
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      file_node("main.cpp").with_cost(1, main_cpp_code.size() * B), g);
+
+  add_edge(main_cpp, guarded_hpp, {"\"guarded.hpp\"", 1}, g);
+  add_edge(guarded_hpp, common_hpp, {"\"common.hpp\"", 3}, g);
+  add_edge(guarded_hpp, good_file_hpp, {"\"good_file.hpp\"", 5}, g);
+
+  llvm::Expected<build_graph::result> results =
+      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
+}
+
 } // namespace
