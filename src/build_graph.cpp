@@ -125,15 +125,18 @@ struct IncludeScanner : public clang::PPCallbacks {
   // Apply the costs (preprocessing tokens/file size) as we leave the
   // specified `finished` file.
   void apply_costs(const clang::FileEntry *finished) {
-    if (!m_stack.back()->second.token_count_overridden) {
-      m_r.graph[m_stack.back()->second.v].underlying_cost.token_count +=
-          m_pp->getTokenCount() - m_accounted_for_token_count;
+    FileState &state = m_stack.back()->second;
+    if (!state.fully_processed) {
+      if (!m_stack.back()->second.token_count_overridden) {
+        m_r.graph[m_stack.back()->second.v].underlying_cost.token_count +=
+            m_pp->getTokenCount() - m_accounted_for_token_count;
+      }
+      if (!m_stack.back()->second.file_size_overridden) {
+        m_r.graph[m_stack.back()->second.v].underlying_cost.file_size +=
+            finished->getSize() * boost::units::information::bytes;
+      }
     }
     m_accounted_for_token_count = m_pp->getTokenCount();
-    if (!m_stack.back()->second.file_size_overridden) {
-      m_r.graph[m_stack.back()->second.v].underlying_cost.file_size +=
-          finished->getSize() * boost::units::information::bytes;
-    }
   }
 
 public:
@@ -186,17 +189,21 @@ public:
     case FileChangeReason::ExitFile: {
       if (const clang::FileEntry *file =
               m_sm->getFileEntryForID(OptionalPrevFID)) {
+        FileState &state = m_stack.back()->second;
+
         // If we are unguarded, then don't set the 'fully_processed' stuff
         // and move the total cost into the includer.
         const bool guarded =
             m_pp->getHeaderSearchInfo().isFileMultipleIncludeGuarded(file);
         if (guarded) {
-          // If we're guarded then we are fully processed and we won't need
-          // to enter this file again.
-          m_stack.back()->second.fully_processed = true;
 
           // Apply the costs to ourselves
           apply_costs(file);
+
+          // If we're guarded then we are fully processed and we won't need
+          // to enter this file again.
+          state.fully_processed = true;
+
           m_stack.pop_back();
         } else {
           m_r.unguarded_files.insert(m_stack.back()->second.v);
