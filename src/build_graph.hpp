@@ -34,6 +34,17 @@ struct build_graph {
     std::unordered_set<Graph::vertex_descriptor> unguarded_files;
   };
 
+  struct options {
+    bool replace_file_optimization;
+
+    options() = default;
+
+    options &enable_replace_file_optimization(bool value) {
+      replace_file_optimization = true;
+      return *this;
+    }
+  };
+
   enum class file_type {
     source,
     header,
@@ -46,13 +57,14 @@ struct build_graph {
                       const std::filesystem::path &working_dir,
                       std::span<const std::filesystem::path> source_paths,
                       std::function<file_type(std::string_view)> file_type,
-                      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
+                      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
+                      options opts);
   static llvm::Expected<result> from_compilation_db(
       const clang::tooling::CompilationDatabase &compilation_db,
       const std::filesystem::path &working_dir,
       std::initializer_list<const std::filesystem::path> source_paths,
       std::function<file_type(std::string_view)> file_type,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs, options opts);
 
   // Try to construct a `Graph` object from all files in the specified
   // `source_dir` that return `source` from `file_type` (and files they
@@ -67,6 +79,7 @@ struct build_graph {
                include_dirs,
            llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
            std::function<file_type(std::string_view)> file_type,
+           options opts,
            std::span<const std::filesystem::path> forced_includes =
                std::span<const std::filesystem::path>());
   static llvm::Expected<result> from_dir(
@@ -75,9 +88,11 @@ struct build_graph {
           std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
           include_dirs,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
-      std::function<file_type(std::string_view)> file_type,
+      std::function<file_type(std::string_view)> file_type, options opts,
       std::initializer_list<std::filesystem::path> forced_includes = {});
 };
+
+std::ostream& operator<<(std::ostream& out, build_graph::options opts);
 
 } // namespace IncludeGuardian
 

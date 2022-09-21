@@ -9,6 +9,8 @@
   * For another analysis, see if we can look if a set of includes have the
     exact same set of includers, and figure out the benefit of combining these
     components.
+  * For another analysis, see if there is a component that is included by
+    only one other file and suggest inlining it as a private component.
 
 ## MVP Plan
 

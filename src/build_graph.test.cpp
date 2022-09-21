@@ -22,6 +22,8 @@ const bool not_external = false;
 const bool removable = true;
 const bool not_removable = false;
 
+class BuildGraphTest : public testing::TestWithParam<build_graph::options> {};
+
 const std::function<build_graph::file_type(std::string_view)> get_file_type =
     [](std::string_view file) {
       if (file.ends_with(".cpp")) {
@@ -113,11 +115,7 @@ bool vertices_equal(const file_node &lhs, const Graph &lgraph,
 }
 
 MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
-  if (num_vertices(arg) != num_vertices(expected)) {
-    *result_listener << "num_vertices(arg) != num_vertices(expected)"
-                     << num_vertices(arg) << " != " << num_vertices(expected);
-    return false;
-  }
+  EXPECT_THAT(num_vertices(arg), Eq(num_vertices(expected)));
 
   // We need to use an `unordered_map` as we may build up our graph in the wrong
   // order that we encounter files during our C++ preprocessor step.
@@ -147,6 +145,8 @@ MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
       return false;
     }
 
+    // TODO, we don't check the target of our edges to make sure
+    // that they match
     const std::vector<include_edge> l_edges = get_out_edges(it->second, arg);
     const std::vector<include_edge> r_edges = get_out_edges(v, expected);
     if (l_edges != r_edges) {
@@ -160,7 +160,7 @@ MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
   return true;
 }
 
-TEST(BuildGraphTest, SimpleGraph) {
+TEST_P(BuildGraphTest, SimpleGraph) {
   Graph g;
   add_vertex(file_node("main.cpp").with_cost(1, 100 * B), g);
   add_vertex(file_node("main_copy.cpp").with_cost(1, 101 * B), g);
@@ -168,14 +168,14 @@ TEST(BuildGraphTest, SimpleGraph) {
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, FileStats) {
+TEST_P(BuildGraphTest, FileStats) {
   auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   const std::filesystem::path working_directory = root / "working_dir";
   const std::string_view main_cpp_code =
@@ -220,14 +220,14 @@ TEST(BuildGraphTest, FileStats) {
   add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 4}, g);
   add_edge(main_copy_cpp, a_hpp, {"\"a.hpp\"", 4}, g);
 
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, MultipleChildren) {
+TEST_P(BuildGraphTest, MultipleChildren) {
   Graph g;
   const Graph::vertex_descriptor main_cpp =
       add_vertex(file_node("main.cpp").with_cost(1, 100 * B), g);
@@ -245,14 +245,14 @@ TEST(BuildGraphTest, MultipleChildren) {
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, DiamondIncludes) {
+TEST_P(BuildGraphTest, DiamondIncludes) {
   Graph g;
   const Graph::vertex_descriptor main_cpp =
       add_vertex(file_node("main.cpp").with_cost(1, 100 * B), g);
@@ -277,14 +277,14 @@ TEST(BuildGraphTest, DiamondIncludes) {
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, MultipleSources) {
+TEST_P(BuildGraphTest, MultipleSources) {
   Graph g;
   const Graph::vertex_descriptor main1_cpp = add_vertex(
       file_node("main1.cpp").with_cost(1, 100 * B).set_internal_parents(0), g);
@@ -310,14 +310,14 @@ TEST(BuildGraphTest, MultipleSources) {
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, DifferentDirectories) {
+TEST_P(BuildGraphTest, DifferentDirectories) {
   Graph g;
   const std::filesystem::path src = "src";
   const std::filesystem::path include = "include";
@@ -348,14 +348,14 @@ TEST(BuildGraphTest, DifferentDirectories) {
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, ExternalCode) {
+TEST_P(BuildGraphTest, ExternalCode) {
   auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   const std::filesystem::path src = "src";
   const std::filesystem::path other = "other";
@@ -433,13 +433,13 @@ TEST(BuildGraphTest, ExternalCode) {
       {{working_directory / other, clang::SrcMgr::C_System},
        {working_directory / other / include, clang::SrcMgr::C_System},
        {working_directory / other / ours, clang::SrcMgr::C_User}},
-      fs, get_file_type);
+      fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, UnremovableHeaders) {
+TEST_P(BuildGraphTest, UnremovableHeaders) {
   Graph g;
   const std::filesystem::path include = "include";
   const Graph::vertex_descriptor a_cpp = add_vertex(
@@ -467,14 +467,14 @@ TEST(BuildGraphTest, UnremovableHeaders) {
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, PrecompiledHeaders) {
+TEST_P(BuildGraphTest, PrecompiledHeaders) {
   Graph g;
   const bool precompiled = true;
   const std::filesystem::path include = "include";
@@ -498,14 +498,14 @@ TEST(BuildGraphTest, PrecompiledHeaders) {
   const std::filesystem::path working_directory = root / "working_dir";
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> fs =
       make_file_system(g, working_directory);
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
-TEST(BuildGraphTest, ForcedIncludes) {
+TEST_P(BuildGraphTest, ForcedIncludes) {
   auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   const std::filesystem::path working_directory = root / "working_dir";
   const std::filesystem::path foo = "foo";
@@ -549,16 +549,16 @@ TEST(BuildGraphTest, ForcedIncludes) {
   add_edge(forced_hpp, forced_sub_hpp,
            {"\"../foo/forced_sub.hpp\"", 1, removable}, g);
 
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type,
-                            {working_directory / foo / "forced.hpp"});
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam(),
+      {working_directory / foo / "forced.hpp"});
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files,
               UnorderedElementsAre(forced_hpp, forced_sub_hpp, include_hpp));
 }
 
-TEST(BuildGraphTest, XMacros) {
+TEST_P(BuildGraphTest, XMacros) {
   // Test files that are unguarded and can be included multiple times
   auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
   const std::filesystem::path working_directory = root / "working_dir";
@@ -627,8 +627,8 @@ TEST(BuildGraphTest, XMacros) {
   add_edge(main_copy_cpp, a_hpp, {"\"a.hpp\"", 5}, g);
   add_edge(a_hpp, x_macro_hpp, {"\"x_macro.hpp\"", 2}, g);
 
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   ASSERT_THAT(results->unguarded_files.size(), Eq(1));
@@ -641,7 +641,7 @@ TEST(BuildGraphTest, XMacros) {
 //   - Guarded files are still guarded
 //   - Unguarded files are not guarded
 //   - Included files are still included
-TEST(BuildGraphTest, ReducedFileOptimization) {
+TEST_P(BuildGraphTest, ReducedFileOptimization) {
   const std::string_view good_file_hpp_code = "#pragma once\n"
                                               "#define GOOD_FILE\n";
   const std::string_view common_hpp_code = "#pragma once\n"
@@ -695,11 +695,16 @@ TEST(BuildGraphTest, ReducedFileOptimization) {
   add_edge(guarded_hpp, common_hpp, {"\"common.hpp\"", 3}, g);
   add_edge(guarded_hpp, good_file_hpp, {"\"good_file.hpp\"", 5}, g);
 
-  llvm::Expected<build_graph::result> results =
-      build_graph::from_dir(working_directory, {}, fs, get_file_type);
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
+
+INSTANTIATE_TEST_CASE_P(
+    SmallFileOptimization, BuildGraphTest,
+    Values(build_graph::options(),
+           build_graph::options().enable_replace_file_optimization(true)));
 
 } // namespace

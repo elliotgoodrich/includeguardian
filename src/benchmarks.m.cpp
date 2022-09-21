@@ -109,7 +109,8 @@ static void BM_SomeFunction(benchmark::State &state) {
       make_file_system(root, 1000, 0.1, function_count);
 
   for (auto _ : state) {
-    [[maybe_unused]] auto r = build_graph::from_dir(root, {}, fs, &map_ext);
+    [[maybe_unused]] auto r =
+        build_graph::from_dir(root, {}, fs, &map_ext, build_graph::options());
   }
 
   state.SetItemsProcessed(sources.size());

@@ -185,6 +185,13 @@ int main(int argc, const char **argv) {
       llvm::cl::desc(
           "Require ratio of token reduction compared to pch file growth"),
       llvm::cl::value_desc("ratio"), llvm::cl::init(2.0));
+  llvm::cl::opt<bool> smaller_file_opt(
+      "smaller-file-opt",
+      llvm::cl::desc(
+          "Whether to enable an optimization to improve preprocessing time by "
+          "replacing already seen files with a smaller version for further "
+          "sources "),
+      llvm::cl::value_desc("enabled"), llvm::cl::init(false));
 
   if (!llvm::cl::ParseCommandLineOptions(argc, argv)) {
     return 1;
@@ -212,7 +219,9 @@ int main(int argc, const char **argv) {
 
   llvm::Expected<build_graph::result> result = build_graph::from_dir(
       dir.getValue(), parse_include_dirs(include_dirs, system_include_dirs),
-      llvm::vfs::getRealFileSystem(), map_ext, forced_includes_files);
+      llvm::vfs::getRealFileSystem(), map_ext,
+      build_graph::options().enable_replace_file_optimization(smaller_file_opt),
+      forced_includes_files);
 
   if (!result) {
     // TODO: error message

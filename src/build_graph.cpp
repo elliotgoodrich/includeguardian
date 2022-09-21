@@ -105,6 +105,10 @@ struct FileState {
   bool fully_processed = false;
   bool file_size_overridden = false;
   bool token_count_overridden = false;
+  std::string replacement_contents; //< If we are `fully_processed` this will
+                                    //< contain a C++ file that is equivalent
+                                    //< when this is < included by another file
+                                    //< (i.e. only the macro < definitions)
 };
 
 using UniqueIdToNode =
@@ -119,6 +123,7 @@ struct IncludeScanner : public clang::PPCallbacks {
   unsigned m_accounted_for_token_count;
   clang::Preprocessor *m_pp;
   std::filesystem::path m_working_dir;
+  bool m_replace_file_optimization;
 
   // Add the number of preprocessing tokens seen since the last time
   // this function was called to the top file on our stack.
@@ -139,14 +144,62 @@ struct IncludeScanner : public clang::PPCallbacks {
     m_accounted_for_token_count = m_pp->getTokenCount();
   }
 
+  // This function is taken from MacroPPCallbacks.cpp
+  // Part of the LLVM Project, under the Apache License v2.0 with LLVM
+  // Exceptions.
+  // See https://llvm.org/LICENSE.txt for license information.
+  // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+  static void writeMacroDefinition(const clang::IdentifierInfo &II,
+                                   const clang::MacroInfo &MI,
+                                   clang::Preprocessor &PP,
+                                   clang::raw_ostream &Name,
+                                   clang::raw_ostream &Value) {
+    Name << II.getName();
+
+    if (MI.isFunctionLike()) {
+      Name << '(';
+      if (!MI.param_empty()) {
+        auto AI = MI.param_begin(), E = MI.param_end();
+        for (; AI + 1 != E; ++AI) {
+          Name << (*AI)->getName();
+          Name << ',';
+        }
+
+        // Last argument.
+        if ((*AI)->getName() == "__VA_ARGS__")
+          Name << "...";
+        else
+          Name << (*AI)->getName();
+      }
+
+      if (MI.isGNUVarargs())
+        // #define foo(x...)
+        Name << "...";
+
+      Name << ')';
+    }
+
+    clang::SmallString<128> SpellingBuffer;
+    bool First = true;
+    for (const auto &T : MI.tokens()) {
+      if (!First && T.hasLeadingSpace())
+        Value << ' ';
+
+      Value << PP.getSpelling(T, SpellingBuffer);
+      First = false;
+    }
+  }
+
 public:
   IncludeScanner(
       const std::function<build_graph::file_type(std::string_view)> &file_type,
       build_graph::result &r, UniqueIdToNode &id_to_node,
-      clang::Preprocessor &pp, const std::filesystem::path &working_dir)
+      clang::Preprocessor &pp, const std::filesystem::path &working_dir,
+      bool replace_file_optimization)
       : m_r(r), m_sm(&pp.getSourceManager()), m_id_to_node(id_to_node),
         m_file_type(file_type), m_pp(&pp), m_accounted_for_token_count{0u},
-        m_working_dir(working_dir) {}
+        m_working_dir(working_dir),
+        m_replace_file_optimization(replace_file_optimization) {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
                    clang::SrcMgr::CharacteristicKind FileType,
@@ -196,6 +249,13 @@ public:
         const bool guarded =
             m_pp->getHeaderSearchInfo().isFileMultipleIncludeGuarded(file);
         if (guarded) {
+          // If we are fully guarded, then make sure that subsequent includes
+          // won't do anything.
+          if (m_replace_file_optimization) {
+            std::string tmp = "#pragma once\n";
+            tmp.swap(state.replacement_contents);
+            state.replacement_contents += tmp;
+          }
 
           // Apply the costs to ourselves
           apply_costs(file);
@@ -237,15 +297,26 @@ public:
                           const clang::Module *Imported,
                           clang::SrcMgr::CharacteristicKind FileType) final {
 
-    if (m_stack.back()->second.fully_processed) {
-      return;
-    }
-
-    if (!File) {
+    if (!File && !m_stack.back()->second.fully_processed) {
       // File does not exist
       m_r.missing_includes.emplace(FileName.str());
       return;
     }
+
+    auto const [it, inserted] =
+        m_id_to_node.emplace(File->getUniqueID(), empty);
+
+    // If we have seen this file then replace it with the smaller,
+    // cheaper file before we attempt to enter it.
+    if (it->second.fully_processed && m_replace_file_optimization) {
+      m_sm->overrideFileContents(
+          File, llvm::MemoryBufferRef(it->second.replacement_contents, ""));
+    }
+
+    if (m_stack.back()->second.fully_processed) {
+      return;
+    }
+
     const clang::FileID fileID = m_sm->getFileID(HashLoc);
     const char open = IsAngled ? '<' : '"';
     std::string include(&open, 1);
@@ -253,8 +324,13 @@ public:
     const char close = IsAngled ? '>' : '"';
     include.insert(include.cend(), &close, &close + 1);
     const Graph::vertex_descriptor from = m_stack.back()->second.v;
-    auto const [it, inserted] =
-        m_id_to_node.emplace(File->getUniqueID(), empty);
+
+    if (m_replace_file_optimization && m_stack.back()->second.fully_processed) {
+      m_stack.back()->second.replacement_contents += "#include ";
+      m_stack.back()->second.replacement_contents += include;
+      m_stack.back()->second.replacement_contents += '\n';
+    }
+
     if (inserted) {
       // If we don't have an angled include, try and build up the relative
       // path from the first angled include.
@@ -344,6 +420,7 @@ public:
           m_r.graph[v].underlying_cost.file_size =
               file_size * boost::units::information::bytes;
         }
+        return;
       }
     }
 
@@ -359,8 +436,73 @@ public:
           const Graph::vertex_descriptor v = m_stack.back()->second.v;
           m_r.graph[v].underlying_cost.token_count = token_count;
         }
+        return;
       }
     }
+  }
+
+  void MacroDefined(const clang::Token &MacroNameTok,
+                    const clang::MacroDirective *MD) final {
+    if (!m_replace_file_optimization) {
+      return;
+    }
+
+    if (m_stack.back()->second.fully_processed) {
+      return;
+    }
+
+    // Ignore built-in macros
+    if (MD->getMacroInfo()->isBuiltinMacro()) {
+      return;
+    }
+
+    if (m_sm->isWrittenInBuiltinFile(MD->getLocation()) ||
+        m_sm->isWrittenInCommandLineFile(MD->getLocation())) {
+      return;
+    }
+
+    clang::IdentifierInfo *Id = MacroNameTok.getIdentifierInfo();
+    clang::SourceLocation location = MacroNameTok.getLocation();
+    std::string NameBuffer, ValueBuffer;
+    llvm::raw_string_ostream Name(NameBuffer);
+    llvm::raw_string_ostream Value(ValueBuffer);
+    writeMacroDefinition(*Id, *MD->getMacroInfo(), *m_pp, Name, Value);
+
+    m_stack.back()->second.replacement_contents += "#define ";
+    m_stack.back()->second.replacement_contents += Name.str();
+    m_stack.back()->second.replacement_contents += ' ';
+    m_stack.back()->second.replacement_contents += Value.str();
+    m_stack.back()->second.replacement_contents += '\n';
+  }
+
+  void MacroUndefined(const clang::Token &MacroNameTok,
+                      const clang::MacroDefinition &MD,
+                      const clang::MacroDirective *Undef) final {
+    if (!m_replace_file_optimization) {
+      return;
+    }
+
+    if (m_stack.back()->second.fully_processed) {
+      return;
+    }
+
+    // I don't think we need to handle built-in undefs as
+    // `getMacroInfo()` below returns a `nullptr`.
+    #if 0
+    if (Undef->getMacroInfo()->isBuiltinMacro()) {
+      return;
+    }
+    #endif
+
+    if (m_sm->isWrittenInBuiltinFile(Undef->getLocation()) ||
+        m_sm->isWrittenInCommandLineFile(Undef->getLocation())) {
+      return;
+    }
+
+    m_stack.back()->second.replacement_contents += "#undef ";
+    m_stack.back()->second.replacement_contents +=
+        MacroNameTok.getIdentifierInfo()->getName();
+    m_stack.back()->second.replacement_contents += '\n';
   }
 
   void EndOfMainFile() final {
@@ -376,14 +518,16 @@ class ExpensiveAction : public clang::PreprocessOnlyAction {
   UniqueIdToNode &m_id_to_node;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::filesystem::path m_working_dir;
+  bool m_replace_file_optimization;
 
 public:
   ExpensiveAction(
       build_graph::result &r, UniqueIdToNode &id_to_node,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
-      const std::filesystem::path &working_dir)
+      const std::filesystem::path &working_dir, bool replace_file_optimization)
       : m_f(), m_ci(nullptr), m_r(r), m_id_to_node(id_to_node),
-        m_file_type(file_type), m_working_dir(working_dir) {}
+        m_file_type(file_type), m_working_dir(working_dir),
+        m_replace_file_optimization(replace_file_optimization) {}
 
   bool BeginInvocation(clang::CompilerInstance &ci) final {
     ci.getDiagnostics().setClient(&s_ignore, /*TakeOwnership=*/false);
@@ -401,8 +545,8 @@ public:
   void ExecuteAction() final {
     getCompilerInstance().getPreprocessor().addPPCallbacks(
         std::make_unique<IncludeScanner>(m_file_type, m_r, m_id_to_node,
-                                         m_ci->getPreprocessor(),
-                                         m_working_dir));
+                                         m_ci->getPreprocessor(), m_working_dir,
+                                         m_replace_file_optimization));
 
     clang::PreprocessOnlyAction::ExecuteAction();
   }
@@ -416,20 +560,23 @@ class find_graph_factory : public clang::tooling::FrontendActionFactory {
   UniqueIdToNode &m_id_to_node;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::filesystem::path m_working_dir;
+  bool m_replace_file_optimization;
 
 public:
   /// Create a `print_graph_factory`.
   find_graph_factory(
       build_graph::result &r, UniqueIdToNode &id_to_node,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
-      const std::filesystem::path &working_dir)
+      const std::filesystem::path &working_dir, bool replace_file_optimization)
       : m_r(r), m_id_to_node(id_to_node), m_working_dir(working_dir),
-        m_file_type(file_type) {}
+        m_file_type(file_type),
+        m_replace_file_optimization(replace_file_optimization) {}
 
   /// Returns a new `clang::FrontendAction`.
   std::unique_ptr<clang::FrontendAction> create() final {
     return std::make_unique<ExpensiveAction>(m_r, m_id_to_node, m_file_type,
-                                             m_working_dir);
+                                             m_working_dir,
+                                             m_replace_file_optimization);
   }
 };
 
@@ -440,18 +587,20 @@ llvm::Expected<build_graph::result> build_graph::from_compilation_db(
     const std::filesystem::path &working_dir,
     std::span<const std::filesystem::path> source_paths,
     std::function<build_graph::file_type(std::string_view)> file_type,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs, options opts) {
   std::vector<std::string> source_path_strings(source_paths.size());
   std::transform(source_paths.begin(), source_paths.end(),
                  source_path_strings.begin(),
                  [](const std::filesystem::path &p) { return p.string(); });
+
   clang::tooling::ClangTool tool(
       compilation_db, source_path_strings,
       std::make_shared<clang::PCHContainerOperations>(), fs);
 
   UniqueIdToNode id_to_node;
   result r;
-  find_graph_factory f(r, id_to_node, file_type, working_dir);
+  find_graph_factory f(r, id_to_node, file_type, working_dir,
+                       opts.replace_file_optimization);
   const int rc = tool.run(&f);
   if (rc != 0) {
     return llvm::createStringError(std::error_code(rc, std::generic_category()),
@@ -465,10 +614,10 @@ llvm::Expected<build_graph::result> build_graph::from_compilation_db(
     const std::filesystem::path &working_dir,
     std::initializer_list<const std::filesystem::path> source_paths,
     std::function<build_graph::file_type(std::string_view)> file_type,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs, options opts) {
   return from_compilation_db(
       compilation_db, working_dir,
-      std::span(source_paths.begin(), source_paths.end()), file_type, fs);
+      std::span(source_paths.begin(), source_paths.end()), file_type, fs, opts);
 }
 
 llvm::Expected<build_graph::result> build_graph::from_dir(
@@ -477,7 +626,7 @@ llvm::Expected<build_graph::result> build_graph::from_dir(
                               clang::SrcMgr::CharacteristicKind>>
         include_dirs,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
-    std::function<file_type(std::string_view)> file_type,
+    std::function<file_type(std::string_view)> file_type, options opts,
     std::span<const std::filesystem::path> forced_includes) {
   source_dir = std::filesystem::absolute(source_dir);
   assert(std::all_of(include_dirs.begin(), include_dirs.end(),
@@ -506,7 +655,7 @@ llvm::Expected<build_graph::result> build_graph::from_dir(
     }
   }
 
-  return from_compilation_db(db, source_dir, db.m_sources, file_type, fs);
+  return from_compilation_db(db, source_dir, db.m_sources, file_type, fs, opts);
 }
 
 llvm::Expected<build_graph::result> build_graph::from_dir(
@@ -515,11 +664,17 @@ llvm::Expected<build_graph::result> build_graph::from_dir(
         std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
         include_dirs,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
-    std::function<file_type(std::string_view)> file_type,
+    std::function<file_type(std::string_view)> file_type, options opts,
     std::initializer_list<std::filesystem::path> forced_includes) {
-  return from_dir(
-      source_dir, std::span(include_dirs.begin(), include_dirs.end()), fs,
-      file_type, std::span(forced_includes.begin(), forced_includes.end()));
+  return from_dir(source_dir,
+                  std::span(include_dirs.begin(), include_dirs.end()), fs,
+                  file_type, opts,
+                  std::span(forced_includes.begin(), forced_includes.end()));
+}
+
+std::ostream &operator<<(std::ostream &out, build_graph::options opts) {
+  return out << "options(replace_file_optimization=" << std::boolalpha
+             << opts.replace_file_optimization << ")";
 }
 
 } // namespace IncludeGuardian
