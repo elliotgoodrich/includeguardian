@@ -486,15 +486,16 @@ public:
       return;
     }
 
-    // I don't think we need to handle built-in undefs as
-    // `getMacroInfo()` below returns a `nullptr`.
-    #if 0
+#if 0
+	// I don't think we need to handle built-in undefs as
+	// `getMacroInfo()` below returns a `nullptr`.
     if (Undef->getMacroInfo()->isBuiltinMacro()) {
       return;
     }
-    #endif
+#endif
 
-    if (m_sm->isWrittenInBuiltinFile(Undef->getLocation()) ||
+    // TODO: Need to fully understand and document this return guard
+    if (!Undef || m_sm->isWrittenInBuiltinFile(Undef->getLocation()) ||
         m_sm->isWrittenInCommandLineFile(Undef->getLocation())) {
       return;
     }

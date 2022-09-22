@@ -35,12 +35,12 @@ struct build_graph {
   };
 
   struct options {
-    bool replace_file_optimization;
+    bool replace_file_optimization = false;
 
     options() = default;
 
     options &enable_replace_file_optimization(bool value) {
-      replace_file_optimization = true;
+      replace_file_optimization = value;
       return *this;
     }
   };
