@@ -36,6 +36,45 @@ file_node_printer pretty_path(const file_node &n) {
   return file_node_printer{n};
 }
 
+// TODO: Move this to a component and unit test it
+std::string format_file_size(
+    boost::units::quantity<boost::units::information::info> file_size) {
+  // For some reason when we use `boost::units::binary_prefix` it converts
+  // to bits, e.g. kib and Mib, instead of sticking with bytes.  Here we
+  // can make sure we stick with bytes and can also print out to 3 signficant
+  // figures instead of using decimal places.
+  using namespace boost::units::information;
+
+  assert(file_size >= 0 * bytes);
+
+  std::ostringstream ss;
+
+  // Technically our files size could be larger than all of these and
+  // we overflow this array, but it's not really realistic :)
+  const std::string_view suffixes[] = {"B",   "KiB", "MiB", "GiB",
+                                       "TiB", "PiB", "EiB", "ZiB"};
+  auto suffix = suffixes;
+  while (file_size >= 1024 * bytes) {
+    file_size /= 1024.0;
+    ++suffix;
+  }
+
+  // Try to display to 3 significant figures, but print out 4 if we have
+  // something like "1023 KiB" as "1020 KiB" would be inaccurate and still take
+  // the same amount of space
+  if (file_size >= 1000 * bytes) {
+    ss << static_cast<int>(std::round(file_size.value())) << ' ' << *suffix;
+  } else {
+    const int sf = 3;
+    const int rounded = std::round(file_size.value()) * std::pow(10, sf);
+    const int precision = rounded < 10000 ? 2 : (rounded < 100000 ? 1 : 0);
+    ss << std::setprecision(precision) << std::fixed;
+    ss << (rounded / std::pow(10, sf)) << ' ' << *suffix;
+  }
+
+  return ss.str();
+}
+
 std::ostream &operator<<(std::ostream &stream, file_node_printer v) {
   if (v.node.is_external) {
     return stream << '<' << v.node.path.string() << '>';
@@ -249,25 +288,20 @@ int main(int argc, const char **argv) {
 
   std::cout << "Overview\n";
   std::cout << "========\n";
-  std::cout << "Total file size = " << std::setprecision(2) << std::fixed
-            << boost::units::binary_prefix << naive_cost.total().file_size
-            << '\n';
+  std::cout << "Total file size = "
+            << format_file_size(naive_cost.total().file_size) << '\n';
   std::cout << "Token count = " << naive_cost.total().token_count << '\n';
-  std::cout << "Total translation unit file size = " << std::setprecision(2)
-            << std::fixed << boost::units::binary_prefix
-            << project_cost.total().file_size << '\n';
+  std::cout << "Total translation unit file size = "
+            << format_file_size(project_cost.total().file_size) << '\n';
   std::cout << "Translation Unit Token count = "
             << project_cost.total().token_count << '\n';
   if (naive_cost.precompiled.token_count > 0u) {
-    std::cout << "Precompiled header (PCH) file size = " << std::setprecision(2)
-              << std::fixed << boost::units::binary_prefix
-              << naive_cost.precompiled.file_size << '\n';
+    std::cout << "Precompiled header (PCH) file size = "
+              << format_file_size(naive_cost.precompiled.file_size) << '\n';
     std::cout << "Precompiled header (PCH) token count = "
               << naive_cost.precompiled.token_count << '\n';
     std::cout << "Total translation unit file size without PCH = "
-              << std::setprecision(2) << std::fixed
-              << boost::units::binary_prefix << project_cost.true_cost.file_size
-              << " ("
+              << format_file_size(project_cost.true_cost.file_size) << " ("
               << (100.0 * project_cost.true_cost.file_size /
                   project_cost.total().file_size)
                      .value()
