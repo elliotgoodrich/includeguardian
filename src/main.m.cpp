@@ -346,6 +346,10 @@ int main(int argc, const char **argv) {
                  [&](const Graph::vertex_descriptor v) {
                    return in_degree(v, graph) > 1;
                  });
+    std::sort(unguarded_copy.begin(), unguarded_copy.end(),
+              [&](Graph::vertex_descriptor l, Graph::vertex_descriptor r) {
+                return in_degree(l, graph) > in_degree(r, graph);
+              });
     std::vector<std::string> files(unguarded_copy.size());
     std::transform(unguarded_copy.begin(), unguarded_copy.end(), files.begin(),
                    [&](Graph::vertex_descriptor v) {
@@ -354,7 +358,6 @@ int main(int argc, const char **argv) {
                          << in_degree(v, graph) << " files\n";
                      return out.view();
                    });
-    std::sort(files.begin(), files.end());
     std::copy(files.begin(), files.end(),
               std::ostream_iterator<std::string>(std::cout));
   }
