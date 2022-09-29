@@ -37,6 +37,7 @@ add_library(
     find_expensive_files.hpp find_expensive_files.cpp
     find_expensive_headers.hpp find_expensive_headers.cpp
     find_expensive_includes.hpp find_expensive_includes.cpp
+    includeguardian.hpp includeguardian.cpp
     list_included_files.hpp list_included_files.cpp
     find_unnecessary_sources.hpp find_unnecessary_sources.cpp
     find_unused_components.hpp find_unused_components.cpp
