@@ -229,7 +229,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
           "Whether to enable an optimization to improve preprocessing time by "
           "replacing already seen files with a smaller version for further "
           "sources "),
-      llvm::cl::value_desc("enabled"), llvm::cl::init(false));
+      llvm::cl::value_desc("enabled"), llvm::cl::init(false), llvm::cl::Hidden);
 
   if (!llvm::cl::ParseCommandLineOptions(argc, argv)) {
     return 1;
