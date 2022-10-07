@@ -297,7 +297,7 @@ public:
                           const clang::Module *Imported,
                           clang::SrcMgr::CharacteristicKind FileType) final {
 
-    if (!File && !m_stack.back()->second.fully_processed) {
+    if (!File) {
       // File does not exist
       m_r.missing_includes.emplace(FileName.str());
       return;
