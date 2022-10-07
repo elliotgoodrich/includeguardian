@@ -17,7 +17,8 @@
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/VirtualFileSystem.h>
 
-#include <clang/Basic/SourceManager.h>
+#include <clang/Tooling/ArgumentsAdjusters.h>
+#include <clang/Tooling/CommonOptionsParser.h>
 
 #include <chrono>
 #include <iomanip>
@@ -128,7 +129,7 @@ get_total_cost::result get_naive_cost(const Graph &g) {
       });
 }
 
-std::vector<std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
+std::vector<std::string>
 parse_include_dirs(const llvm::cl::list<std::string> &include_dirs,
                    const llvm::cl::list<std::string> &system_include_dirs) {
   std::vector<std::tuple<std::filesystem::path,
@@ -154,13 +155,13 @@ parse_include_dirs(const llvm::cl::list<std::string> &include_dirs,
                        return std::get<unsigned>(l) < std::get<unsigned>(r);
                      });
 
-  std::vector<
-      std::pair<std::filesystem::path, clang::SrcMgr::CharacteristicKind>>
-      result;
+  std::vector<std::string> result;
   std::transform(
       tmp.begin(), tmp.end(), std::back_inserter(result), [](const auto &t) {
-        return std::make_pair(std::get<std::filesystem::path>(t),
-                              std::get<clang::SrcMgr::CharacteristicKind>(t));
+        return (isSystem(std::get<clang::SrcMgr::CharacteristicKind>(t))
+                    ? "-isystem "
+                    : "-I") +
+               std::get<std::filesystem::path>(t).string();
       });
   return result;
 }
@@ -183,9 +184,74 @@ enum class output {
   most_expensive,
 };
 
+class ReplacementCompilationDatabase
+    : public clang::tooling::CompilationDatabase {
+public:
+  std::filesystem::path m_working_directory;
+  std::vector<std::filesystem::path> m_sources;
+
+  ReplacementCompilationDatabase(const std::filesystem::path &working_directory,
+                                 llvm::vfs::FileSystem &fs)
+      : m_working_directory(working_directory), m_sources() {
+    std::vector<std::string> directories;
+    directories.push_back(working_directory.string());
+    const llvm::vfs::directory_iterator end;
+    while (!directories.empty()) {
+      const std::string dir_copy = std::move(directories.back());
+      directories.pop_back();
+      std::error_code ec;
+      llvm::vfs::directory_iterator it = fs.dir_begin(dir_copy, ec);
+      while (!ec && it != end) {
+        if (it->type() == llvm::sys::fs::file_type::directory_file) {
+          directories.push_back(it->path().str());
+        } else if (it->type() == llvm::sys::fs::file_type::regular_file &&
+                   map_ext(it->path()) == build_graph::file_type::source) {
+          m_sources.emplace_back(it->path().str());
+        }
+        it.increment(ec);
+      }
+    }
+  }
+
+  /// Returns all compile commands in which the specified file was
+  /// compiled.
+  ///
+  /// This includes compile commands that span multiple source files.
+  /// For example, consider a project with the following compilations:
+  /// $ clang++ -o test a.cc b.cc t.cc
+  /// $ clang++ -o production a.cc b.cc -DPRODUCTION
+  /// A compilation database representing the project would return both command
+  /// lines for a.cc and b.cc and only the first command line for t.cc.
+  std::vector<clang::tooling::CompileCommand>
+  getCompileCommands(clang::StringRef FilePath) const final {
+    // Note for the preprocessor we do not need `-o` flags and it is
+    // specifically stripped out by an `ArgumentAdjuster`.
+    using namespace std::string_literals;
+
+    std::vector<std::string> things;
+    things.emplace_back("/usr/bin/clang++");
+    things.emplace_back(FilePath.str());
+    return {{m_working_directory.string(), FilePath, std::move(things), "out"}};
+  }
+
+  /// Returns the list of all files available in the compilation database.
+  ///
+  /// By default, returns nothing. Implementations should override this if they
+  /// can enumerate their source files.
+  std::vector<std::string> getAllFiles() const final {
+    std::vector<std::string> result(m_sources.size());
+    std::transform(m_sources.cbegin(), m_sources.cend(), result.begin(),
+                   [](const std::filesystem::path &p) { return p.string(); });
+    return result;
+  }
+};
+
 } // namespace
 
 int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
+  llvm::cl::OptionCategory build_category("Build Options");
+
+  // TODO: Change to analysis
   llvm::cl::opt<output> output(
       "output", llvm::cl::desc("Choose the output"),
       llvm::cl::values(
@@ -196,44 +262,146 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
           llvm::cl::OptionEnumValue(
               "most-expensive", static_cast<int>(output::most_expensive),
               "List of most expensive include directives (default)")),
-      llvm::cl::init(output::most_expensive));
+      llvm::cl::init(output::most_expensive), llvm::cl::cat(build_category));
 
-  llvm::cl::opt<std::string> dir("dir", llvm::cl::desc("Choose the directory"),
-                                 llvm::cl::value_desc("directory"),
-                                 llvm::cl::Required);
+  llvm::cl::opt<std::string> build_path("p", llvm::cl::desc("Build path"),
+                                        llvm::cl::Optional,
+                                        llvm::cl::cat(build_category));
+
+  llvm::cl::list<std::string> source_paths(
+      llvm::cl::Positional, llvm::cl::desc("<source0> [... <sourceN>]"),
+      llvm::cl::ZeroOrMore, llvm::cl::cat(build_category));
+
+  llvm::cl::opt<std::string> fake_compilation_db(
+      "dir",
+      llvm::cl::desc("Instead of looking for a compilation database "
+                     "(compile_commands.json) use all C/C++ source files in "
+                     "this directory"),
+      llvm::cl::value_desc("directory"), llvm::cl::Optional,
+      llvm::cl::cat(build_category));
 
   llvm::cl::list<std::string> include_dirs(
       "I", llvm::cl::desc("Additional include directories"),
-      llvm::cl::ZeroOrMore);
+      llvm::cl::ZeroOrMore, llvm::cl::cat(build_category));
 
   llvm::cl::list<std::string> system_include_dirs(
       "isystem", llvm::cl::desc("Additional system include directories"),
-      llvm::cl::ZeroOrMore);
+      llvm::cl::ZeroOrMore, llvm::cl::cat(build_category));
 
   llvm::cl::list<std::string> forced_includes(
       "forced-includes",
       llvm::cl::desc("Forced includes (absolute path preferred)"),
-      llvm::cl::ZeroOrMore);
+      llvm::cl::ZeroOrMore, llvm::cl::cat(build_category));
 
-  llvm::cl::opt<double> cutoff(
-      "cutoff", llvm::cl::desc("Cutoff percentage for suggestions"),
-      llvm::cl::value_desc("percentage"), llvm::cl::init(1.0));
-  llvm::cl::opt<double> pch_ratio(
-      "pch-ratio",
+  llvm::cl::list<std::string> args_after(
+      "extra-arg",
       llvm::cl::desc(
-          "Require ratio of token reduction compared to pch file growth"),
-      llvm::cl::value_desc("ratio"), llvm::cl::init(2.0));
+          "Additional argument to append to the compiler command line"),
+      llvm::cl::cat(build_category));
+
+  llvm::cl::list<std::string> args_before(
+      "extra-arg-before",
+      llvm::cl::desc(
+          "Additional argument to prepend to the compiler command line"),
+      llvm::cl::cat(build_category));
+
   llvm::cl::opt<bool> smaller_file_opt(
       "smaller-file-opt",
       llvm::cl::desc(
           "Whether to enable an optimization to improve preprocessing time by "
           "replacing already seen files with a smaller version for further "
           "sources "),
-      llvm::cl::value_desc("enabled"), llvm::cl::init(false), llvm::cl::Hidden);
+      llvm::cl::value_desc("enabled"), llvm::cl::init(false), llvm::cl::Hidden,
+      llvm::cl::cat(build_category));
 
-  if (!llvm::cl::ParseCommandLineOptions(argc, argv)) {
+  llvm::cl::OptionCategory analysis_category("Analysis Options");
+
+  llvm::cl::opt<double> cutoff(
+      "cutoff", llvm::cl::desc("Cutoff percentage for suggestions"),
+      llvm::cl::value_desc("percentage"), llvm::cl::init(1.0),
+      llvm::cl::cat(analysis_category));
+  llvm::cl::opt<double> pch_ratio(
+      "pch-ratio",
+      llvm::cl::desc(
+          "Require ratio of token reduction compared to pch file growth"),
+      llvm::cl::value_desc("ratio"), llvm::cl::init(2.0),
+      llvm::cl::cat(analysis_category));
+
+  std::string ErrorMessage;
+  std::unique_ptr<clang::tooling::FixedCompilationDatabase> foo =
+      clang::tooling::FixedCompilationDatabase::loadFromCommandLine(
+          argc, argv, ErrorMessage);
+  if (!ErrorMessage.empty()) {
+    ErrorMessage.append("\n");
+  }
+  const char *Overview = "";
+  llvm::raw_string_ostream OS(ErrorMessage);
+  // Stop initializing if command-line option parsing failed.
+  if (!llvm::cl::ParseCommandLineOptions(argc, argv, Overview, &OS)) {
+    OS.flush();
     return 1;
   }
+
+  llvm::cl::PrintOptionValues();
+
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs =
+      llvm::vfs::getRealFileSystem();
+
+  std::unique_ptr<clang::tooling::CompilationDatabase> db;
+  if (!build_path.empty()) {
+    db = clang::tooling::CompilationDatabase::autoDetectFromDirectory(
+        build_path, ErrorMessage);
+  } else if (fake_compilation_db != "") {
+    db = std::make_unique<ReplacementCompilationDatabase>(
+        std::filesystem::path(fake_compilation_db.getValue()), *fs);
+  } else {
+    db = clang::tooling::CompilationDatabase::autoDetectFromSource(
+        source_paths.front(), ErrorMessage);
+  }
+
+  if (!db) {
+    llvm::errs() << "Error while trying to load a compilation database:\n"
+                 << ErrorMessage << "Running without flags.\n";
+    db.reset(new clang::tooling::FixedCompilationDatabase(".", {}));
+  }
+
+  // Add our adjustments to our database
+  db = [&] {
+    auto adjusting_db =
+        std::make_unique<clang::tooling::ArgumentsAdjustingCompilations>(
+            std::move(db));
+
+    std::vector<std::string> forced_include_cmd(forced_includes.size());
+    std::transform(forced_includes.begin(), forced_includes.end(),
+                   forced_include_cmd.begin(),
+                   [](const std::string &file) { return "-include " + file; });
+
+    // Add our forced-includes
+    clang::tooling::ArgumentsAdjuster adjuster =
+        clang::tooling::getInsertArgumentAdjuster(
+            forced_include_cmd, clang::tooling::ArgumentInsertPosition::BEGIN);
+
+    // Put everything at the beginning as either the position doesn't matter, or
+    // the user wants to override something (e.g. put `-isystem` instead of
+    // `-I`) so we should put this first
+    adjuster = clang::tooling::combineAdjusters(
+        std::move(adjuster),
+        clang::tooling::getInsertArgumentAdjuster(
+            parse_include_dirs(include_dirs, system_include_dirs),
+            clang::tooling::ArgumentInsertPosition::BEGIN));
+
+    // Add the adjusters from the command line
+    adjuster = clang::tooling::combineAdjusters(
+        std::move(adjuster),
+        clang::tooling::getInsertArgumentAdjuster(
+            args_before, clang::tooling::ArgumentInsertPosition::BEGIN));
+    adjuster = clang::tooling::combineAdjusters(
+        std::move(adjuster),
+        clang::tooling::getInsertArgumentAdjuster(
+            args_after, clang::tooling::ArgumentInsertPosition::END));
+    adjusting_db->appendArgumentsAdjuster(adjuster);
+    return adjusting_db;
+  }();
 
   if (cutoff.getValue() < 0.0 || cutoff.getValue() > 100.0) {
     err << "'cutoff' must lie between [0, 100]\n";
@@ -249,17 +417,15 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
   stopwatch timer;
 
-  std::vector<std::filesystem::path> forced_includes_files(
-      forced_includes.size());
-  std::transform(forced_includes.begin(), forced_includes.end(),
-                 forced_includes_files.begin(),
+  const std::vector<std::string> &raw_sources = db->getAllFiles();
+  std::vector<std::filesystem::path> source_files(raw_sources.size());
+  std::transform(raw_sources.begin(), raw_sources.end(), source_files.begin(),
                  [](const std::string &s) { return std::filesystem::path(s); });
 
-  llvm::Expected<build_graph::result> result = build_graph::from_dir(
-      dir.getValue(), parse_include_dirs(include_dirs, system_include_dirs),
-      llvm::vfs::getRealFileSystem(), map_ext,
-      build_graph::options().enable_replace_file_optimization(smaller_file_opt),
-      forced_includes_files);
+  llvm::Expected<build_graph::result> result = build_graph::from_compilation_db(
+      *db, std::filesystem::current_path(), source_files, map_ext, fs,
+      build_graph::options().enable_replace_file_optimization(
+          smaller_file_opt));
 
   if (!result) {
     // TODO: error message

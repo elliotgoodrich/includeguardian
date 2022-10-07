@@ -5,7 +5,10 @@
 
 namespace IncludeGuardian {
 
-int run(int argc, const char **argv, std::ostream& out, std::ostream& err);
+// Run `includeguardian` with the array of command line options specified
+// by the array `argv` of length `argc`.  Output the results to `out` and
+// any errors to `err`.  Return 0 on success and non-zero on error.
+int run(int argc, const char **argv, std::ostream &out, std::ostream &err);
 
 } // namespace IncludeGuardian
 
