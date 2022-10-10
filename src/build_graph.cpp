@@ -93,7 +93,7 @@ clang::IgnoringDiagConsumer s_ignore;
 
 struct Hasher {
   std::size_t operator()(const llvm::sys::fs::UniqueID key) const noexcept {
-    // NOTE: Not a good hash, but out devices should probably be the same
+    // NOTE: Not a good hash, but our devices should probably be the same
     return key.getFile() ^ key.getDevice();
   }
 };
