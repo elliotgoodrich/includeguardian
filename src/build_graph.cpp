@@ -15,7 +15,7 @@
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 
-#include <llvm/ADT/StringRef.h>
+#include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/Host.h>
@@ -31,6 +31,60 @@
 namespace IncludeGuardian {
 
 namespace {
+
+const bool LOG = false;
+
+class LoggingFileSystem : public llvm::vfs::FileSystem {
+public:
+  explicit LoggingFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS)
+      : FS(std::move(FS)) {}
+
+  llvm::ErrorOr<llvm::vfs::Status> status(const llvm::Twine &Path) final {
+    llvm::ErrorOr<llvm::vfs::Status> s = FS->status(Path);
+    if (s) {
+      llvm::SmallVector<char, 256> out;
+      std::cout << "status(" << Path.toStringRef(out).str()
+                << ") = " << s.get().getUniqueID().getFile() << "\n";
+    }
+    return s;
+  }
+  llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
+  openFileForRead(const llvm::Twine &Path) final {
+    llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>> f =
+        FS->openFileForRead(Path);
+    if (f) {
+      llvm::SmallVector<char, 256> out;
+      std::cout << "openFileForRead(" << Path.toStringRef(out).str()
+                << ") = " << f.get()->status()->getUniqueID().getFile() << "\n";
+    }
+    return f;
+  }
+  llvm::vfs::directory_iterator dir_begin(const llvm::Twine &Dir,
+                                          std::error_code &EC) final {
+    return FS->dir_begin(Dir, EC);
+  }
+  llvm::ErrorOr<std::string> getCurrentWorkingDirectory() const final {
+    return FS->getCurrentWorkingDirectory();
+  }
+  std::error_code setCurrentWorkingDirectory(const llvm::Twine &Path) final {
+    return FS->setCurrentWorkingDirectory(Path);
+  }
+  std::error_code getRealPath(const llvm::Twine &Path,
+                              llvm::SmallVectorImpl<char> &Output) const final {
+    return FS->getRealPath(Path, Output);
+  }
+  std::error_code isLocal(const llvm::Twine &Path, bool &Result) final {
+    return FS->isLocal(Path, Result);
+  }
+
+protected:
+  FileSystem &getUnderlyingFS() { return *FS; }
+
+private:
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS;
+
+  virtual void anchor() {}
+};
 
 class FakeCompilationDatabase : public clang::tooling::CompilationDatabase {
 public:
@@ -114,9 +168,17 @@ struct FileState {
 using UniqueIdToNode =
     std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher>;
 
+struct ReplaceWith {
+  std::unique_ptr<llvm::MemoryBuffer> contents;
+  llvm::sys::fs::UniqueID previousID;
+};
+
+using NeedsReplacing = std::unordered_map<std::string, ReplaceWith>;
+
 struct IncludeScanner : public clang::PPCallbacks {
   clang::SourceManager *m_sm;
   UniqueIdToNode &m_id_to_node;
+  NeedsReplacing &m_needs_replacing;
   build_graph::result &m_r;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::vector<UniqueIdToNode::iterator> m_stack;
@@ -194,11 +256,11 @@ public:
   IncludeScanner(
       const std::function<build_graph::file_type(std::string_view)> &file_type,
       build_graph::result &r, UniqueIdToNode &id_to_node,
-      clang::Preprocessor &pp, const std::filesystem::path &working_dir,
-      bool replace_file_optimization)
+      NeedsReplacing &needs_replacing, clang::Preprocessor &pp,
+      const std::filesystem::path &working_dir, bool replace_file_optimization)
       : m_r(r), m_sm(&pp.getSourceManager()), m_id_to_node(id_to_node),
-        m_file_type(file_type), m_pp(&pp), m_accounted_for_token_count{0u},
-        m_working_dir(working_dir),
+        m_needs_replacing(needs_replacing), m_file_type(file_type),
+        m_pp(&pp), m_accounted_for_token_count{0u}, m_working_dir(working_dir),
         m_replace_file_optimization(replace_file_optimization) {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
@@ -215,20 +277,18 @@ public:
       }
 
       if (m_stack.empty()) {
-        // If our stack's empty, then this is our source file
         auto const [it, inserted] =
             m_id_to_node.emplace(file->getUniqueID(), empty);
-        if (inserted) {
-          const std::filesystem::path rel =
-              std::filesystem::path(file->getName().str())
-                  .lexically_relative(m_working_dir);
-          it->second.v = add_vertex(rel, m_r.graph);
-          it->second.angled_rel = rel.parent_path();
-          m_r.sources.push_back(it->second.v);
-        } else {
-          // TODO: Warn that a source is being included
-          assert(false);
-        }
+
+        // TODO: Warn that a source is being included
+        // If our stack's empty, then this is our source file
+        assert(inserted);
+        const std::filesystem::path rel =
+            std::filesystem::path(file->getName().str())
+                .lexically_relative(m_working_dir);
+        it->second.v = add_vertex(rel, m_r.graph);
+        it->second.angled_rel = rel.parent_path();
+        m_r.sources.push_back(it->second.v);
         m_stack.push_back(it);
       } else {
         // We should already have added this in `InclusionDirective` or
@@ -255,6 +315,13 @@ public:
             std::string tmp = "#pragma once\n";
             tmp.swap(state.replacement_contents);
             state.replacement_contents += tmp;
+
+            m_needs_replacing.emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(file->tryGetRealPathName().str()),
+                std::forward_as_tuple(llvm::MemoryBuffer::getMemBufferCopy(
+                                          state.replacement_contents, ""),
+                                      file->getUniqueID()));
           }
 
           // Apply the costs to ourselves
@@ -306,14 +373,10 @@ public:
     auto const [it, inserted] =
         m_id_to_node.emplace(File->getUniqueID(), empty);
 
-    // If we have seen this file then replace it with the smaller,
-    // cheaper file before we attempt to enter it.
-    if (it->second.fully_processed && m_replace_file_optimization) {
-      m_sm->overrideFileContents(
-          File, llvm::MemoryBufferRef(it->second.replacement_contents, ""));
-    }
-
     if (m_stack.back()->second.fully_processed) {
+      // Assert here for a previousl bug we had when swapping out a file,
+      // where we got a "new" `UniqueID` for a fully processed file.
+      assert(!inserted);
       return;
     }
 
@@ -517,18 +580,22 @@ class ExpensiveAction : public clang::PreprocessOnlyAction {
   clang::CompilerInstance *m_ci;
   build_graph::result &m_r;
   UniqueIdToNode &m_id_to_node;
+  NeedsReplacing m_needs_replacing;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> m_in_memory_fs;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_fs;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::filesystem::path m_working_dir;
-  bool m_replace_file_optimization;
 
 public:
   ExpensiveAction(
       build_graph::result &r, UniqueIdToNode &id_to_node,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> in_memory_fs,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
       const std::filesystem::path &working_dir, bool replace_file_optimization)
       : m_f(), m_ci(nullptr), m_r(r), m_id_to_node(id_to_node),
-        m_file_type(file_type), m_working_dir(working_dir),
-        m_replace_file_optimization(replace_file_optimization) {}
+        m_needs_replacing(), m_in_memory_fs(in_memory_fs), m_fs(fs),
+        m_file_type(file_type), m_working_dir(working_dir) {}
 
   bool BeginInvocation(clang::CompilerInstance &ci) final {
     ci.getDiagnostics().setClient(&s_ignore, /*TakeOwnership=*/false);
@@ -545,11 +612,32 @@ public:
 
   void ExecuteAction() final {
     getCompilerInstance().getPreprocessor().addPPCallbacks(
-        std::make_unique<IncludeScanner>(m_file_type, m_r, m_id_to_node,
-                                         m_ci->getPreprocessor(), m_working_dir,
-                                         m_replace_file_optimization));
+        std::make_unique<IncludeScanner>(
+            m_file_type, m_r, m_id_to_node, m_needs_replacing,
+            m_ci->getPreprocessor(), m_working_dir, m_in_memory_fs != nullptr));
 
     clang::PreprocessOnlyAction::ExecuteAction();
+  }
+
+  void EndSourceFileAction() final {
+    for (auto &[path, v] : m_needs_replacing) {
+      const bool file_inserted =
+          m_in_memory_fs->addFile(path, 0, std::move(v.contents));
+      assert(file_inserted);
+
+      // TODO: Do we need error checking here for the `llvm::Error`?
+      std::unique_ptr<llvm::vfs::File> f =
+          std::move(m_in_memory_fs->openFileForRead(path).get());
+
+      // Since we're overriding our file, it will get a new `UniqueID` and we
+      // should replace it in the `UniqueID` lookup to the new one
+      const auto prev = m_id_to_node.find(v.previousID);
+      const auto [it, inserted] =
+          m_id_to_node.emplace(f->status()->getUniqueID(), prev->second);
+      assert(inserted);
+      m_id_to_node.erase(prev);
+    }
+    m_needs_replacing.clear();
   }
 };
 
@@ -559,25 +647,60 @@ public:
 class find_graph_factory : public clang::tooling::FrontendActionFactory {
   build_graph::result &m_r;
   UniqueIdToNode &m_id_to_node;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> m_in_memory_fs;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_fs;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::filesystem::path m_working_dir;
-  bool m_replace_file_optimization;
 
 public:
   /// Create a `print_graph_factory`.
   find_graph_factory(
       build_graph::result &r, UniqueIdToNode &id_to_node,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> in_memory_fs,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
-      const std::filesystem::path &working_dir, bool replace_file_optimization)
-      : m_r(r), m_id_to_node(id_to_node), m_working_dir(working_dir),
-        m_file_type(file_type),
-        m_replace_file_optimization(replace_file_optimization) {}
+      const std::filesystem::path &working_dir)
+      : m_r(r), m_id_to_node(id_to_node), m_in_memory_fs(in_memory_fs),
+        m_fs(fs), m_working_dir(working_dir), m_file_type(file_type) {}
+
+  /// Invokes the compiler with a FrontendAction created by create().
+  bool
+  runInvocation(std::shared_ptr<clang::CompilerInvocation> Invocation,
+                clang::FileManager *Files,
+                std::shared_ptr<clang::PCHContainerOperations> PCHContainerOps,
+                clang::DiagnosticConsumer *DiagConsumer) final {
+    if (m_in_memory_fs) {
+      // For performance, `ClangTool` shares the `clang::FileManager *` across
+      // all translation units.  This FileManager has a cache of file paths
+      // against their `File *`, entries which stops us being able to swap out
+      // our files in the VFS.
+      //
+      // So here we override `runInvocation`, disregard the `FileManager *`
+      // passed in here and call the base `runInvocation` with a completely new
+      // `FileManager`. This allows us to swap out the files in the VFS and they
+      // will be looked up again for each new translation unit - at an extra
+      // (but comparatively lower) cost.
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fake_fs(
+          &Files->getVirtualFileSystem());
+      // Even though the interface takes a `FileManager *`, it expects an
+      // `IntrusiveRefCntPtr<FileManager>`
+      auto new_file_mgr = llvm::makeIntrusiveRefCnt<clang::FileManager>(
+          Files->getFileSystemOpts(), fake_fs);
+      return clang::tooling::FrontendActionFactory::runInvocation(
+          std::move(Invocation), new_file_mgr.get(), std::move(PCHContainerOps),
+          DiagConsumer);
+    } else {
+      return clang::tooling::FrontendActionFactory::runInvocation(
+          std::move(Invocation), Files, std::move(PCHContainerOps),
+          DiagConsumer);
+    }
+  }
 
   /// Returns a new `clang::FrontendAction`.
   std::unique_ptr<clang::FrontendAction> create() final {
-    return std::make_unique<ExpensiveAction>(m_r, m_id_to_node, m_file_type,
-                                             m_working_dir,
-                                             m_replace_file_optimization);
+    return std::make_unique<ExpensiveAction>(m_r, m_id_to_node, m_in_memory_fs,
+                                             m_fs, m_file_type, m_working_dir,
+                                             m_in_memory_fs != nullptr);
   }
 };
 
@@ -594,14 +717,37 @@ llvm::Expected<build_graph::result> build_graph::from_compilation_db(
                  source_path_strings.begin(),
                  [](const std::filesystem::path &p) { return p.string(); });
 
+  // Avoid re-preprocessing files that we have seen before and already
+  // added to the graph.  By using an `OverlayFileSystem` we can,
+  //
+  //   1. Keep track of the replacement contents, but put them in a map
+  //      of file path against contents
+  //   2. Whenever we call `ExecuteAction` (meaning we have a completely
+  //      new source file we're looking at) we load all the map contents
+  //      into our `OverlayFileSystem`.  Hopefully at this point we can
+  //      guarantee that there is no state left over from the previous
+  //      source files.
+  //   3. In the future, figure out how we can do this while processing
+  //      sources in parallel.
+
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> in_memory;
+  if (opts.replace_file_optimization) {
+    auto overlay = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(fs);
+    in_memory = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+    overlay->pushOverlay(in_memory);
+    fs = overlay;
+    if (LOG) {
+      fs = llvm::makeIntrusiveRefCnt<LoggingFileSystem>(fs);
+    }
+  }
+
   clang::tooling::ClangTool tool(
       compilation_db, source_path_strings,
       std::make_shared<clang::PCHContainerOperations>(), fs);
 
   UniqueIdToNode id_to_node;
   result r;
-  find_graph_factory f(r, id_to_node, file_type, working_dir,
-                       opts.replace_file_optimization);
+  find_graph_factory f(r, id_to_node, in_memory, fs, file_type, working_dir);
   const int rc = tool.run(&f);
   if (rc != 0) {
     return llvm::createStringError(std::error_code(rc, std::generic_category()),
