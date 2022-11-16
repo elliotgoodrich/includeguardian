@@ -11,14 +11,14 @@ file_node::file_node() = default;
 file_node::file_node(const std::filesystem::path &path) : path(path) {}
 
 file_node &file_node::with_cost(
-    long long int token_count,
+    std::int64_t token_count,
     boost::units::quantity<boost::units::information::info> file_size) & {
   underlying_cost = cost{token_count, file_size};
   return *this;
 }
 
 file_node &&file_node::with_cost(
-    long long int token_count,
+    std::int64_t token_count,
     boost::units::quantity<boost::units::information::info> file_size) && {
   underlying_cost = cost{token_count, file_size};
   return std::move(*this);

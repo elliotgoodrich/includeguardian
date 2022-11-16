@@ -10,7 +10,7 @@ namespace IncludeGuardian {
 cost::cost() : cost{0, 0.0 * boost::units::information::bytes} {}
 
 cost::cost(
-    const long long int token_count,
+    const std::int64_t token_count,
     const boost::units::quantity<boost::units::information::info> file_size)
     : token_count{token_count}, file_size{file_size} {}
 

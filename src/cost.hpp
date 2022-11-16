@@ -7,12 +7,19 @@
 namespace IncludeGuardian {
 
 struct cost {
-  long long int token_count;
+  std::int64_t token_count;
   boost::units::quantity<boost::units::information::info> file_size;
 
   cost();
 
-  cost(long long int token_count, boost::units::quantity<boost::units::information::info> file_size);
+  cost(std::int64_t token_count,
+       boost::units::quantity<boost::units::information::info> file_size);
+
+  template <typename Archive>
+  void serialize(Archive &ar, const unsigned version) {
+    ar &token_count;
+    ar &file_size;
+  }
 };
 
 std::ostream &operator<<(std::ostream &stream, cost c);

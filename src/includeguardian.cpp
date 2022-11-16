@@ -12,6 +12,9 @@
 #include "list_included_files.hpp"
 #include "recommend_precompiled.hpp"
 
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/graph/adj_list_serialize.hpp>
 #include <boost/units/io.hpp>
 
 #include <llvm/Support/CommandLine.h>
@@ -21,6 +24,7 @@
 #include <clang/Tooling/CommonOptionsParser.h>
 
 #include <chrono>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -178,12 +182,6 @@ public:
   }
 };
 
-enum class output {
-  dot_graph,
-  list_files,
-  most_expensive,
-};
-
 class ReplacementCompilationDatabase
     : public clang::tooling::CompilationDatabase {
 public:
@@ -251,22 +249,16 @@ public:
 int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   llvm::cl::OptionCategory build_category("Build Options");
 
-  // TODO: Change to analysis
-  llvm::cl::opt<output> output(
-      "output", llvm::cl::desc("Choose the output"),
-      llvm::cl::values(
-          llvm::cl::OptionEnumValue(
-              "dot-graph", static_cast<int>(output::dot_graph), "DOT graph"),
-          llvm::cl::OptionEnumValue(
-              "list-files", static_cast<int>(output::list_files), "List files"),
-          llvm::cl::OptionEnumValue(
-              "most-expensive", static_cast<int>(output::most_expensive),
-              "List of most expensive include directives (default)")),
-      llvm::cl::init(output::most_expensive), llvm::cl::cat(build_category));
+  llvm::cl::opt<std::string> load_path("load", llvm::cl::desc("Load path"),
+                                       llvm::cl::Optional,
+                                       llvm::cl::cat(build_category));
 
   llvm::cl::opt<std::string> build_path("p", llvm::cl::desc("Build path"),
                                         llvm::cl::Optional,
                                         llvm::cl::cat(build_category));
+  llvm::cl::opt<std::string> save_path("save", llvm::cl::desc("Save path"),
+                                       llvm::cl::Optional,
+                                       llvm::cl::cat(build_category));
 
   llvm::cl::list<std::string> source_paths(
       llvm::cl::Positional, llvm::cl::desc("<source0> [... <sourceN>]"),
@@ -316,6 +308,10 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
   llvm::cl::OptionCategory analysis_category("Analysis Options");
 
+  llvm::cl::opt<bool> analyze(
+      "analyze", llvm::cl::desc("Whether to perform analysis"),
+      llvm::cl::value_desc("enabled"), llvm::cl::init(true),
+      llvm::cl::cat(analysis_category));
   llvm::cl::opt<double> cutoff(
       "cutoff", llvm::cl::desc("Cutoff percentage for suggestions"),
       llvm::cl::value_desc("percentage"), llvm::cl::init(1.0),
@@ -344,65 +340,6 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
   llvm::cl::PrintOptionValues();
 
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs =
-      llvm::vfs::getRealFileSystem();
-
-  std::unique_ptr<clang::tooling::CompilationDatabase> db;
-  if (!build_path.empty()) {
-    db = clang::tooling::CompilationDatabase::autoDetectFromDirectory(
-        build_path, ErrorMessage);
-  } else if (fake_compilation_db != "") {
-    db = std::make_unique<ReplacementCompilationDatabase>(
-        std::filesystem::path(fake_compilation_db.getValue()), *fs);
-  } else {
-    db = clang::tooling::CompilationDatabase::autoDetectFromSource(
-        source_paths.front(), ErrorMessage);
-  }
-
-  if (!db) {
-    llvm::errs() << "Error while trying to load a compilation database:\n"
-                 << ErrorMessage << "Running without flags.\n";
-    db.reset(new clang::tooling::FixedCompilationDatabase(".", {}));
-  }
-
-  // Add our adjustments to our database
-  db = [&] {
-    auto adjusting_db =
-        std::make_unique<clang::tooling::ArgumentsAdjustingCompilations>(
-            std::move(db));
-
-    std::vector<std::string> forced_include_cmd(forced_includes.size());
-    std::transform(forced_includes.begin(), forced_includes.end(),
-                   forced_include_cmd.begin(),
-                   [](const std::string &file) { return "-include " + file; });
-
-    // Add our forced-includes
-    clang::tooling::ArgumentsAdjuster adjuster =
-        clang::tooling::getInsertArgumentAdjuster(
-            forced_include_cmd, clang::tooling::ArgumentInsertPosition::BEGIN);
-
-    // Put everything at the beginning as either the position doesn't matter, or
-    // the user wants to override something (e.g. put `-isystem` instead of
-    // `-I`) so we should put this first
-    adjuster = clang::tooling::combineAdjusters(
-        std::move(adjuster),
-        clang::tooling::getInsertArgumentAdjuster(
-            parse_include_dirs(include_dirs, system_include_dirs),
-            clang::tooling::ArgumentInsertPosition::BEGIN));
-
-    // Add the adjusters from the command line
-    adjuster = clang::tooling::combineAdjusters(
-        std::move(adjuster),
-        clang::tooling::getInsertArgumentAdjuster(
-            args_before, clang::tooling::ArgumentInsertPosition::BEGIN));
-    adjuster = clang::tooling::combineAdjusters(
-        std::move(adjuster),
-        clang::tooling::getInsertArgumentAdjuster(
-            args_after, clang::tooling::ArgumentInsertPosition::END));
-    adjusting_db->appendArgumentsAdjuster(adjuster);
-    return adjusting_db;
-  }();
-
   if (cutoff.getValue() < 0.0 || cutoff.getValue() > 100.0) {
     err << "'cutoff' must lie between [0, 100]\n";
     return 1;
@@ -417,15 +354,91 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
   stopwatch timer;
 
-  const std::vector<std::string> &raw_sources = db->getAllFiles();
-  std::vector<std::filesystem::path> source_files(raw_sources.size());
-  std::transform(raw_sources.begin(), raw_sources.end(), source_files.begin(),
-                 [](const std::string &s) { return std::filesystem::path(s); });
+  auto result = [&]() -> llvm::Expected<build_graph::result> {
+    if (!load_path.empty()) {
+      build_graph::result r;
+      std::ifstream ifs(load_path.getValue()); // save to file
+      boost::archive::text_iarchive ia(ifs);
+      ia >> r.graph;
+      out << "Graph loaded in "
+          << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
+      out << '\n';
+      return r;
+    } else {
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs =
+          llvm::vfs::getRealFileSystem();
 
-  llvm::Expected<build_graph::result> result = build_graph::from_compilation_db(
-      *db, std::filesystem::current_path(), source_files, map_ext, fs,
-      build_graph::options().enable_replace_file_optimization(
-          smaller_file_opt));
+      std::unique_ptr<clang::tooling::CompilationDatabase> db;
+      if (!build_path.empty()) {
+        db = clang::tooling::CompilationDatabase::autoDetectFromDirectory(
+            build_path, ErrorMessage);
+      } else if (fake_compilation_db != "") {
+        db = std::make_unique<ReplacementCompilationDatabase>(
+            std::filesystem::path(fake_compilation_db.getValue()), *fs);
+      } else if (!source_paths.empty()) {
+        db = clang::tooling::CompilationDatabase::autoDetectFromSource(
+            source_paths.front(), ErrorMessage);
+      }
+
+      if (!db) {
+        llvm::errs() << "Error while trying to load a compilation database:\n"
+                     << ErrorMessage << "Running without flags.\n";
+        db.reset(new clang::tooling::FixedCompilationDatabase(".", {}));
+      }
+
+      // Add our adjustments to our database
+      db = [&] {
+        auto adjusting_db =
+            std::make_unique<clang::tooling::ArgumentsAdjustingCompilations>(
+                std::move(db));
+
+        std::vector<std::string> forced_include_cmd(forced_includes.size());
+        std::transform(forced_includes.begin(), forced_includes.end(),
+                       forced_include_cmd.begin(), [](const std::string &file) {
+                         return "-include " + file;
+                       });
+
+        // Add our forced-includes
+        clang::tooling::ArgumentsAdjuster adjuster =
+            clang::tooling::getInsertArgumentAdjuster(
+                forced_include_cmd,
+                clang::tooling::ArgumentInsertPosition::BEGIN);
+
+        // Put everything at the beginning as either the position doesn't
+        // matter, or the user wants to override something (e.g. put `-isystem`
+        // instead of
+        // `-I`) so we should put this first
+        adjuster = clang::tooling::combineAdjusters(
+            std::move(adjuster),
+            clang::tooling::getInsertArgumentAdjuster(
+                parse_include_dirs(include_dirs, system_include_dirs),
+                clang::tooling::ArgumentInsertPosition::BEGIN));
+
+        // Add the adjusters from the command line
+        adjuster = clang::tooling::combineAdjusters(
+            std::move(adjuster),
+            clang::tooling::getInsertArgumentAdjuster(
+                args_before, clang::tooling::ArgumentInsertPosition::BEGIN));
+        adjuster = clang::tooling::combineAdjusters(
+            std::move(adjuster),
+            clang::tooling::getInsertArgumentAdjuster(
+                args_after, clang::tooling::ArgumentInsertPosition::END));
+        adjusting_db->appendArgumentsAdjuster(adjuster);
+        return adjusting_db;
+      }();
+
+      const std::vector<std::string> &raw_sources = db->getAllFiles();
+      std::vector<std::filesystem::path> source_files(raw_sources.size());
+      std::transform(
+          raw_sources.begin(), raw_sources.end(), source_files.begin(),
+          [](const std::string &s) { return std::filesystem::path(s); });
+
+      return build_graph::from_compilation_db(
+          *db, std::filesystem::current_path(), source_files, map_ext, fs,
+          build_graph::options().enable_replace_file_optimization(
+              smaller_file_opt));
+    }
+  }();
 
   if (!result) {
     // TODO: error message
@@ -496,70 +509,46 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   }
   out << '\n';
 
-  out << "Recommendations\n";
-  out << "===============\n";
-  out << "There are " << unguarded.size()
-      << " files that do not have an include guard that is strict enough "
-         "to trigger the multiple-inclusion optimization where compilers "
-         "will skip opening a file a second time for each translation "
-         "unit\n";
-  if (!unguarded.empty()) {
-    std::vector<Graph::vertex_descriptor> unguarded_copy;
-    std::copy_if(unguarded.begin(), unguarded.end(),
-                 std::back_inserter(unguarded_copy),
-                 [&](const Graph::vertex_descriptor v) {
-                   return in_degree(v, graph) > 1;
-                 });
-    std::sort(unguarded_copy.begin(), unguarded_copy.end(),
-              [&](Graph::vertex_descriptor l, Graph::vertex_descriptor r) {
-                return in_degree(l, graph) > in_degree(r, graph);
-              });
-    std::vector<std::string> files(unguarded_copy.size());
-    std::transform(unguarded_copy.begin(), unguarded_copy.end(), files.begin(),
-                   [&](Graph::vertex_descriptor v) {
-                     std::ostringstream out;
-                     out << "  - " << pretty_path(graph[v]) << " included by "
-                         << in_degree(v, graph) << " files\n";
-                     return out.view();
-                   });
-    std::copy(files.begin(), files.end(),
-              std::ostream_iterator<std::string>(out));
+  if (!save_path.empty()) {
+    std::ofstream ofs(save_path.getValue()); // save to file
+    boost::archive::text_oarchive oa(ofs);
+    oa << graph;
+    out << "Graph saved as " << save_path.getValue() << " in "
+        << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
+    out << '\n';
   }
 
-  switch (output) {
-  case output::dot_graph: {
-    dot_graph::print(graph, out);
-    out << "Graph printed in "
-        << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
-    return 0;
-  }
-  case output::list_files: {
-    {
-      std::vector<list_included_files::result> results =
-          list_included_files::from_graph(graph, sources);
-      out << "Files found in "
-          << duration_cast<std::chrono::milliseconds>(timer.restart()) << "\n";
-      std::sort(results.begin(), results.end(),
-                [&](const list_included_files::result &l,
-                    const list_included_files::result &r) {
-                  return l.source_that_can_reach_it_count *
-                             graph[l.v].true_cost().token_count >
-                         r.source_that_can_reach_it_count *
-                             graph[r.v].true_cost().token_count;
+  if (analyze.getValue()) {
+    out << "Recommendations\n";
+    out << "===============\n";
+    out << "There are " << unguarded.size()
+        << " files that do not have an include guard that is strict enough "
+           "to trigger the multiple-inclusion optimization where compilers "
+           "will skip opening a file a second time for each translation "
+           "unit\n";
+    if (!unguarded.empty()) {
+      std::vector<Graph::vertex_descriptor> unguarded_copy;
+      std::copy_if(unguarded.begin(), unguarded.end(),
+                   std::back_inserter(unguarded_copy),
+                   [&](const Graph::vertex_descriptor v) {
+                     return in_degree(v, graph) > 1;
+                   });
+      std::sort(unguarded_copy.begin(), unguarded_copy.end(),
+                [&](Graph::vertex_descriptor l, Graph::vertex_descriptor r) {
+                  return in_degree(l, graph) > in_degree(r, graph);
                 });
-      for (const list_included_files::result &i : results) {
-        const cost c =
-            i.source_that_can_reach_it_count * graph[i.v].true_cost();
-        const double percentage =
-            (100.0 * c.token_count) / project_cost.true_cost.token_count;
-        out << std::setprecision(2) << std::fixed << c.token_count << " ("
-            << percentage << "%) " << graph[i.v].path.filename().string()
-            << " x" << i.source_that_can_reach_it_count << "\n";
-      }
+      std::vector<std::string> files(unguarded_copy.size());
+      std::transform(unguarded_copy.begin(), unguarded_copy.end(),
+                     files.begin(), [&](Graph::vertex_descriptor v) {
+                       std::ostringstream out;
+                       out << "  - " << pretty_path(graph[v]) << " included by "
+                           << in_degree(v, graph) << " files\n";
+                       return out.view();
+                     });
+      std::copy(files.begin(), files.end(),
+                std::ostream_iterator<std::string>(out));
     }
-    return 0;
-  }
-  case output::most_expensive: {
+
     {
       std::vector<component_and_cost> results =
           find_unused_components::from_graph(graph, sources, 0u);
@@ -710,12 +699,8 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
             << graph[*graph[i.source].component].path << "\n";
       }
     }
-    return 0;
   }
-  default:
-    err << "Unknown output argument";
-    return 1;
-  }
+  return 0;
 }
 
 } // namespace IncludeGuardian
