@@ -114,6 +114,11 @@ bool vertices_equal(const file_node &lhs, const Graph &lgraph,
   return true;
 }
 
+MATCHER_P2(VertexDescriptorIs, graph, matcher,
+           "Whether a graph vertex descriptor matches something") {
+  return Matches(matcher)(graph[arg]);
+}
+
 MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
   EXPECT_THAT(num_vertices(arg), Eq(num_vertices(expected)));
 
@@ -183,6 +188,7 @@ TEST_P(BuildGraphTest, FileStats) {
       "#define DEFINE_FOO int foo(int, int, int)\n"
       "DEFINE_FOO;DEFINE_FOO;\n"
       "#include \"a.hpp\"\n"
+      "DEFINE_FOO;\n"
       "int main() {\n"
       "    SUM;\n"
       "}\n";
@@ -208,12 +214,12 @@ TEST_P(BuildGraphTest, FileStats) {
 
   Graph g;
   const Graph::vertex_descriptor main_cpp = add_vertex(
-      file_node("main.cpp").with_cost(25, main_cpp_code.size() * B), g);
+      file_node("main.cpp").with_cost(55, main_cpp_code.size() * B), g);
   const Graph::vertex_descriptor main_copy_cpp = add_vertex(
-      file_node("main_copy.cpp").with_cost(25, main_cpp_code.size() * B), g);
+      file_node("main_copy.cpp").with_cost(55, main_cpp_code.size() * B), g);
   const Graph::vertex_descriptor a_hpp =
       add_vertex(file_node("a.hpp")
-                     .with_cost(40, a_hpp_code.size() * B)
+                     .with_cost(20, a_hpp_code.size() * B)
                      .set_internal_parents(2),
                  g);
 
@@ -516,13 +522,17 @@ TEST_P(BuildGraphTest, ForcedIncludes) {
                   "#pragma override_token_count(1)\n"));
   fs->addFile((working_directory / "include.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma once\n"
                   "#pragma override_file_size(246)\n"
                   "#pragma override_token_count(2)\n"));
+  const std::string_view forced_hpp_code =
+      "#pragma once\n"
+      "#include \"../foo/forced_sub.hpp\"\n"
+      "int myFunction(int a) {\n"
+      "    return -a + 1;\n"
+      "}\n";
   fs->addFile((working_directory / foo / "forced.hpp").string(), 0,
-              llvm::MemoryBuffer::getMemBufferCopy(
-                  "#include \"../foo/forced_sub.hpp\"\n"
-                  "#pragma override_file_size(999)\n"
-                  "#pragma override_token_count(4)\n"));
+              llvm::MemoryBuffer::getMemBufferCopy(forced_hpp_code));
   fs->addFile((working_directory / foo / "forced_sub.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(
                   "#pragma override_file_size(1000)\n"
@@ -535,19 +545,19 @@ TEST_P(BuildGraphTest, ForcedIncludes) {
       g);
   const Graph::vertex_descriptor forced_hpp =
       add_vertex(file_node(working_directory / foo / "forced.hpp")
-                     .with_cost(4, 999 * B)
+                     .with_cost(22, (1000 + forced_hpp_code.size()) * B)
                      .set_internal_parents(1),
                  g);
   const Graph::vertex_descriptor forced_sub_hpp =
       add_vertex(file_node(working_directory / foo / "forced_sub.hpp")
-                     .with_cost(8, 1000 * B)
+                     .with_cost(0, 0 * B)
                      .set_internal_parents(1),
                  g);
   add_edge(main_cpp, forced_hpp,
            {"\"C:\\working_dir\\foo\\forced.hpp\"", 0, not_removable}, g);
   add_edge(main_cpp, include_hpp, {"\"include.hpp\"", 1, removable}, g);
   add_edge(forced_hpp, forced_sub_hpp,
-           {"\"../foo/forced_sub.hpp\"", 1, removable}, g);
+           {"\"../foo/forced_sub.hpp\"", 2, removable}, g);
 
   llvm::Expected<build_graph::result> results = build_graph::from_dir(
       working_directory, {}, fs, get_file_type, GetParam(),
@@ -555,7 +565,10 @@ TEST_P(BuildGraphTest, ForcedIncludes) {
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files,
-              UnorderedElementsAre(forced_hpp, forced_sub_hpp, include_hpp));
+              UnorderedElementsAre(VertexDescriptorIs(
+                  results->graph,
+                  Field(&file_node::path,
+                        Eq(working_directory / foo / "forced_sub.hpp")))));
 }
 
 TEST_P(BuildGraphTest, XMacros) {
@@ -586,16 +599,22 @@ TEST_P(BuildGraphTest, XMacros) {
                                       "#include \"x_macro.hpp\"\n"
                                       "enum class Fruits {\n"
                                       "#define X(name) name,\n"
+                                      "FRUITS\n"
+                                      "#undef X\n"
                                       "}\n"
                                       "#undef X\n";
   fs->addFile((working_directory / "a.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
-  const std::string_view x_macro_hpp_code = "#define FRUITS \\\n"
+  const std::string_view something_hpp_code = "#define EXTRA peach\n";
+  fs->addFile((working_directory / "something.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(something_hpp_code));
+  const std::string_view x_macro_hpp_code = "#include \"something.hpp\"\n"
+                                            "#define FRUITS \\\n"
                                             "X(apple) \\\n"
                                             "X(pear) \\\n"
                                             "X(blueberry) \\\n"
                                             "X(lemon) \\\n"
-                                            "X(peach) \\\n"
+                                            "X(EXTRA) \\\n"
                                             "X(orange) \\\n"
                                             "X(banana) \\n";
   fs->addFile((working_directory / "x_macro.hpp").string(), 0,
@@ -604,20 +623,29 @@ TEST_P(BuildGraphTest, XMacros) {
   Graph g;
   const Graph::vertex_descriptor main_cpp = add_vertex(
       file_node("main.cpp")
-          .with_cost(113, (main_cpp_code.size() + x_macro_hpp_code.size()) * B)
+          .with_cost(129, (main_cpp_code.size() + x_macro_hpp_code.size() +
+                           something_hpp_code.size()) *
+                              B)
           .set_internal_parents(0),
       g);
   const Graph::vertex_descriptor main_copy_cpp = add_vertex(
       file_node("main_copy.cpp")
-          .with_cost(113, (main_cpp_code.size() + x_macro_hpp_code.size()) * B)
+          .with_cost(129, (main_cpp_code.size() + x_macro_hpp_code.size() +
+                           something_hpp_code.size()) *
+                              B)
           .set_internal_parents(0),
+      g);
+  const Graph::vertex_descriptor something_hpp = add_vertex(
+      file_node("something.hpp").with_cost(0, 0.0 * B).set_internal_parents(1),
       g);
   const Graph::vertex_descriptor x_macro_hpp = add_vertex(
       file_node("x_macro.hpp").with_cost(0, 0.0 * B).set_internal_parents(3),
       g);
   const Graph::vertex_descriptor a_hpp = add_vertex(
       file_node("a.hpp")
-          .with_cost(21, (a_hpp_code.size() + x_macro_hpp_code.size()) * B)
+          .with_cost(21, (a_hpp_code.size() + x_macro_hpp_code.size() +
+                          something_hpp_code.size()) *
+                             B)
           .set_internal_parents(2),
       g);
 
@@ -626,14 +654,92 @@ TEST_P(BuildGraphTest, XMacros) {
   add_edge(main_copy_cpp, x_macro_hpp, {"\"x_macro.hpp\"", 1}, g);
   add_edge(main_copy_cpp, a_hpp, {"\"a.hpp\"", 5}, g);
   add_edge(a_hpp, x_macro_hpp, {"\"x_macro.hpp\"", 2}, g);
+  add_edge(x_macro_hpp, something_hpp, {"\"something.hpp\"", 1}, g);
 
   llvm::Expected<build_graph::result> results = build_graph::from_dir(
       working_directory, {}, fs, get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
-  ASSERT_THAT(results->unguarded_files.size(), Eq(1));
-  EXPECT_THAT(results->graph[*results->unguarded_files.begin()].path.string(),
-              Eq("x_macro.hpp"));
+  EXPECT_THAT(
+      results->unguarded_files,
+      UnorderedElementsAre(
+          VertexDescriptorIs(results->graph,
+                             Field(&file_node::path, Eq("something.hpp"))),
+          VertexDescriptorIs(results->graph,
+                             Field(&file_node::path, Eq("x_macro.hpp")))));
+}
+
+TEST_P(BuildGraphTest, NaughtyIncludes) {
+  // Test files that change their include size when included by different
+  // sources.  This is allowed by non-guarded files, but for guarded files
+  // we should report an error.
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  const std::string_view main_cpp_code = "#include \"unguarded.hpp\"\n"
+                                         "#define USE_A\n"
+                                         "#include \"unguarded.hpp\"\n";
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  fs->addFile((working_directory / "main_copy.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  const std::string_view unguarded_hpp_code = "#ifdef USE_A\n"
+                                              "  #include \"a.hpp\"\n"
+                                              "#else\n"
+                                              "  #include \"b.hpp\"\n"
+                                              "#endif\n";
+  fs->addFile((working_directory / "unguarded.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(unguarded_hpp_code));
+  fs->addFile((working_directory / "a.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma override_file_size(1000)\n"
+                  "#pragma override_token_count(223)\n"));
+  fs->addFile((working_directory / "b.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  "#pragma override_file_size(555)\n"
+                  "#pragma override_token_count(111)\n"));
+
+  Graph g;
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      file_node("main.cpp")
+          .with_cost(224, (main_cpp_code.size() +
+                           2 * unguarded_hpp_code.size() + 1000 + 555) *
+                              B)
+          .set_internal_parents(0),
+      g);
+  const Graph::vertex_descriptor main_copy_cpp = add_vertex(
+      file_node("main_copy.cpp")
+          .with_cost(224, (main_cpp_code.size() +
+                           2 * unguarded_hpp_code.size() + 1000 + 555) *
+                              B)
+          .with_cost(224, 1747 * B)
+          .set_internal_parents(0),
+      g);
+  const Graph::vertex_descriptor unguarded_hpp = add_vertex(
+      file_node("unguarded.hpp").with_cost(0, 0.0 * B).set_internal_parents(2),
+      g);
+  const Graph::vertex_descriptor a_hpp = add_vertex(
+      file_node("a.hpp").with_cost(0, 0.0 * B).set_internal_parents(1), g);
+  const Graph::vertex_descriptor b_hpp = add_vertex(
+      file_node("b.hpp").with_cost(0, 0.0 * B).set_internal_parents(1), g);
+
+  add_edge(main_cpp, unguarded_hpp, {"\"unguarded.hpp\"", 1}, g);
+  add_edge(main_copy_cpp, unguarded_hpp, {"\"unguarded.hpp\"", 1}, g);
+  add_edge(unguarded_hpp, b_hpp, {"\"b.hpp\"", 4}, g);
+  add_edge(unguarded_hpp, a_hpp, {"\"a.hpp\"", 2}, g);
+
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(
+      results->unguarded_files,
+      UnorderedElementsAre(
+          VertexDescriptorIs(results->graph,
+                             Field(&file_node::path, Eq("unguarded.hpp"))),
+          VertexDescriptorIs(results->graph,
+                             Field(&file_node::path, Eq("a.hpp"))),
+          VertexDescriptorIs(results->graph,
+                             Field(&file_node::path, Eq("b.hpp")))));
 }
 
 // We want to test that for our generated files:

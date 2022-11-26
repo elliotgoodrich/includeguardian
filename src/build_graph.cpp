@@ -154,19 +154,33 @@ struct Hasher {
 
 struct FileState {
   Graph::vertex_descriptor v;
+#ifdef _DEBUG
+  std::string debug_name;
+#endif
   std::filesystem::path angled_rel; //< This is the relative path of `v`
                                     //< compared to the last angled include seen
   bool fully_processed = false;
-  bool file_size_overridden = false;
-  bool token_count_overridden = false;
-  std::string replacement_contents; //< If we are `fully_processed` this will
-                                    //< contain a C++ file that is equivalent
-                                    //< when this is < included by another file
-                                    //< (i.e. only the macro < definitions)
+  // A file becomes fully processed once it has been exited and the
+  // corresponding entry in the `Graph` is complete.
+  std::string replacement_contents =
+      "#pragma once\n"; //< If we are `fully_processed` this will
+                        //< contain a C++ file that is equivalent
+                        //< when this is included by another file
+                        //< (i.e. only the preprocessor definitions)
 };
 
 using UniqueIdToNode =
     std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher>;
+
+struct InProgress {
+  UniqueIdToNode::iterator it;
+  cost c;
+  std::optional<std::uint64_t> overridden_token_count;
+  std::optional<boost::units::quantity<boost::units::information::info>>
+      overridden_file_size;
+
+  InProgress(UniqueIdToNode::iterator it) : it(it) {}
+};
 
 struct ReplaceWith {
   std::unique_ptr<llvm::MemoryBuffer> contents;
@@ -181,29 +195,27 @@ struct IncludeScanner : public clang::PPCallbacks {
   NeedsReplacing &m_needs_replacing;
   build_graph::result &m_r;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
-  std::vector<UniqueIdToNode::iterator> m_stack;
-  unsigned m_accounted_for_token_count;
+  std::vector<InProgress> m_stack;
+  std::uint64_t m_accounted_for_token_count;
   clang::Preprocessor *m_pp;
   std::filesystem::path m_working_dir;
   bool m_replace_file_optimization;
 
-  // Add the number of preprocessing tokens seen since the last time
-  // this function was called to the top file on our stack.
-  // Apply the costs (preprocessing tokens/file size) as we leave the
-  // specified `finished` file.
-  void apply_costs(const clang::FileEntry *finished) {
-    FileState &state = m_stack.back()->second;
-    if (!state.fully_processed) {
-      if (!m_stack.back()->second.token_count_overridden) {
-        m_r.graph[m_stack.back()->second.v].underlying_cost.token_count +=
-            m_pp->getTokenCount() - m_accounted_for_token_count;
-      }
-      if (!m_stack.back()->second.file_size_overridden) {
-        m_r.graph[m_stack.back()->second.v].underlying_cost.file_size +=
-            finished->getSize() * boost::units::information::bytes;
-      }
+  void update_cost_when_leaving_file(const clang::FileEntry *file) {
+    InProgress &p = m_stack.back();
+    if (p.overridden_file_size) {
+      p.c.file_size = *p.overridden_file_size;
+    } else {
+      p.c.file_size += file->getSize() * boost::units::information::bytes;
     }
-    m_accounted_for_token_count = m_pp->getTokenCount();
+
+    const std::uint64_t token_count = m_pp->getTokenCount();
+    if (p.overridden_token_count) {
+      p.c.token_count = *p.overridden_token_count;
+    } else {
+      p.c.token_count += token_count - m_accounted_for_token_count;
+    }
+    m_accounted_for_token_count = token_count;
   }
 
   // This function is taken from MacroPPCallbacks.cpp
@@ -269,7 +281,6 @@ public:
     switch (Reason) {
     case FileChangeReason::EnterFile: {
       const clang::FileID fileID = m_sm->getFileID(Loc);
-
       const clang::FileEntry *file = m_sm->getFileEntryForID(fileID);
       if (!file) {
         // Ignore if this is the predefines
@@ -287,35 +298,70 @@ public:
             std::filesystem::path(file->getName().str())
                 .lexically_relative(m_working_dir);
         it->second.v = add_vertex(rel, m_r.graph);
+#ifdef _DEBUG
+        it->second.debug_name = file->getName();
+#endif
         it->second.angled_rel = rel.parent_path();
+
         m_r.sources.push_back(it->second.v);
-        m_stack.push_back(it);
+        m_stack.emplace_back(it);
+
+        // Check that if we are looking at our source that we haven't got
+        // any unaccounted for tokens somehow
+        assert(m_pp->getTokenCount() == m_accounted_for_token_count);
       } else {
+        // Assign all lexed tokens to the file before we enter this
+        // new one
+        const std::uint64_t token_count = m_pp->getTokenCount();
+        m_stack.back().c.token_count =
+            token_count - m_accounted_for_token_count;
+        m_accounted_for_token_count = token_count;
+
         // We should already have added this in `InclusionDirective` or
         // it is a source file that was already added to the graph
         assert(m_id_to_node.count(file->getUniqueID()) > 0);
-        m_stack.push_back(m_id_to_node.find(file->getUniqueID()));
+
+        // We can get here if we have a guarded file that included different
+        // files depending on defines.  This is most likely an issue and a poor
+        // design of files. TODO: Warn on this!
+        assert(m_id_to_node.find(file->getUniqueID())->second.v != empty);
+        m_stack.emplace_back(m_id_to_node.find(file->getUniqueID()));
       }
 
       return;
     }
     case FileChangeReason::ExitFile: {
-      if (const clang::FileEntry *file =
-              m_sm->getFileEntryForID(OptionalPrevFID)) {
-        FileState &state = m_stack.back()->second;
+      const clang::FileEntry *file = m_sm->getFileEntryForID(OptionalPrevFID);
+      if (!file) {
+        // Ignore if this is the predefines
+        return;
+      }
 
-        // If we are unguarded, then don't set the 'fully_processed' stuff
-        // and move the total cost into the includer.
-        const bool guarded =
-            m_pp->getHeaderSearchInfo().isFileMultipleIncludeGuarded(file);
-        if (guarded) {
+      // Update `InProgress` from the costs of `file`.
+      update_cost_when_leaving_file(file);
+
+      InProgress &p = m_stack.back();
+      FileState &state = p.it->second;
+
+      // If we are unguarded, then don't set the 'fully_processed' stuff
+      // and move the total cost into the includer.
+      const bool guarded =
+          m_pp->getHeaderSearchInfo().isFileMultipleIncludeGuarded(file);
+      if (!guarded) {
+        m_r.unguarded_files.insert(state.v);
+
+        // If we're not guarded then push the cost to our includer
+        const cost x = p.c;
+        m_stack.pop_back();
+        m_stack.back().c += x;
+
+        state.fully_processed = true;
+      } else {
+        file_node &node = m_r.graph[state.v];
+        if (!state.fully_processed) {
           // If we are fully guarded, then make sure that subsequent includes
           // won't do anything.
           if (m_replace_file_optimization) {
-            std::string tmp = "#pragma once\n";
-            tmp.swap(state.replacement_contents);
-            state.replacement_contents += tmp;
-
             m_needs_replacing.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(file->tryGetRealPathName().str()),
@@ -324,23 +370,23 @@ public:
                                       file->getUniqueID()));
           }
 
-          // Apply the costs to ourselves
-          apply_costs(file);
+          // Mark it at guarded
+          node.set_guarded(true);
+
+          // Apply the costs to ourselves and double check we haven't
+          // done it yet
+          assert(node.underlying_cost == cost{});
+          node.underlying_cost = p.c;
 
           // If we're guarded then we are fully processed and we won't need
           // to enter this file again.
           state.fully_processed = true;
-
-          m_stack.pop_back();
-        } else {
-          m_r.unguarded_files.insert(m_stack.back()->second.v);
-
-          // If we're not guarded then we `pop_back` and attribute the token
-          // count to the file that included us.
-          m_stack.pop_back();
-          apply_costs(file);
         }
+
+        assert(guarded && state.fully_processed);
+        m_stack.pop_back();
       }
+
       return;
     }
     case FileChangeReason::RenameFile:
@@ -373,10 +419,57 @@ public:
     auto const [it, inserted] =
         m_id_to_node.emplace(File->getUniqueID(), empty);
 
-    if (m_stack.back()->second.fully_processed) {
-      // Assert here for a previousl bug we had when swapping out a file,
-      // where we got a "new" `UniqueID` for a fully processed file.
+    FileState &state = m_stack.back().it->second;
+
+    if (state.fully_processed && m_r.graph[state.v].is_guarded) {
+      // We can avoid doing any processing here if we have already seen
+      // this file and it is unguarded.  For unguarded files (like X macros),
+      // they may conditionally include other files depending on what is defined
+      // at the point they are defined, and this may change each time it's
+      // included
       assert(!inserted);
+      return;
+    }
+
+    if (inserted) {
+      // If we don't have an angled include, try and build up the relative
+      // path from the first angled include.
+      const std::filesystem::path p =
+          (IsAngled ? std::filesystem::path(RelativePath.str())
+                    : state.angled_rel / RelativePath.str())
+              .make_preferred()
+              .lexically_normal();
+
+      // We are also precompiled if the header including us is
+      // precompiled
+      const bool is_precompiled =
+          (!m_stack.empty() && m_r.graph[state.v].is_precompiled) ||
+          m_file_type(p.string()) == build_graph::file_type::precompiled_header;
+
+      it->second.v =
+          add_vertex(file_node(p)
+                         .set_external(clang::SrcMgr::isSystem(FileType))
+                         .set_precompiled(is_precompiled),
+                     m_r.graph);
+#ifdef _DEBUG
+      it->second.debug_name = RelativePath.str();
+#endif
+
+      // If we have a non-angled include, then make it relative to the
+      // previous path we are storing.
+      const std::filesystem::path relative_path(RelativePath.str());
+      it->second.angled_rel =
+          (IsAngled ? relative_path : state.angled_rel / relative_path)
+              .parent_path();
+    }
+
+    const Graph::vertex_descriptor from = state.v;
+    const Graph::vertex_descriptor to = it->second.v;
+
+    // If we already have this edge, then skip everything below.  This can
+    // happen for unguarded files as we do not exit early above because the
+    // set of includes may vary each time it is included.
+    if (edge(from, to, m_r.graph).second) {
       return;
     }
 
@@ -386,46 +479,12 @@ public:
     include.insert(include.cend(), FileName.begin(), FileName.end());
     const char close = IsAngled ? '>' : '"';
     include.insert(include.cend(), &close, &close + 1);
-    const Graph::vertex_descriptor from = m_stack.back()->second.v;
 
-    if (m_replace_file_optimization && m_stack.back()->second.fully_processed) {
-      m_stack.back()->second.replacement_contents += "#include ";
-      m_stack.back()->second.replacement_contents += include;
-      m_stack.back()->second.replacement_contents += '\n';
+    if (m_replace_file_optimization) {
+      state.replacement_contents += "#include ";
+      state.replacement_contents += include;
+      state.replacement_contents += '\n';
     }
-
-    if (inserted) {
-      // If we don't have an angled include, try and build up the relative
-      // path from the first angled include.
-      const std::filesystem::path p =
-          (IsAngled ? std::filesystem::path(RelativePath.str())
-                    : m_stack.back()->second.angled_rel / RelativePath.str())
-              .make_preferred()
-              .lexically_normal();
-
-      // We are also precompiled if the header including us is
-      // precompiled
-      const bool is_precompiled =
-          (!m_stack.empty() &&
-           m_r.graph[m_stack.back()->second.v].is_precompiled) ||
-          m_file_type(p.string()) == build_graph::file_type::precompiled_header;
-
-      it->second.v =
-          add_vertex(file_node(p)
-                         .set_external(clang::SrcMgr::isSystem(FileType))
-                         .set_precompiled(is_precompiled),
-                     m_r.graph);
-
-      // If we have a non-angled include, then make it relative to the
-      // previous path we are storing.
-      const std::filesystem::path relative_path(RelativePath.str());
-      it->second.angled_rel =
-          (IsAngled ? relative_path
-                    : m_stack.back()->second.angled_rel / relative_path)
-              .parent_path();
-    }
-
-    const Graph::vertex_descriptor to = it->second.v;
 
     const clang::FileID fromFileID = m_sm->getFileID(HashLoc);
     const clang::FileEntry *fromFile = m_sm->getFileEntryForID(fromFileID);
@@ -478,9 +537,7 @@ public:
         const char *end = std::strchr(start, ')');
         const auto [ptr, ec] = std::from_chars(start, end, file_size);
         if (ec == std::errc()) {
-          m_stack.back()->second.file_size_overridden = true;
-          const Graph::vertex_descriptor v = m_stack.back()->second.v;
-          m_r.graph[v].underlying_cost.file_size =
+          m_stack.back().overridden_file_size =
               file_size * boost::units::information::bytes;
         }
         return;
@@ -490,14 +547,12 @@ public:
     {
       const clang::StringRef prefix = "#pragma override_token_count(";
       if (std::equal(prefix.begin(), prefix.end(), pragma_text.data())) {
-        std::size_t token_count;
+        std::uint64_t token_count;
         const char *start = pragma_text.data() + prefix.size();
         const char *end = std::strchr(start, ')');
         const auto [ptr, ec] = std::from_chars(start, end, token_count);
         if (ec == std::errc()) {
-          m_stack.back()->second.token_count_overridden = true;
-          const Graph::vertex_descriptor v = m_stack.back()->second.v;
-          m_r.graph[v].underlying_cost.token_count = token_count;
+          m_stack.back().overridden_token_count = token_count;
         }
         return;
       }
@@ -510,7 +565,8 @@ public:
       return;
     }
 
-    if (m_stack.back()->second.fully_processed) {
+    FileState &state = m_stack.back().it->second;
+    if (state.fully_processed) {
       return;
     }
 
@@ -531,11 +587,11 @@ public:
     llvm::raw_string_ostream Value(ValueBuffer);
     writeMacroDefinition(*Id, *MD->getMacroInfo(), *m_pp, Name, Value);
 
-    m_stack.back()->second.replacement_contents += "#define ";
-    m_stack.back()->second.replacement_contents += Name.str();
-    m_stack.back()->second.replacement_contents += ' ';
-    m_stack.back()->second.replacement_contents += Value.str();
-    m_stack.back()->second.replacement_contents += '\n';
+    state.replacement_contents += "#define ";
+    state.replacement_contents += Name.str();
+    state.replacement_contents += ' ';
+    state.replacement_contents += Value.str();
+    state.replacement_contents += '\n';
   }
 
   void MacroUndefined(const clang::Token &MacroNameTok,
@@ -545,7 +601,8 @@ public:
       return;
     }
 
-    if (m_stack.back()->second.fully_processed) {
+    FileState &state = m_stack.back().it->second;
+    if (state.fully_processed) {
       return;
     }
 
@@ -563,15 +620,16 @@ public:
       return;
     }
 
-    m_stack.back()->second.replacement_contents += "#undef ";
-    m_stack.back()->second.replacement_contents +=
-        MacroNameTok.getIdentifierInfo()->getName();
-    m_stack.back()->second.replacement_contents += '\n';
+    state.replacement_contents += "#undef ";
+    state.replacement_contents += MacroNameTok.getIdentifierInfo()->getName();
+    state.replacement_contents += '\n';
   }
 
   void EndOfMainFile() final {
     assert(m_stack.size() == 1);
-    apply_costs(m_sm->getFileEntryForID(m_sm->getMainFileID()));
+    update_cost_when_leaving_file(
+        m_sm->getFileEntryForID(m_sm->getMainFileID()));
+    m_r.graph[m_stack.back().it->second.v].underlying_cost = m_stack.back().c;
   }
 };
 

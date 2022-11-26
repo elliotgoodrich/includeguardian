@@ -73,6 +73,16 @@ file_node &&file_node::set_precompiled(bool v) && {
   return std::move(*this);
 }
 
+file_node &file_node::set_guarded(bool v) & {
+  this->is_guarded = v;
+  return *this;
+}
+
+file_node &&file_node::set_guarded(bool v) && {
+  this->is_guarded = v;
+  return std::move(*this);
+}
+
 cost file_node::true_cost() const {
   return is_precompiled ? cost{} : underlying_cost;
 }

@@ -77,14 +77,14 @@ template <typename Archive>
 void load(Archive &ar, IncludeGuardian::Graph::vertex_descriptor &t,
           const unsigned version) {
   boost::uint32_t x;
-  ar & x;
+  ar &x;
   t = x;
 }
 
 template <typename Archive>
 void save(Archive &ar, const IncludeGuardian::Graph::vertex_descriptor &t,
           const unsigned version) {
-  ar & boost::uint32_t(t);
+  ar &boost::uint32_t(t);
 }
 
 template <typename Archive>
@@ -116,6 +116,7 @@ public:
       0; //< The number of times this file is included from non-external files
   unsigned external_incoming =
       0; //< The number of times this file is included from external files
+  bool is_guarded = false;
 
   file_node();
   file_node(const std::filesystem::path &path);
@@ -136,6 +137,8 @@ public:
   file_node &&set_external_parents(unsigned count) &&;
   file_node &set_precompiled(bool is_precompiled) &;
   file_node &&set_precompiled(bool is_precompiled) &&;
+  file_node &set_guarded(bool is_guarded) &;
+  file_node &&set_guarded(bool is_guarded) &&;
 
   cost true_cost() const;
 
@@ -148,6 +151,7 @@ public:
     ar &is_precompiled;
     ar &internal_incoming;
     ar &external_incoming;
+    ar &is_guarded;
   }
 };
 
