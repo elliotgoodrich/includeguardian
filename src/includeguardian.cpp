@@ -303,7 +303,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
           "Whether to enable an optimization to improve preprocessing time by "
           "replacing already seen files with a smaller version for further "
           "sources "),
-      llvm::cl::value_desc("enabled"), llvm::cl::init(false), llvm::cl::Hidden,
+      llvm::cl::value_desc("enabled"), llvm::cl::init(true), llvm::cl::Hidden,
       llvm::cl::cat(build_category));
 
   llvm::cl::OptionCategory analysis_category("Analysis Options");
