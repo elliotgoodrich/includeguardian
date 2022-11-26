@@ -163,7 +163,7 @@ parse_include_dirs(const llvm::cl::list<std::string> &include_dirs,
   std::transform(
       tmp.begin(), tmp.end(), std::back_inserter(result), [](const auto &t) {
         return (isSystem(std::get<clang::SrcMgr::CharacteristicKind>(t))
-                    ? "-isystem "
+                    ? "-isystem"
                     : "-I") +
                std::get<std::filesystem::path>(t).string();
       });
