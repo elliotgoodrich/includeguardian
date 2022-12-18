@@ -656,7 +656,9 @@ public:
         m_file_type(file_type), m_working_dir(working_dir) {}
 
   bool BeginInvocation(clang::CompilerInstance &ci) final {
-    ci.getDiagnostics().setClient(&s_ignore, /*TakeOwnership=*/false);
+    ci.getDiagnostics().setSuppressAllDiagnostics(true);
+    ci.getDiagnostics().setSuppressSystemWarnings(true);
+    ci.getDiagnostics().setIgnoreAllWarnings(true);
     ci.getDiagnostics().setErrorLimit(0u);
     m_ci = &ci;
     return true;
@@ -802,6 +804,12 @@ llvm::Expected<build_graph::result> build_graph::from_compilation_db(
   clang::tooling::ClangTool tool(
       compilation_db, source_path_strings,
       std::make_shared<clang::PCHContainerOperations>(), fs);
+
+  // Set our diagnosic consumer here as we get some diagnostics emitted before
+  // `BeginInvocation` is called, e.g.
+  //   > warning: treating 'c' input as 'c++' when in C++ mode, this behavior
+  //   > is deprecated [-Wdeprecated]
+  tool.setDiagnosticConsumer(&s_ignore);
 
   UniqueIdToNode id_to_node;
   result r;
