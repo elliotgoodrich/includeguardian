@@ -3,9 +3,6 @@
 #include <iostream>
 
 int main(int argc, const char **argv) {
-
-  // Use the user's locale to format numbers etc.
-  std::cout.imbue(std::locale(""));
-
+  std::ios::sync_with_stdio(false);
   return IncludeGuardian::run(argc, argv, std::cout, std::cerr);
 }

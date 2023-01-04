@@ -30,13 +30,16 @@
   5. Install [CMake](https://cmake.org/download/) and add to PATH
   6. Install [vcpkg](https://vcpkg.io/en/getting-started.html)
   7. Open `cmd` as admin
-  8. vcpkg install llvm[tools,target-x86]:x64-windows
+  8. vcpkg
+    * vcpkg install llvm[tools,target-x86]:x64-windows
+    * vcpkg install termcolor:x64-windows
   9. Open CMake GUI to `src`, set build directory to be `../out` and set the `LLVM_DIR`/`Clang_DIR` `${VCPKG_DIR}/installed/x64-windows/share/clang`/`llvm`
   10. Set `ZLIB_ROOT` to the `C:/Users/Elliot/.conan/data/zlib/1.2.12/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab` (use the conan output path)
   11. vcpkg install benchmark:x64-windows
   12. Add `benchmark_DIR` as `C:\Program Files\vcpkg\installed\x64-windows\share\benchmark` (search for `benchmarkConfig.cmake`) when configuring in CMake
-  12. Select the Visual Studio 2019 generator
-  13. Click generate
+  13. Add `termcolor_DIR` as `C:\Program Files\vcpkg\installed\x64-windows\share\termcolor` (search for `termcolorConfig.cmake`) when configuring in CMake
+  14. Select the Visual Studio 2019 generator
+  15. Click generate
 
 ## Building
   1. Open `out\includeguardian.sln` with Microsoft Visual Studio

@@ -12,6 +12,8 @@
 #include "list_included_files.hpp"
 #include "recommend_precompiled.hpp"
 
+#include <termcolor/termcolor.hpp>
+
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/graph/adj_list_serialize.hpp>
@@ -35,8 +37,10 @@ namespace IncludeGuardian {
 
 namespace {
 
-struct file_node_printer {
-  const file_node &node;
+struct percent {
+  double value;
+
+  percent(double p) : value(p) {}
 };
 
 // TODO: Move this to a component and unit test it
@@ -86,45 +90,163 @@ template <typename TIME> std::string format_time(TIME t) {
   return ss.str();
 }
 
-// Format `s` so that it is printable as a YAML string
-std::string format_str(std::string_view s) {
+const auto key_color = termcolor::bright_blue;
+const auto str_color = termcolor::bright_yellow;
+const auto num_color = termcolor::bright_red;
+const auto punc_color = termcolor::bright_white;
+const auto comment_color = termcolor::green;
+
+void yaml_value(std::ostream &o, int i) { o << num_color << i << '\n'; }
+
+void yaml_value(std::ostream &o, percent p) {
+  o << num_color << std::setprecision(2) << std::fixed << p.value
+    << comment_color << " # (%)\n";
+}
+
+void yaml_value(std::ostream &o, std::chrono::steady_clock::duration d) {
+  const double ms = duration_cast<std::chrono::milliseconds>(d).count();
+  const double s = std::round(ms) / 1000;
+  o << num_color << s << comment_color << " # seconds\n";
+}
+
+void yaml_value(std::ostream &o, cost d) {
+  o << num_color << d.token_count << '\n';
+}
+
+void yaml_value(std::ostream &o, std::string_view s) {
   if (std::any_of(s.begin(), s.end(),
                   [](char c) { return c == '\\' || c == '"'; })) {
     // If we contain a backslash or a double quote, then we need to
     // surround with single quotes and double up any single quotes.
     // This does not support non-printable characters, which need
     // to be surrounded by double quotes.
-    std::string out;
-    out += '\'';
+    o << punc_color << '\'' << str_color;
     auto it = s.begin();
     while (true) {
       auto next = std::find(it, s.end(), '\'');
-      out.append(it, next);
+      o << std::string_view(it, next);
       if (next == s.end()) {
         break;
       }
-      out += "''";
+      o << "''";
       it = next;
     }
-    out += '\'';
-    return out;
+    o << punc_color << "'\n";
   } else {
-    return std::string(s);
+    o << str_color << s << '\n';
   }
 }
 
-file_node_printer pretty_path(const file_node &n) {
-  return file_node_printer{n};
+void yaml_value(std::ostream &o,
+                boost::units::quantity<boost::units::information::info> i) {
+  o << num_color << std::setprecision(std::numeric_limits<double>::digits10)
+    << i.value() << comment_color << " # " << format_file_size(i) << "\n";
 }
 
-std::ostream &operator<<(std::ostream &stream, file_node_printer v) {
+void yaml_value(std::ostream &o, const file_node &v) {
   std::ostringstream ss;
-  if (v.node.is_external) {
-    ss << '<' << v.node.path.string() << '>';
+  if (v.is_external) {
+    ss << '<';
+    ss << v.path.string();
+    ss << '>';
   } else {
-    ss << '"' << v.node.path.string() << '"';
+    ss << '"';
+    ss << v.path.string();
+    ss << '"';
   }
-  return stream << format_str(ss.view());
+  yaml_value(o, ss.view());
+}
+
+class ObjPrinter;
+
+class ArrayPrinter {
+  std::ostream &o;
+  int m_indent;
+  int m_num_entries = 0;
+
+public:
+  ArrayPrinter(std::ostream &out, int indent) : o(out), m_indent(indent) {}
+
+  ~ArrayPrinter() {
+    if (m_num_entries == 0) {
+      o << "[]\n";
+    }
+  }
+
+  ObjPrinter obj();
+
+  template <typename T> void value(const T &t) {
+    if (m_num_entries++ == 0) {
+      o << "\n";
+    }
+    std::fill_n(std::ostream_iterator<char>(o), 2 * m_indent, ' ');
+    o << punc_color << "- ";
+    yaml_value(o, t);
+  }
+};
+
+class ObjPrinter {
+  std::ostream &o;
+  struct Indent {
+    int m_indent;
+    bool m_first_arr_elem;
+
+    friend std::ostream &operator<<(std::ostream &out, Indent &i) {
+      if (i.m_first_arr_elem) {
+        std::fill_n(std::ostream_iterator<char>(out), 2 * (i.m_indent - 1),
+                    ' ');
+        out << punc_color << "- ";
+        i.m_first_arr_elem = false;
+      } else {
+        std::fill_n(std::ostream_iterator<char>(out), 2 * i.m_indent, ' ');
+      }
+      return out;
+    }
+  };
+
+  Indent indent;
+
+public:
+  ObjPrinter(std::ostream &out, int indent, bool in_array = false)
+      : o(out), indent{indent, in_array} {}
+
+  void comment(std::string_view comment) {
+    o << indent << comment_color << "# " << comment << '\n';
+  }
+
+  void key(std::string_view str) {
+    o << indent << key_color << str << punc_color << ": ";
+  }
+
+  ObjPrinter obj(std::string_view str) {
+    key(str);
+    o << "\n";
+    return ObjPrinter(o, indent.m_indent + 1);
+  }
+
+  ArrayPrinter arr(std::string_view str) {
+    key(str);
+    return ArrayPrinter(o, indent.m_indent + 1);
+  }
+
+  template <typename T> void value(const T &t) { yaml_value(o, t); }
+
+  template <typename T> void property(std::string_view k, const T &v) {
+    key(k);
+    value(v);
+  }
+};
+
+ObjPrinter ArrayPrinter::obj() {
+  if (m_num_entries++ == 0) {
+    o << "\n";
+  }
+  return ObjPrinter(o, m_indent + 1, true);
+}
+
+ObjPrinter start_document(std::ostream &out) {
+  out << punc_color << "---\n";
+  return ObjPrinter(out, 0);
 }
 
 const std::pair<std::string_view, build_graph::file_type> lookup[] = {
@@ -395,23 +517,27 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   }
 
   stopwatch timer;
+  ObjPrinter root = start_document(out);
 
-  out << "---\n"
-         "# Visit http://includeguarian.io/download for updates and\n"
-         "# http://includeguarian.io/ci to keep your project building fast!\n"
-         "stats:\n";
-  out << "  version: " << format_str("0.0.2")
-      << "\n"
-         "  command: ";
+  // Use direct printing to get underlined links
+  out << comment_color << "# Visit " << termcolor::underline
+      << "https://includeguardian.io/download" << termcolor::reset
+      << comment_color << " for updates and\n"
+      << termcolor::underline << "# http://includeguarian.io/ci"
+      << termcolor::reset << comment_color
+      << " to keep your project building fast!\n";
+
+  ObjPrinter stats = root.obj("stats");
   {
+    stats.property("version", "0.0.2");
     std::string command = "includeguardian.exe ";
     for (int i = 0; i < argc; ++i) {
       command += ' ';
       command += argv[i];
     }
-    out << format_str(command);
+    stats.property("command", command);
+    stats.key("processing time");
   }
-  out << "\n  processing time: ";
 
   auto result = [&]() -> llvm::Expected<build_graph::result> {
     if (!load_path.empty()) {
@@ -419,8 +545,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       std::ifstream ifs(load_path.getValue()); // save to file
       boost::archive::text_iarchive ia(ifs);
       ia >> r.graph;
-      out << format_time(timer.restart())
-          << " # seconds to load serialized graph\n";
+      stats.value(timer.restart());
       return r;
     } else {
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs =
@@ -496,7 +621,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
           build_graph::options().enable_replace_file_optimization(
               smaller_file_opt));
 
-      out << format_time(timer.restart()) << " # seconds to parse files\n";
+      stats.value(timer.restart());
       return result;
     }
   }();
@@ -513,16 +638,16 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   const auto &unguarded = result->unguarded_files;
 
   if (show_sources.getValue()) {
-    out << "  sources:\n";
+    ArrayPrinter arr = stats.arr("sources");
     for (Graph::vertex_descriptor v : sources) {
-      out << "    - " << format_str(graph[v].path.string()) << "\n";
+      arr.value(graph[v].path.string());
     }
   } else {
-    out << "  # sources: pass --show-sources to list source files\n";
+    stats.comment("sources: pass --show-sources to list source files");
   }
-  out << "  source count: " << sources.size() << "\n";
-  out << "  file count: " << num_vertices(graph) << "\n";
-  out << "  include directives: " << num_edges(graph) << "\n";
+  stats.property("source count", sources.size());
+  stats.property("file count", num_vertices(graph));
+  stats.property("include directives", num_edges(graph));
 
   const get_total_cost::result naive_cost = get_naive_cost(graph);
   const get_total_cost::result project_cost =
@@ -531,65 +656,63 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   const cost &postprocessed = project_cost.true_cost;
   const cost &actual = project_cost.total();
 
-  out << "  # These are the stats of all the files found.  This would be\n"
-         "  # similar to the cost of a \"unity build\".\n"
-      << "  preprocessed:\n"
-      << "    byte count: " << naive_cost.total().file_size << " # "
-      << format_file_size(naive_cost.total().file_size) << "\n"
-      << "    token count: " << naive_cost.total().token_count << "\n"
-      << "  # These are the stats of all postprocessed\n"
-         "  # translation units passed to the compiler.\n"
-      << "  postprocessed:\n"
-      << "    byte count: " << postprocessed.file_size << " # "
-      << format_file_size(postprocessed.file_size) << '\n'
-      << "    token count: " << postprocessed.token_count << '\n'
-      << "  # These are the stats of the actual build, i.e. all\n"
-         "  # postprocessed translation units passed to the compiler "
-         "subtracting the\n"
-         "  # cost of precompiled header:\n"
-      << "  actual:\n"
-      << "    byte count: " << actual.file_size << " # "
-      << format_file_size(actual.file_size) << "\n"
-      << "    token count: " << actual.token_count << "\n";
+  {
+    stats.comment("These are the stats of all the files found.  This would be");
+    stats.comment("similar to the cost of a \"unity build\".");
+    ObjPrinter o = stats.obj("preprocessed");
+    o.property("byte count", naive_cost.total().file_size);
+    o.property("token count", naive_cost.total().token_count);
+  }
+  {
+    stats.comment("These are the stats of all postprocessed");
+    stats.comment("translation units passed to the compiler.");
+    ObjPrinter o = stats.obj("postprocessed");
+    o.property("byte count", postprocessed.file_size);
+    o.property("token count", postprocessed.token_count);
+  }
+  {
+    stats.comment("These are the stats of the actual build, i.e. all");
+    stats.comment("postprocessed translation units passed to the compiler "
+                  "subtracting the");
+    stats.comment("cost of precompiled header:");
+    ObjPrinter o = stats.obj("actual");
+    o.property("byte count", actual.file_size);
+    o.property("token count", actual.token_count);
+  }
 
   timer.restart();
 
-  out << "  missing files:";
-  if (missing.empty()) {
-    out << " []\n";
-  } else {
-    out << "\n";
+  {
+    ArrayPrinter missing_files = stats.arr("missing files");
     for (std::string_view m : missing) {
-      out << "    - " << format_str(m) << "\n";
+      missing_files.value(m);
     }
   }
 
   if (!save_path.empty()) {
-    out << "  output:\n";
-    out << "    file: " << format_str(save_path.getValue()) << "\n";
-    out << "    save time: ";
+    ObjPrinter output = stats.obj("output");
+    output.property("file", save_path.getValue());
+    output.key("save time");
     std::ofstream ofs(save_path.getValue()); // save to file
     boost::archive::text_oarchive oa(ofs);
-    out << format_time(timer.restart())
-        << " # seconds to serialize and save graph\n";
+    output.value(timer.restart());
   }
 
   if (analyze.getValue()) {
-    out << "analysis:\n";
-    out << "  # Below are the files that do not have an include guard or "
-           "have an\n"
-        << "  # include guard that is not strict enough to enable the "
-           "multiple-include\n"
-        << "  # optimization where compilers will skip opening a file a "
-           "second time\n"
-        << "  # for each source.\n"
-        << "  unguarded files:\n"
-        << "    time taken: 0 # seconds\n"
-        << "    results:";
-    if (unguarded.empty()) {
-      out << " []\n";
-    } else {
-      out << "\n";
+    out << '\n';
+    ObjPrinter an = root.obj("analysis");
+
+    {
+      an.comment("Below are the files that do not have an include guard or");
+      an.comment("include guard that is not strict enough to enable the "
+                 "multiple-include");
+      an.comment("optimization where compilers will skip opening a file a "
+                 "second time");
+      an.comment("for each source.");
+      ObjPrinter unguarded_files = an.obj("unguarded files");
+      unguarded_files.property("time taken",
+                               std::chrono::steady_clock::duration::zero());
+      ArrayPrinter results = unguarded_files.arr("results");
       std::vector<Graph::vertex_descriptor> unguarded_copy;
       std::copy_if(unguarded.begin(), unguarded.end(),
                    std::back_inserter(unguarded_copy),
@@ -600,226 +723,189 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
                 [&](Graph::vertex_descriptor l, Graph::vertex_descriptor r) {
                   return in_degree(l, graph) > in_degree(r, graph);
                 });
-      std::vector<std::string> files(unguarded_copy.size());
-      std::transform(unguarded_copy.begin(), unguarded_copy.end(),
-                     files.begin(), [&](Graph::vertex_descriptor v) {
-                       std::ostringstream out;
-                       out << "      - file: " << pretty_path(graph[v]) << "\n"
-                           << "        count: " << in_degree(v, graph) << "\n";
-                       return out.view();
-                     });
-      std::copy(files.begin(), files.end(),
-                std::ostream_iterator<std::string>(out));
+      std::for_each(unguarded_copy.begin(), unguarded_copy.end(),
+                    [&](Graph::vertex_descriptor v) {
+                      ObjPrinter result = results.obj();
+                      result.property("file", graph[v]);
+                      result.property("count", in_degree(v, graph));
+                    });
     }
 
     {
+      out << '\n';
+      an.comment(
+          "These are components that have a header file that is not included");
+      an.comment("by any other component and may be a candidate for removal.");
       std::vector<component_and_cost> results =
           find_unused_components::from_graph(graph, sources, 0u);
-      out << "  # These are the components that have a header file that is "
-             "not included\n"
-          << "  # by any other component and may be a candidate for "
-             "removal.\n"
-          << "  unreferenced components:\n"
-          << "    time taken: " << format_time(timer.restart())
-          << " # seconds\n"
-          << "    results:";
-      if (results.empty()) {
-        out << " []\n";
-      } else {
-        out << "\n";
-      }
+      ObjPrinter unreferenced = an.obj("unreferenced components");
+      unreferenced.property("time taken", timer.restart());
       std::sort(results.begin(), results.end(),
                 [](const component_and_cost &l, const component_and_cost &r) {
                   return l.saving.token_count > r.saving.token_count;
                 });
+
+      ArrayPrinter results_out = unreferenced.arr("results");
       for (const component_and_cost &i : results) {
-        const double percentage =
-            (100.0 * i.saving.token_count) / project_cost.true_cost.token_count;
-        out << "      - source: " << pretty_path(*i.source) << "\n"
-            << "        token count: " << i.saving.token_count << " # ("
-            << percentage << "%)\n";
+        ObjPrinter result = results_out.obj();
+        result.property("source", *i.source);
+        result.property("saving", percent((100.0 * i.saving.token_count) /
+                                          project_cost.true_cost.token_count));
       }
     }
     {
+      out << '\n';
       std::vector<include_directive_and_cost> results =
           find_expensive_includes::from_graph(
               graph, sources,
               project_cost.true_cost.token_count * percent_cut_off);
-      out << "  # This is a list of the most costly #include directives.\n"
-             "  include directives:\n"
-             "    time: "
-          << format_time(timer.restart())
-          << " # seconds\n"
-             "      results: ";
+      an.comment("This is a list of the most costly #include directives.");
+      ObjPrinter include_directives = an.obj("include directives");
+      include_directives.property("time", timer.restart());
       std::sort(results.begin(), results.end(),
                 [](const include_directive_and_cost &l,
                    const include_directive_and_cost &r) {
                   return l.saving.token_count > r.saving.token_count;
                 });
-      if (results.empty()) {
-        out << "[]\n";
-      } else {
-        out << "\n";
-        for (const include_directive_and_cost &i : results) {
-          const double percentage = (100.0 * i.saving.token_count) /
-                                    project_cost.true_cost.token_count;
-          out << "    - directive: " << format_str(i.include->code) << "\n"
-              << "      file: " << format_str(i.file.filename().string())
-              << "\n"
-              << "      line: " << i.include->lineNumber << "\n"
-              << "      token count: " << i.saving.token_count << " # "
-              << percentage << "%\n";
-        }
+
+      ArrayPrinter results_out = include_directives.arr("results");
+      for (const include_directive_and_cost &i : results) {
+        ObjPrinter result_out = results_out.obj();
+        result_out.property("directive", "#include " + i.include->code);
+        result_out.property("file", i.file.filename());
+        result_out.property("line", i.include->lineNumber);
+        result_out.property("saving",
+                            percent((100.0 * i.saving.token_count) /
+                                    project_cost.true_cost.token_count));
       }
     }
 
     {
+      out << '\n';
       std::vector<find_expensive_headers::result> results =
           find_expensive_headers::from_graph(
               graph, sources,
               project_cost.true_cost.token_count * percent_cut_off);
-      out << "  # This is a list of all header files that should be "
-             "considered\n"
-             "  # to not be included by other header files, but source files "
-             "only:\n"
-             "  make private: \n"
-             "    time: "
-          << format_time(timer.restart())
-          << " # seconds\n"
-             "    results: ";
-      if (results.empty()) {
-        out << "[]\n";
-      } else {
-        out << "\n";
-        std::sort(results.begin(), results.end(),
-                  [](const find_expensive_headers::result &l,
-                     const find_expensive_headers::result &r) {
-                    return l.total_saving().token_count >
-                           r.total_saving().token_count;
-                  });
-        for (const find_expensive_headers::result &i : results) {
-          const double percentage = (100.0 * i.total_saving().token_count) /
-                                    project_cost.true_cost.token_count;
-          out << "    - file: " << format_str(graph[i.v].path.string())
-              << "\n"
-                 "      reference count: "
-              << graph[i.v].internal_incoming
-              << "\n"
-                 "      token count: "
-              << i.total_saving().token_count << " # " << std::setprecision(2)
-              << std::fixed << percentage << "%\n";
-        }
+      an.comment(
+          "This is a list of all header files that should be considered");
+      an.comment(
+          "to not be included by other header files, but source files only");
+      ObjPrinter make_private = an.obj("make private");
+      make_private.property("time", timer.restart());
+      std::sort(results.begin(), results.end(),
+                [](const find_expensive_headers::result &l,
+                   const find_expensive_headers::result &r) {
+                  return l.total_saving().token_count >
+                         r.total_saving().token_count;
+                });
+
+      ArrayPrinter results_out = make_private.arr("results");
+      for (const find_expensive_headers::result &i : results) {
+        ObjPrinter result_out = results_out.obj();
+        result_out.property("file", graph[i.v]);
+        result_out.property("reference count", graph[i.v].internal_incoming);
+        result_out.property("saving",
+                            percent((100.0 * i.total_saving().token_count) /
+                                    project_cost.true_cost.token_count));
       }
     }
 
     {
+      out << '\n';
       std::vector<recommend_precompiled::result> results =
           recommend_precompiled::from_graph(graph, sources,
                                             project_cost.true_cost.token_count *
                                                 percent_cut_off,
                                             pch_ratio.getValue());
-      out << "  # This is a list of all header files that should be "
-             "considered\n"
-             "  # to be added to the precompiled header:\n"
-             "  pch additions:\n"
-             "    time: "
-          << format_time(timer.restart())
-          << " # seconds\n"
-             "    results: ";
-      if (results.empty()) {
-        out << "[]\n";
-      } else {
-        out << "\n";
-        std::sort(results.begin(), results.end(),
-                  [](const recommend_precompiled::result &l,
-                     const recommend_precompiled::result &r) {
-                    return l.saving.token_count > r.saving.token_count;
-                  });
-        for (const recommend_precompiled::result &i : results) {
-          const double percentage = (100.0 * i.saving.token_count) /
-                                    project_cost.true_cost.token_count;
-          out << "    - file: " << format_str(graph[i.v].path.string()) << "\n"
-              << "      token count: " << i.saving.token_count << " # "
-              << std::setprecision(2) << std::fixed << percentage << "%\n";
-        }
+      an.comment(
+          "This is a list of all header files that should be considered");
+      an.comment("to be added to the precompiled header:");
+      ObjPrinter pch_additions = an.obj("pch additions");
+      pch_additions.property("time", timer.restart());
+      std::sort(results.begin(), results.end(),
+                [](const recommend_precompiled::result &l,
+                   const recommend_precompiled::result &r) {
+                  return l.saving.token_count > r.saving.token_count;
+                });
+
+      ArrayPrinter results_out = pch_additions.arr("results");
+      for (const recommend_precompiled::result &i : results) {
+        ObjPrinter result_out = results_out.obj();
+        result_out.property("file", graph[i.v].path);
+        result_out.property("saving",
+                            percent((100.0 * i.saving.token_count) /
+                                    project_cost.true_cost.token_count));
       }
     }
 
     {
+      out << '\n';
+
       // Assume that each "expensive" file could be reduced this much
       const double assumed_reduction = 0.50;
       std::vector<file_and_cost> results = find_expensive_files::from_graph(
           graph, sources,
           project_cost.true_cost.token_count * percent_cut_off /
               assumed_reduction);
-      out << "  # This is a list of all comparatively large files that\n"
-             "  # should be considered to be simplified or split into\n"
-             "  # smaller parts and #includes updated:\n"
-             "  large files:\n"
-             "    time: "
-          << format_time(timer.restart()) << " # seconds\n"
-          << "    assumed_reduction: " << assumed_reduction * 100
-          << " # %\n"
-             "    results: ";
-      if (results.empty()) {
-        out << "[]\n";
-      } else {
-        out << "\n";
-        std::sort(
-            results.begin(), results.end(),
-            [](const file_and_cost &l, const file_and_cost &r) {
-              return static_cast<std::size_t>(l.node->true_cost().token_count) *
-                         l.sources >
-                     static_cast<std::size_t>(r.node->true_cost().token_count) *
-                         r.sources;
-            });
-        for (const file_and_cost &i : results) {
-          const unsigned saving =
-              i.sources * assumed_reduction * i.node->true_cost().token_count;
-          const double percentage =
-              (100.0 * saving) / project_cost.true_cost.token_count;
-          out << "    - file: " << format_str(i.node->path.string()) << "\n"
-              << "      token count: " << saving << " # "
-              << std::setprecision(2) << std::fixed << saving << " ("
-              << percentage << "%\n";
-        }
+      an.comment("This is a list of all comparatively large files that");
+      an.comment("should be considered to be simplified or split into");
+      an.comment("smaller parts and #includes updated:");
+      ObjPrinter large_files = an.obj("large files");
+      large_files.property("time", timer.restart());
+      large_files.property("assumed reduction",
+                           percent(assumed_reduction * 100));
+      std::sort(
+          results.begin(), results.end(),
+          [](const file_and_cost &l, const file_and_cost &r) {
+            return static_cast<std::size_t>(l.node->true_cost().token_count) *
+                       l.sources >
+                   static_cast<std::size_t>(r.node->true_cost().token_count) *
+                       r.sources;
+          });
+
+      ArrayPrinter results_out = large_files.arr("results");
+      for (const file_and_cost &i : results) {
+        const unsigned saving =
+            i.sources * assumed_reduction * i.node->true_cost().token_count;
+        ObjPrinter result_out = results_out.obj();
+        result_out.property("file", i.node->path);
+        result_out.property(
+            "saving",
+            percent((100.0 * saving) / project_cost.true_cost.token_count));
       }
     }
 
     {
+      out << '\n';
       std::vector<find_unnecessary_sources::result> results =
           find_unnecessary_sources::from_graph(
               graph, sources,
               project_cost.true_cost.token_count * percent_cut_off);
-      out << "  # This is a list of all source files that should be "
-             "considered\n"
-             "  # to be inlined into the header and then the source file "
-             "removed:\n"
-             "  inline sources:\n"
-             "    time: "
-          << format_time(timer.restart())
-          << " # seconds\n"
-             "    results: ";
-      if (results.empty()) {
-        out << "[]\n";
-      } else {
-        out << "\n";
-        std::sort(results.begin(), results.end(),
-                  [](const find_unnecessary_sources::result &l,
-                     const find_unnecessary_sources::result &r) {
-                    return l.total_saving().token_count >
-                           r.total_saving().token_count;
-                  });
-        for (const find_unnecessary_sources::result &i : results) {
-          const double percentage = (100.0 * i.total_saving().token_count) /
-                                    project_cost.true_cost.token_count;
-          out << "    - source: " << format_str(graph[i.source].path.string()) << "\n"
-              << "      token count: " << i.total_saving().token_count << " # "
-              << std::setprecision(2) << std::fixed << percentage << "% \n";
-        }
+      an.comment(
+          "This is a list of all source files that should be considered");
+      an.comment(
+          "to be inlined into the header and then the source file removed:");
+      ObjPrinter inline_sources = an.obj("inline sources");
+      inline_sources.property("time", timer.restart());
+      std::sort(results.begin(), results.end(),
+                [](const find_unnecessary_sources::result &l,
+                   const find_unnecessary_sources::result &r) {
+                  return l.total_saving().token_count >
+                         r.total_saving().token_count;
+                });
+
+      ArrayPrinter results_out = inline_sources.arr("results");
+      for (const find_unnecessary_sources::result &i : results) {
+        ObjPrinter result_out = results_out.obj();
+        result_out.property("source", graph[i.source].path);
+        result_out.property("token count",
+                            percent((100.0 * i.total_saving().token_count) /
+                                    project_cost.true_cost.token_count));
       }
     }
   }
+
+  out << termcolor::reset;
   return 0;
 }
 

@@ -71,6 +71,9 @@ target_include_directories(common PUBLIC ${LLVM_INCLUDE_DIRS})
 # Link against LLVM libraries
 target_link_libraries(common ${llvm_libs})
 
+find_package(termcolor CONFIG REQUIRED)
+target_link_libraries(common termcolor::termcolor)
+
 if(WIN32)
     target_compile_options(common PRIVATE /EHsc /FS)
 endif()
