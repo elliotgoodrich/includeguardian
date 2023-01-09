@@ -44,6 +44,7 @@ add_library(
     get_total_cost.hpp get_total_cost.cpp
     reachability_graph.hpp
     recommend_precompiled.hpp recommend_precompiled.cpp
+    topological_order.hpp topological_order.cpp
 )
 
 find_package(GTest)
@@ -91,6 +92,7 @@ add_executable(
     find_unused_components.test.cpp
     get_total_cost.test.cpp
     reachability_graph.test.cpp
+    topological_order.test.cpp
 )
 target_precompile_headers(tests REUSE_FROM common)
 if(WIN32)

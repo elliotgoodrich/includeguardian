@@ -11,6 +11,7 @@
 #include "graph.hpp"
 #include "list_included_files.hpp"
 #include "recommend_precompiled.hpp"
+#include "topological_order.hpp"
 
 #include <termcolor/termcolor.hpp>
 
@@ -174,6 +175,15 @@ public:
   }
 
   ObjPrinter obj();
+
+  ArrayPrinter arr(std::string_view key) {
+    if (m_num_entries++ == 0) {
+      o << "\n";
+    }
+    std::fill_n(std::ostream_iterator<char>(o), 2 * m_indent, ' ');
+    o << punc_color << "- " << key_color << key << punc_color << ":";
+    return ArrayPrinter(o, m_indent + 1);
+  }
 
   template <typename T> void value(const T &t) {
     if (m_num_entries++ == 0) {
@@ -469,6 +479,13 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       "show-sources", llvm::cl::desc("Whether to output all source files"),
       llvm::cl::value_desc("enabled"), llvm::cl::init(false),
       llvm::cl::cat(build_category));
+
+  llvm::cl::OptionCategory topological_category("Topological Order Options");
+  llvm::cl::opt<bool> topological_order(
+      "topological-order",
+      llvm::cl::desc("Whether to display the files found in topological order"),
+      llvm::cl::value_desc("enabled"), llvm::cl::init(false),
+      llvm::cl::cat(topological_category));
 
   llvm::cl::OptionCategory analysis_category("Analysis Options");
 
@@ -901,6 +918,30 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
         result_out.property("token count",
                             percent((100.0 * i.total_saving().token_count) /
                                     project_cost.true_cost.token_count));
+      }
+    }
+  }
+
+  if (topological_order.getValue()) {
+    out << '\n';
+    ArrayPrinter top = root.arr("topological order");
+    std::vector<std::vector<std::vector<Graph::vertex_descriptor>>> ordering =
+        topological_order::from_graph(graph, sources);
+    for (std::size_t level = 0; level < ordering.size(); ++level) {
+      ObjPrinter result_out = top.obj();
+      result_out.property("level", level);
+      ArrayPrinter files = result_out.arr("files");
+      const std::vector<std::vector<Graph::vertex_descriptor>> &groups =
+          ordering[level];
+      for (const std::vector<Graph::vertex_descriptor> &group : groups) {
+        if (group.size() == 1) {
+          files.value(graph[group.front()]);
+        } else {
+          ArrayPrinter group_out = files.arr("cycle");
+          for (const Graph::vertex_descriptor v : group) {
+            group_out.value(graph[v]);
+          }
+        }
       }
     }
   }
