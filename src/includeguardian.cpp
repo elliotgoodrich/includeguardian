@@ -547,12 +547,16 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   ObjPrinter stats = root.obj("stats");
   {
     stats.property("version", "0.0.2");
-    std::string command = "includeguardian.exe ";
-    for (int i = 0; i < argc; ++i) {
-      command += ' ';
-      command += argv[i];
-    }
-    stats.property("command", command);
+    stats.property("command",
+                   std::accumulate(argv, argv + argc, std::string(""),
+                                   [](std::string &&ss, const char *arg) {
+                                     if (ss.empty()) {
+                                       return std::string(arg);
+                                     }
+                                     ss.append(" ");
+                                     ss.append(arg);
+                                     return std::move(ss);
+                                   }));
     stats.key("processing time");
   }
 
