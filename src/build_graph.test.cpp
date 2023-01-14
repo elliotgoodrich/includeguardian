@@ -808,6 +808,165 @@ TEST_P(BuildGraphTest, ReducedFileOptimization) {
   EXPECT_THAT(results->unguarded_files, IsEmpty());
 }
 
+// Want to check that includes outside of the include guard
+// still cause a file to not be registered as "guarded" even
+// if that include is guarded itself and encountered multiple
+// times.
+TEST_P(BuildGraphTest, OutsideIncludes) {
+  const std::string_view common_hpp_code = "#ifndef COMMON_HPP\n"
+                                           "#define COMMON_HPP\n"
+                                           "#endif\n";
+  const std::string_view a_hpp_code = "#include \"common.hpp\"\n"
+                                      "#ifndef A_HPP\n"
+                                      "#define A_HPP\n"
+                                      "int bar() { return 42; }\n"
+                                      "#endif\n";
+  const std::string_view b_hpp_code = "#include \"common.hpp\"\n"
+                                      "#ifndef B_HPP\n"
+                                      "#define B_HPP\n"
+                                      "int foo() { return 42; }\n"
+                                      "#endif\n";
+  const std::string_view main_cpp_code = "#include \"a.hpp\"\n"
+                                         "#include \"b.hpp\"\n";
+  const std::string_view main2_cpp_code = "#include \"b.hpp\"\n"
+                                          "#include \"a.hpp\"\n";
+
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  fs->addFile((working_directory / "common.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(common_hpp_code));
+  fs->addFile((working_directory / "a.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
+  fs->addFile((working_directory / "b.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(b_hpp_code));
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  fs->addFile((working_directory / "main2.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main2_cpp_code));
+
+  Graph g;
+  const Graph::vertex_descriptor common_hpp =
+      add_vertex(file_node("common.hpp")
+                     .with_cost(0, common_hpp_code.size() * B)
+                     .set_internal_parents(2),
+                 g);
+  const Graph::vertex_descriptor a_hpp = add_vertex(
+      file_node("a.hpp").with_cost(0, 0 * B).set_internal_parents(2), g);
+  const Graph::vertex_descriptor b_hpp = add_vertex(
+      file_node("b.hpp").with_cost(0, 0 * B).set_internal_parents(2), g);
+  const Graph::vertex_descriptor main_cpp =
+      add_vertex(file_node("main.cpp")
+                     .with_cost(10, (a_hpp_code.size() + b_hpp_code.size() +
+                                     main_cpp_code.size()) *
+                                        B),
+                 g);
+  const Graph::vertex_descriptor main2_cpp =
+      add_vertex(file_node("main2.cpp")
+                     .with_cost(10, (a_hpp_code.size() + b_hpp_code.size() +
+                                     main2_cpp_code.size()) *
+                                        B),
+                 g);
+
+  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
+  add_edge(main_cpp, b_hpp, {"\"b.hpp\"", 2}, g);
+  add_edge(main2_cpp, b_hpp, {"\"b.hpp\"", 1}, g);
+  add_edge(main2_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
+  add_edge(a_hpp, common_hpp, {"\"common.hpp\"", 1}, g);
+  add_edge(b_hpp, common_hpp, {"\"common.hpp\"", 1}, g);
+
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files,
+              UnorderedElementsAre(
+                  VertexDescriptorIs(results->graph,
+                                     Field(&file_node::path, Eq("a.hpp"))),
+                  VertexDescriptorIs(results->graph,
+                                     Field(&file_node::path, Eq("b.hpp")))));
+}
+
+// Check external include guards are "working" as expected.
+// Unfortunately that means that we hide some dependencies when
+// using external includes for the moment.
+TEST_P(BuildGraphTest, ExternalIncludeGuards) {
+  const std::string_view common_hpp_code = "#ifndef COMMON_HPP\n"
+                                           "#define COMMON_HPP\n"
+                                           "#endif\n";
+  const std::string_view a_hpp_code = "#pragma once\n"
+                                      ""
+                                      "#ifndef COMMON_HPP\n"
+                                      "#include \"common.hpp\"\n"
+                                      "#endif\n"
+                                      "char bar() { return 'a'; }\n";
+  const std::string_view b_hpp_code = "#pragma once\n"
+                                      ""
+                                      "#ifndef COMMON_HPP\n"
+                                      "#include \"common.hpp\"\n"
+                                      "#endif\n"
+                                      "char bar() { return '\\0'; }\n";
+  const std::string_view c_hpp_code = "#pragma once\n"
+                                      "#include \"b.hpp\"\n";
+  const std::string_view main_cpp_code = "#include \"a.hpp\"\n"
+                                         "#include \"c.hpp\"\n";
+  const std::string_view main2_cpp_code = "#include \"c.hpp\"\n"
+                                          "#include \"a.hpp\"\n";
+
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  fs->addFile((working_directory / "common.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(common_hpp_code));
+  fs->addFile((working_directory / "a.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
+  fs->addFile((working_directory / "b.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(b_hpp_code));
+  fs->addFile((working_directory / "c.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(c_hpp_code));
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  fs->addFile((working_directory / "main2.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main2_cpp_code));
+
+  Graph g;
+  const Graph::vertex_descriptor common_hpp =
+      add_vertex(file_node("common.hpp")
+                     .with_cost(0, common_hpp_code.size() * B)
+                     .set_internal_parents(1),
+                 g);
+  const Graph::vertex_descriptor a_hpp =
+      add_vertex(file_node("a.hpp")
+                     .with_cost(9, a_hpp_code.size() * B)
+                     .set_internal_parents(2),
+                 g);
+  const Graph::vertex_descriptor b_hpp =
+      add_vertex(file_node("b.hpp")
+                     .with_cost(9, b_hpp_code.size() * B)
+                     .set_internal_parents(1),
+                 g);
+  const Graph::vertex_descriptor c_hpp =
+      add_vertex(file_node("c.hpp")
+                     .with_cost(0, c_hpp_code.size() * B)
+                     .set_internal_parents(2),
+                 g);
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      file_node("main.cpp").with_cost(1, main_cpp_code.size() * B), g);
+  const Graph::vertex_descriptor main2_cpp = add_vertex(
+      file_node("main2.cpp").with_cost(1, main2_cpp_code.size() * B), g);
+
+  add_edge(main_cpp, a_hpp, {"\"a.hpp\"", 1}, g);
+  add_edge(main_cpp, c_hpp, {"\"c.hpp\"", 2}, g);
+  add_edge(main2_cpp, c_hpp, {"\"c.hpp\"", 1}, g);
+  add_edge(main2_cpp, a_hpp, {"\"a.hpp\"", 2}, g);
+  add_edge(a_hpp, common_hpp, {"\"common.hpp\"", 3}, g);
+  add_edge(c_hpp, b_hpp, {"\"b.hpp\"", 2}, g);
+
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
+}
+
 INSTANTIATE_TEST_CASE_P(
     SmallFileOptimization, BuildGraphTest,
     Values(build_graph::options(),

@@ -343,8 +343,7 @@ public:
       InProgress &p = m_stack.back();
       FileState &state = p.it->second;
 
-      // If we are unguarded, then don't set the 'fully_processed' stuff
-      // and move the total cost into the includer.
+      // If we are unguarded then move the total cost into the includer.
       const bool guarded =
           m_pp->getHeaderSearchInfo().isFileMultipleIncludeGuarded(file);
       if (!guarded) {
