@@ -19,10 +19,12 @@
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/Host.h>
+#include <llvm/Support/VirtualFileSystem.h>
 
 #include <algorithm>
 #include <charconv>
 #include <filesystem>
+#include <initializer_list>
 #include <memory>
 #include <numeric>
 #include <string>
@@ -32,7 +34,130 @@ namespace IncludeGuardian {
 
 namespace {
 
+struct Hasher {
+  std::size_t operator()(const llvm::sys::fs::UniqueID key) const noexcept {
+    // NOTE: Not a good hash, but our devices should probably be the same
+    return key.getFile() ^ key.getDevice();
+  }
+};
+
 const bool LOG = false;
+
+// This function gives us a way to restrict ourselves to a subset of
+// includes in order to debug more easily.  To enable, remove the
+// `return true` and add filenames to the `allow_list`.
+bool allowed(const clang::FileEntry *f) {
+    return true;
+    const std::initializer_list<llvm::StringRef> allow_list = {};
+
+  return std::find_if(allow_list.begin(), allow_list.end(), [f](auto x) {
+           return x ==
+                  std::filesystem::path(f->getName().str()).filename().string();
+         }) != allow_list.end();
+}
+
+/* This component is needed on Windows because if we include a file
+   from using both <> and "" we will get a backslash or forward slash
+   respectively between the path and the filename.  This is because of
+   clangs `HeaderSearch.cpp`
+
+      // Concatenate the requested file onto the directory.
+      // FIXME: Portability.  Filename concatenation should be in sys::Path.
+      TmpDir = IncluderAndDir.second->getName();
+      TmpDir.push_back('/');
+      TmpDir.append(Filename.begin(), Filename.end());
+
+   Windows is also case insensitive so we may have multiple different paths
+   refer to the same file.
+
+   This `FileSystem` allows us to overwrite a file in the underlying
+   `FileSystem` by `UniqueID`, which means that we continue to use the
+   underlying `FileSystem` to decide what paths map to which path.
+*/
+class OverwriteFileSystem : public llvm::vfs::FileSystem {
+
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_underlying;
+  llvm::vfs::InMemoryFileSystem m_overwrites;
+  std::unordered_map<llvm::sys::fs::UniqueID, std::string, Hasher> m_lookup;
+
+public:
+  explicit OverwriteFileSystem(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> underlying)
+      : m_underlying(std::move(underlying)), m_overwrites(), m_lookup() {}
+
+  llvm::sys::fs::UniqueID replace(const llvm::Twine &path,
+                                  llvm::sys::fs::UniqueID id,
+                                  std::unique_ptr<llvm::MemoryBuffer> buffer) {
+    assert(m_lookup.count(id) == 0);
+    [[maybe_unused]] const bool inserted =
+        m_overwrites.addFile(path, 0, std::move(buffer));
+    assert(inserted);
+    m_lookup.emplace(id, path.str());
+    return m_overwrites.status(path)->getUniqueID();
+  }
+
+  llvm::ErrorOr<llvm::vfs::Status> status(const llvm::Twine &path) final {
+    llvm::ErrorOr<llvm::vfs::Status> s = m_underlying->status(path);
+    if (!s) {
+      return s;
+    }
+
+    const auto it = m_lookup.find(s->getUniqueID());
+    if (it != m_lookup.end()) {
+      return m_overwrites.status(it->second);
+    }
+
+    return s;
+  }
+
+  llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
+  openFileForRead(const llvm::Twine &path) final {
+    llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>> f =
+        m_underlying->openFileForRead(path);
+    if (!f) {
+      return f;
+    }
+
+    if (f.get() == nullptr) {
+      return f;
+    }
+
+    const llvm::ErrorOr<llvm::vfs::Status> &s = f->get()->status();
+    if (!s) {
+      return f;
+    }
+
+    const auto it = m_lookup.find(s->getUniqueID());
+    if (it != m_lookup.end()) {
+      return m_overwrites.openFileForRead(it->second);
+    }
+
+    return f;
+  }
+
+  llvm::vfs::directory_iterator dir_begin(const llvm::Twine &Dir,
+                                          std::error_code &EC) final {
+    return m_underlying->dir_begin(Dir, EC);
+  }
+  llvm::ErrorOr<std::string> getCurrentWorkingDirectory() const final {
+    return m_underlying->getCurrentWorkingDirectory();
+  }
+  std::error_code setCurrentWorkingDirectory(const llvm::Twine &Path) final {
+    return m_underlying->setCurrentWorkingDirectory(Path);
+  }
+  std::error_code getRealPath(const llvm::Twine &Path,
+                              llvm::SmallVectorImpl<char> &Output) const final {
+    return m_underlying->getRealPath(Path, Output);
+  }
+  std::error_code isLocal(const llvm::Twine &Path, bool &Result) final {
+    return m_underlying->isLocal(Path, Result);
+  }
+
+protected:
+  FileSystem &getUnderlyingFS() { return *m_underlying; }
+
+  virtual void anchor() {}
+};
 
 class LoggingFileSystem : public llvm::vfs::FileSystem {
 public:
@@ -145,13 +270,6 @@ const Graph::vertex_descriptor empty =
 
 clang::IgnoringDiagConsumer s_ignore;
 
-struct Hasher {
-  std::size_t operator()(const llvm::sys::fs::UniqueID key) const noexcept {
-    // NOTE: Not a good hash, but our devices should probably be the same
-    return key.getFile() ^ key.getDevice();
-  }
-};
-
 struct FileState {
   Graph::vertex_descriptor v;
 #ifdef _DEBUG
@@ -184,15 +302,17 @@ struct InProgress {
 
 struct ReplaceWith {
   std::unique_ptr<llvm::MemoryBuffer> contents;
-  llvm::sys::fs::UniqueID previousID;
+  std::string path;
+  Graph::vertex_descriptor v;
 };
 
-using NeedsReplacing = std::unordered_map<std::string, ReplaceWith>;
+using NeedsReplacing = std::unordered_map<llvm::sys::fs::UniqueID, ReplaceWith, Hasher>;
 
 struct IncludeScanner : public clang::PPCallbacks {
   clang::SourceManager *m_sm;
   UniqueIdToNode &m_id_to_node;
   NeedsReplacing &m_needs_replacing;
+  std::vector<bool> &m_replaced;
   build_graph::result &m_r;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::vector<InProgress> m_stack;
@@ -200,6 +320,7 @@ struct IncludeScanner : public clang::PPCallbacks {
   clang::Preprocessor *m_pp;
   std::filesystem::path m_working_dir;
   bool m_replace_file_optimization;
+  int m_skip_count = 0;
 
   void update_cost_when_leaving_file(const clang::FileEntry *file) {
     InProgress &p = m_stack.back();
@@ -268,11 +389,13 @@ public:
   IncludeScanner(
       const std::function<build_graph::file_type(std::string_view)> &file_type,
       build_graph::result &r, UniqueIdToNode &id_to_node,
-      NeedsReplacing &needs_replacing, clang::Preprocessor &pp,
-      const std::filesystem::path &working_dir, bool replace_file_optimization)
+      NeedsReplacing &needs_replacing, std::vector<bool> &replaced,
+      clang::Preprocessor &pp, const std::filesystem::path &working_dir,
+      bool replace_file_optimization)
       : m_r(r), m_sm(&pp.getSourceManager()), m_id_to_node(id_to_node),
-        m_needs_replacing(needs_replacing), m_file_type(file_type),
-        m_pp(&pp), m_accounted_for_token_count{0u}, m_working_dir(working_dir),
+        m_needs_replacing(needs_replacing), m_replaced(replaced),
+        m_file_type(file_type), m_pp(&pp), m_accounted_for_token_count{0u},
+        m_working_dir(working_dir),
         m_replace_file_optimization(replace_file_optimization) {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
@@ -298,6 +421,9 @@ public:
             std::filesystem::path(file->getName().str())
                 .lexically_relative(m_working_dir);
         it->second.v = add_vertex(rel, m_r.graph);
+        if (m_replace_file_optimization) {
+          m_replaced.resize(it->second.v + 1);
+        }
 #ifdef _DEBUG
         it->second.debug_name = file->getName();
 #endif
@@ -310,6 +436,11 @@ public:
         // any unaccounted for tokens somehow
         assert(m_pp->getTokenCount() == m_accounted_for_token_count);
       } else {
+        if (!allowed(file)) {
+          ++m_skip_count;
+          return;
+        }
+
         // Assign all lexed tokens to the file before we enter this
         // new one
         const std::uint64_t token_count = m_pp->getTokenCount();
@@ -337,6 +468,11 @@ public:
         return;
       }
 
+      if (!allowed(file)) {
+        --m_skip_count;
+        return;
+      }
+
       // Update `InProgress` from the costs of `file`.
       update_cost_when_leaving_file(file);
 
@@ -360,13 +496,14 @@ public:
         if (!state.fully_processed) {
           // If we are fully guarded, then make sure that subsequent includes
           // won't do anything.
-          if (m_replace_file_optimization) {
+          if (m_replace_file_optimization && !m_replaced[state.v]) {
             m_needs_replacing.emplace(
                 std::piecewise_construct,
-                std::forward_as_tuple(file->tryGetRealPathName().str()),
+                std::forward_as_tuple(file->getUniqueID()),
                 std::forward_as_tuple(llvm::MemoryBuffer::getMemBufferCopy(
                                           state.replacement_contents, ""),
-                                      file->getUniqueID()));
+                                      file->tryGetRealPathName().str(),
+                                      state.v));
           }
 
           // Mark it at guarded
@@ -415,11 +552,18 @@ public:
       return;
     }
 
+    if (m_skip_count) {
+      return;
+    }
+
+    if (!allowed(File)) {
+      return;
+    }
+
     auto const [it, inserted] =
         m_id_to_node.emplace(File->getUniqueID(), empty);
 
     FileState &state = m_stack.back().it->second;
-
     if (state.fully_processed && m_r.graph[state.v].is_guarded) {
       // We can avoid doing any processing here if we have already seen
       // this file and it is unguarded.  For unguarded files (like X macros),
@@ -450,6 +594,9 @@ public:
                          .set_external(clang::SrcMgr::isSystem(FileType))
                          .set_precompiled(is_precompiled),
                      m_r.graph);
+      if (m_replace_file_optimization) {
+        m_replaced.resize(it->second.v + 1);
+      }
 #ifdef _DEBUG
       it->second.debug_name = RelativePath.str();
 #endif
@@ -479,7 +626,7 @@ public:
     const char close = IsAngled ? '>' : '"';
     include.insert(include.cend(), &close, &close + 1);
 
-    if (m_replace_file_optimization) {
+    if (m_replace_file_optimization && m_replaced[state.v]) {
       state.replacement_contents += "#include ";
       state.replacement_contents += include;
       state.replacement_contents += '\n';
@@ -517,6 +664,9 @@ public:
   /// Callback invoked when start reading any pragma directive.
   void PragmaDirective(clang::SourceLocation Loc,
                        clang::PragmaIntroducerKind Introducer) final {
+    if (m_skip_count) {
+      return;
+    }
     clang::SmallVector<char> buffer;
     const clang::StringRef pragma_text =
         clang::Lexer::getSpelling(Loc, buffer, *m_sm, m_pp->getLangOpts());
@@ -560,12 +710,15 @@ public:
 
   void MacroDefined(const clang::Token &MacroNameTok,
                     const clang::MacroDirective *MD) final {
+    if (m_skip_count) {
+      return;
+    }
     if (!m_replace_file_optimization) {
       return;
     }
 
     FileState &state = m_stack.back().it->second;
-    if (state.fully_processed) {
+    if (state.fully_processed || m_replaced[state.v]) {
       return;
     }
 
@@ -596,12 +749,15 @@ public:
   void MacroUndefined(const clang::Token &MacroNameTok,
                       const clang::MacroDefinition &MD,
                       const clang::MacroDirective *Undef) final {
+    if (m_skip_count) {
+      return;
+    }
     if (!m_replace_file_optimization) {
       return;
     }
 
     FileState &state = m_stack.back().it->second;
-    if (state.fully_processed) {
+    if (state.fully_processed || m_replaced[state.v]) {
       return;
     }
 
@@ -638,7 +794,8 @@ class ExpensiveAction : public clang::PreprocessOnlyAction {
   build_graph::result &m_r;
   UniqueIdToNode &m_id_to_node;
   NeedsReplacing m_needs_replacing;
-  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> m_in_memory_fs;
+  std::vector<bool> &m_replaced; // vertex_descriptor -> isReplaced
+  llvm::IntrusiveRefCntPtr<OverwriteFileSystem> m_in_memory_fs;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_fs;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::filesystem::path m_working_dir;
@@ -646,13 +803,14 @@ class ExpensiveAction : public clang::PreprocessOnlyAction {
 public:
   ExpensiveAction(
       build_graph::result &r, UniqueIdToNode &id_to_node,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> in_memory_fs,
+      std::vector<bool> &replaced,
+      llvm::IntrusiveRefCntPtr<OverwriteFileSystem> in_memory_fs,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
       const std::filesystem::path &working_dir, bool replace_file_optimization)
       : m_f(), m_ci(nullptr), m_r(r), m_id_to_node(id_to_node),
-        m_needs_replacing(), m_in_memory_fs(in_memory_fs), m_fs(fs),
-        m_file_type(file_type), m_working_dir(working_dir) {}
+        m_needs_replacing(), m_replaced(replaced), m_in_memory_fs(in_memory_fs),
+        m_fs(fs), m_file_type(file_type), m_working_dir(working_dir) {}
 
   bool BeginInvocation(clang::CompilerInstance &ci) final {
     ci.getDiagnostics().setSuppressAllDiagnostics(true);
@@ -672,27 +830,23 @@ public:
   void ExecuteAction() final {
     getCompilerInstance().getPreprocessor().addPPCallbacks(
         std::make_unique<IncludeScanner>(
-            m_file_type, m_r, m_id_to_node, m_needs_replacing,
+            m_file_type, m_r, m_id_to_node, m_needs_replacing, m_replaced,
             m_ci->getPreprocessor(), m_working_dir, m_in_memory_fs != nullptr));
 
     clang::PreprocessOnlyAction::ExecuteAction();
   }
 
   void EndSourceFileAction() final {
-    for (auto &[path, v] : m_needs_replacing) {
-      const bool file_inserted =
-          m_in_memory_fs->addFile(path, 0, std::move(v.contents));
-      assert(file_inserted);
-
-      // TODO: Do we need error checking here for the `llvm::Error`?
-      std::unique_ptr<llvm::vfs::File> f =
-          std::move(m_in_memory_fs->openFileForRead(path).get());
+    for (auto &[id, value] : m_needs_replacing) {
+      const llvm::sys::fs::UniqueID new_id =
+          m_in_memory_fs->replace(value.path, id, std::move(value.contents));
+      assert(id != new_id); // Should never happen
+      m_replaced[value.v] = true;
 
       // Since we're overriding our file, it will get a new `UniqueID` and we
       // should replace it in the `UniqueID` lookup to the new one
-      const auto prev = m_id_to_node.find(v.previousID);
-      const auto [it, inserted] =
-          m_id_to_node.emplace(f->status()->getUniqueID(), prev->second);
+      const auto prev = m_id_to_node.find(id);
+      const auto [it, inserted] = m_id_to_node.emplace(new_id, prev->second);
       assert(inserted);
       m_id_to_node.erase(prev);
     }
@@ -706,7 +860,8 @@ public:
 class find_graph_factory : public clang::tooling::FrontendActionFactory {
   build_graph::result &m_r;
   UniqueIdToNode &m_id_to_node;
-  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> m_in_memory_fs;
+  std::vector<bool> m_replaced; // vertex_descriptor -> isReplaced
+  llvm::IntrusiveRefCntPtr<OverwriteFileSystem> m_in_memory_fs;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_fs;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::filesystem::path m_working_dir;
@@ -715,12 +870,13 @@ public:
   /// Create a `print_graph_factory`.
   find_graph_factory(
       build_graph::result &r, UniqueIdToNode &id_to_node,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> in_memory_fs,
+      llvm::IntrusiveRefCntPtr<OverwriteFileSystem> in_memory_fs,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
       const std::filesystem::path &working_dir)
-      : m_r(r), m_id_to_node(id_to_node), m_in_memory_fs(in_memory_fs),
-        m_fs(fs), m_working_dir(working_dir), m_file_type(file_type) {}
+      : m_r(r), m_id_to_node(id_to_node), m_replaced(),
+        m_in_memory_fs(in_memory_fs), m_fs(fs), m_working_dir(working_dir),
+        m_file_type(file_type) {}
 
   /// Invokes the compiler with a FrontendAction created by create().
   bool
@@ -757,9 +913,9 @@ public:
 
   /// Returns a new `clang::FrontendAction`.
   std::unique_ptr<clang::FrontendAction> create() final {
-    return std::make_unique<ExpensiveAction>(m_r, m_id_to_node, m_in_memory_fs,
-                                             m_fs, m_file_type, m_working_dir,
-                                             m_in_memory_fs != nullptr);
+    return std::make_unique<ExpensiveAction>(
+        m_r, m_id_to_node, m_replaced, m_in_memory_fs, m_fs, m_file_type,
+        m_working_dir, m_in_memory_fs != nullptr);
   }
 };
 
@@ -777,27 +933,25 @@ llvm::Expected<build_graph::result> build_graph::from_compilation_db(
                  [](const std::filesystem::path &p) { return p.string(); });
 
   // Avoid re-preprocessing files that we have seen before and already
-  // added to the graph.  By using an `OverlayFileSystem` we can,
+  // added to the graph.  By using `OverwriteFileSystem` we can,
   //
   //   1. Keep track of the replacement contents, but put them in a map
-  //      of file path against contents
+  //      of UniqueID against contents
   //   2. Whenever we call `ExecuteAction` (meaning we have a completely
   //      new source file we're looking at) we load all the map contents
-  //      into our `OverlayFileSystem`.  Hopefully at this point we can
+  //      into our `OverwriteFileSystem`.  Hopefully at this point we can
   //      guarantee that there is no state left over from the previous
   //      source files.
   //   3. In the future, figure out how we can do this while processing
   //      sources in parallel.
 
-  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> in_memory;
+  llvm::IntrusiveRefCntPtr<OverwriteFileSystem> in_memory;
   if (opts.replace_file_optimization) {
-    auto overlay = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(fs);
-    in_memory = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
-    overlay->pushOverlay(in_memory);
-    fs = overlay;
-    if (LOG) {
-      fs = llvm::makeIntrusiveRefCnt<LoggingFileSystem>(fs);
-    }
+    fs = (in_memory = llvm::makeIntrusiveRefCnt<OverwriteFileSystem>(fs));
+  }
+
+  if (LOG) {
+    fs = llvm::makeIntrusiveRefCnt<LoggingFileSystem>(fs);
   }
 
   clang::tooling::ClangTool tool(

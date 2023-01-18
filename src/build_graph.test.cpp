@@ -165,6 +165,61 @@ MATCHER_P(GraphsAreEquivalent, expected, "Whether two graphs compare equal") {
   return true;
 }
 
+/*
+ Drop all trailing '_' characters at the end of all files that
+ have been asked for.  This allows us to have multiple names to
+ refer to the same file.
+*/
+class TrimFileSystem : public llvm::vfs::FileSystem {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_underlying;
+
+  static std::string trim(const llvm::Twine &path) {
+    llvm::SmallVector<char, 256> buffer;
+    std::string str(path.toStringRef(buffer).str());
+    while (str.ends_with("_")) {
+      str.pop_back();
+    }
+    return str;
+  }
+
+public:
+  explicit TrimFileSystem(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> underlying)
+      : m_underlying(std::move(underlying)) {}
+
+  llvm::ErrorOr<llvm::vfs::Status> status(const llvm::Twine &path) final {
+    return m_underlying->status(trim(path));
+  }
+
+  llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
+  openFileForRead(const llvm::Twine &path) final {
+    return m_underlying->openFileForRead(trim(path));
+  }
+
+  llvm::vfs::directory_iterator dir_begin(const llvm::Twine &Dir,
+                                          std::error_code &EC) final {
+    return m_underlying->dir_begin(Dir, EC);
+  }
+  llvm::ErrorOr<std::string> getCurrentWorkingDirectory() const final {
+    return m_underlying->getCurrentWorkingDirectory();
+  }
+  std::error_code setCurrentWorkingDirectory(const llvm::Twine &Path) final {
+    return m_underlying->setCurrentWorkingDirectory(Path);
+  }
+  std::error_code getRealPath(const llvm::Twine &Path,
+                              llvm::SmallVectorImpl<char> &Output) const final {
+    return m_underlying->getRealPath(Path, Output);
+  }
+  std::error_code isLocal(const llvm::Twine &Path, bool &Result) final {
+    return m_underlying->isLocal(Path, Result);
+  }
+
+protected:
+  FileSystem &getUnderlyingFS() { return *m_underlying; }
+
+  virtual void anchor() {}
+};
+
 TEST_P(BuildGraphTest, SimpleGraph) {
   Graph g;
   add_vertex(file_node("main.cpp").with_cost(1, 100 * B), g);
@@ -962,6 +1017,52 @@ TEST_P(BuildGraphTest, ExternalIncludeGuards) {
 
   llvm::Expected<build_graph::result> results = build_graph::from_dir(
       working_directory, {}, fs, get_file_type, GetParam());
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
+}
+
+// This checks that we can refer to files through multiple different
+// names without issues.  This covers issues found on Windows as it
+// does not care about capitalization and occassionally Clang gives
+// us forwardslashes instead of backslashes.  This caused a bug when
+// `--smaller-file-opt=true` was enabled and there were multiple
+// source files including a common header either with different
+// capitalization, or including `#include <windows.h>` and
+// `#include "windows.h"` (the latter would have a forward slash before
+// the filename instead of a backslash).
+TEST_P(BuildGraphTest, DifferentCapitalization) {
+  const std::string_view windows_h_code = "#pragma once\n"
+      "#define min(x,y) ((x<y)?x:y)\n";
+  const std::string_view main_cpp_code = "#include \"windows.h__\"\n";
+  const std::string_view main2_cpp_code = "#include \"windows.h___\"\n";
+
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  fs->addFile((working_directory / "windows.h").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(windows_h_code));
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  fs->addFile((working_directory / "main2.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main2_cpp_code));
+
+  Graph g;
+  const Graph::vertex_descriptor windows_h =
+      add_vertex(file_node("windows.h__")
+                     .with_cost(0, windows_h_code.size() * B)
+                     .set_internal_parents(2),
+                 g);
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      file_node("main.cpp").with_cost(1, main_cpp_code.size() * B), g);
+  const Graph::vertex_descriptor main2_cpp = add_vertex(
+      file_node("main2.cpp").with_cost(1, main2_cpp_code.size() * B), g);
+
+  add_edge(main_cpp, windows_h, {"\"windows.h__\"", 1}, g);
+  add_edge(main2_cpp, windows_h, {"\"windows.h___\"", 1}, g);
+
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, llvm::makeIntrusiveRefCnt<TrimFileSystem>(fs),
+      get_file_type, GetParam());
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
