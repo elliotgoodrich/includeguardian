@@ -1,5 +1,7 @@
 #include "get_total_cost.hpp"
 
+#include "dfs.hpp"
+
 #include <boost/units/io.hpp>
 
 #include <algorithm>
@@ -16,26 +18,13 @@ get_total_cost::from_graph(const Graph &graph,
   std::transform(std::execution::par, sources.begin(), sources.end(),
                  source_cost.data(),
                  [&](const Graph::vertex_descriptor source) {
-                   std::vector<bool> seen(num_vertices(graph));
-                   std::vector<Graph::vertex_descriptor> stack;
-                   stack.push_back(source);
-
+                   dfs_adaptor dfs(graph);
                    result total;
-                   while (!stack.empty()) {
-                     const Graph::vertex_descriptor v = stack.back();
-                     stack.pop_back();
-                     if (seen[v]) {
-                       continue;
-                     }
-
-                     seen[v] = true;
+                   for (const Graph::vertex_descriptor v : dfs.from(source)) {
                      total.true_cost += graph[v].true_cost();
                      if (graph[v].is_precompiled) {
                        total.precompiled += graph[v].underlying_cost;
                      }
-
-                     const auto [begin, end] = adjacent_vertices(v, graph);
-                     stack.insert(stack.end(), begin, end);
                    }
                    return total;
                  });

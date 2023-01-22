@@ -33,6 +33,7 @@ add_library(
     cost.hpp cost.cpp
     graph.hpp graph.cpp
     build_graph.hpp build_graph.cpp
+    dfs.hpp
     dot_graph.hpp dot_graph.cpp
     find_expensive_files.hpp find_expensive_files.cpp
     find_expensive_headers.hpp find_expensive_headers.cpp
