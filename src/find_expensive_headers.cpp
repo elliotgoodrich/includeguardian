@@ -1,180 +1,173 @@
 #include "find_expensive_headers.hpp"
 
+#include "dfs.hpp"
+#include "get_total_cost.hpp"
 #include "reachability_graph.hpp"
-
-#ifndef NDEBUG
-#include <boost/scope_exit.hpp>
-#endif
 
 #include <boost/units/io.hpp>
 
 #include <execution>
 #include <iomanip>
+#include <list>
 #include <numeric>
+#include <optional>
 #include <ostream>
 
 namespace IncludeGuardian {
 
 namespace {
 
-class DFSHelper {
-  enum search_state : std::uint8_t {
-    not_seen, // not found yet
-    seen,     // found in the first DFS from `file`
-    marked,
-  };
+template <typename G>
+get_total_cost::result
+from_graph_ref(const G &graph,
+               std::span<const typename G::vertex_descriptor> sources) {
 
-  const Graph &m_graph;
-  const reachability_graph<file_node, include_edge> &m_dag;
-  std::vector<unsigned> m_state;
-  std::vector<bool> m_reachable;
-  std::vector<Graph::vertex_descriptor> m_stack;
+  std::vector<get_total_cost::result> source_cost(num_vertices(graph));
+  std::transform(
+      std::execution::par, sources.begin(), sources.end(), source_cost.data(),
+      [&](const typename G::vertex_descriptor source) {
+        dfs_adaptor dfs(graph);
+        get_total_cost::result total;
+        for (const typename G::vertex_descriptor v : dfs.from(source)) {
+          total.true_cost += graph[v]->true_cost();
+          if (graph[v]->is_precompiled) {
+            total.precompiled += graph[v]->underlying_cost;
+          }
+        }
+        return total;
+      });
+  return std::reduce(source_cost.begin(), source_cost.end());
+}
 
-public:
-  DFSHelper(const Graph &graph,
-            const reachability_graph<file_node, include_edge> &dag)
-      : m_graph(graph), m_dag(dag), m_state(num_vertices(m_graph)),
-        m_reachable(num_vertices(m_graph)), m_stack() {
-    // Note that it's fine to leave `m_found` uninitialized since it's the first
-    // thing we do in `total_file_size_of_unreachable`.
+// Return the total file size for all vertices that are unreachable from
+// `source` if no files ever included `file` + an optional extra cost that
+// would occur if we needed to add a new source file.
+std::optional<cost> total_file_size_of_unreachable(
+    const Graph &graph, cost cost_before,
+    std::span<const Graph::vertex_descriptor> sources,
+    Graph::vertex_descriptor file,
+    const std::int64_t minimum_token_count_cut_off) {
+  const cost best_case_saving =
+      get_total_cost::from_graph(graph, {file}).true_cost;
+
+  // If **every** source saved the full amount and this
+  // doesn't hit the target we can exit early
+  if (static_cast<std::int64_t>(best_case_saving.token_count * sources.size()) <
+      minimum_token_count_cut_off) {
+    return std::nullopt;
   }
 
-  // Return the total file size for all vertices that are unreachable from
-  // `source` if no files ever included `file` + an optional extra cost that
-  // would occur if we needed to add a new source file.
-  std::pair<cost, std::optional<cost>> total_file_size_of_unreachable(
-      std::span<const Graph::vertex_descriptor> sources,
-      Graph::vertex_descriptor file) {
-    std::fill(m_state.begin(), m_state.end(), not_seen);
-    m_reachable.resize(num_vertices(m_graph), false);
+  // Build up a new graph that does not have any header file include `file`
+  // but instead the corresponding `source` file does
+  using NewGraph = boost::adjacency_list<boost::vecS, boost::vecS,
+                                         boost::directedS, const file_node *>;
+  NewGraph new_graph;
 
-#ifndef NDEBUG
-    // Make sure that we reset our temporary variable
-    BOOST_SCOPE_EXIT(&m_stack) { assert(m_stack.empty()); }
-    BOOST_SCOPE_EXIT_END
-#endif
-    std::vector<Graph::vertex_descriptor> descendents;
-
-    cost total_size;
-
-    // Do a DFS from `file` and add all vertices found to `marked`, summing
-    // up the total cost of all files found
-    m_stack.push_back(file);
-    while (!m_stack.empty()) {
-      const Graph::vertex_descriptor v = m_stack.back();
-      m_stack.pop_back();
-      if (m_state[v] == seen) {
-        continue;
-      }
-
-      total_size += m_graph[v].true_cost();
-      m_reachable[v] = true;
-      m_state[v] = seen;
-      descendents.emplace_back(v);
-      const auto [begin, end] = adjacent_vertices(v, m_graph);
-      m_stack.insert(m_stack.end(), begin, end);
-    }
-
-    cost savings;
-
-    // Go through all sources that included `file` and find what dependencies
-    // of `file` are reachable through other means.
-    for (const Graph::vertex_descriptor source : sources) {
-      // Do nothing if we're not reachable
-      if (!m_dag.is_reachable(source, file)) {
-        continue;
-      }
-
-      // If a source directly include `file`, then we gain nothing
-      const auto [begin, end] = adjacent_vertices(source, m_graph);
-      if (std::find(begin, end, file) != end) {
-        continue;
-      }
-
-      // Reset the state before we can use it again
-      std::fill(m_state.begin(), m_state.end(), not_seen);
-
-      // Mark the file as already seen, so we have to DFS through other
-      // paths
-      m_state[file] = seen;
-
-      // Assume we save the total cost of `file` and all its dependencies
-      savings += total_size;
-
-      // Once all found vertices are marked, we DFS from `file`
-      // only looking at unmarked vertices and summing up their file sizes
-      m_stack.push_back(source);
-      while (!m_stack.empty()) {
-        const Graph::vertex_descriptor v = m_stack.back();
-        m_stack.pop_back();
-        if (m_state[v] == seen) {
-          continue;
-        }
-
-        if (m_reachable[v]) {
-          // If we find something that's reachable not through `file`
-          // then subtract it from our potential savings.
-          savings -= m_graph[v].true_cost();
-        }
-
-        m_state[v] = seen;
-        const auto [begin, end] = adjacent_vertices(v, m_graph);
-        m_stack.insert(m_stack.end(), begin, end);
-      }
-
-      // Reset the state
-      std::fill(m_state.begin(), m_state.end(), not_seen);
-    }
-
-    // If we don't have a source...
-    if (!m_graph[file].component.has_value()) {
-      // ...we would have to recommend adding a new source file that would
-      // include `file`, costing `total_size`.
-      return {savings, total_size};
-    } else {
-      // If we already have a source, there's no extra cost
-      return {savings, std::nullopt};
-    }
+  // Add all vertices
+  for (const Graph::vertex_descriptor v :
+       boost::make_iterator_range(vertices(graph))) {
+    add_vertex(&graph[v], new_graph);
   }
-};
+
+  // Mark all sources
+  std::vector<bool> is_source(num_vertices(graph));
+  for (const Graph::vertex_descriptor source : sources) {
+    is_source[source] = true;
+  }
+
+  std::list<file_node> fake_file_nodes;
+  std::vector<Graph::vertex_descriptor> new_sources;
+
+  // If we have an include
+  std::vector<bool> headers_including_file(num_vertices(graph));
+  int including_header_count = 0;
+  for (const Graph::edge_descriptor &e :
+       boost::make_iterator_range(edges(graph))) {
+    const Graph::vertex_descriptor t = target(e, graph);
+    if (t == file) {
+      const Graph::vertex_descriptor s = source(e, graph);
+      if (!is_source[s]) {
+        // If we're a header and we include `file`, then don't add
+        // the edge, but instead add an edge between our source
+        // file and `file` (or create a source if we don't have one)
+        headers_including_file[s] = true;
+        ++including_header_count;
+        if (graph[s].component.has_value()) {
+          const Graph::vertex_descriptor source = *graph[s].component;
+          if (is_source[source]) {
+            // This should always be true, but maybe we made a mistake
+            // in our "is source" heuristic when building
+            add_edge(source, t, new_graph);
+          } else {
+            assert(false);
+          }
+        } else {
+          // If the header didn't have a source, we'd need to create a
+          // new one
+          const Graph::vertex_descriptor new_source =
+              add_vertex(&fake_file_nodes.emplace_back(), new_graph);
+          new_sources.push_back(new_source);
+          add_edge(new_source, t, new_graph);
+          add_edge(new_source, s, new_graph);
+        }
+        continue;
+      }
+    }
+
+    add_edge(source(e, graph), t, new_graph);
+  }
+
+  std::vector<Graph::vertex_descriptor> full_sources;
+  if (!new_sources.empty()) {
+    full_sources.resize(sources.size() + new_sources.size());
+    const auto it =
+        std::copy(sources.begin(), sources.end(), full_sources.begin());
+    std::copy(new_sources.begin(), new_sources.end(), it);
+    sources = full_sources;
+  }
+
+  const cost cost_after = from_graph_ref(new_graph, sources).true_cost;
+  return cost_before - cost_after;
+}
 
 } // namespace
 
 std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
-    const int minimum_token_count_cut_off,
+    const std::int64_t minimum_token_count_cut_off,
     const unsigned maximum_dependencies) {
   reachability_graph reach(graph);
   std::mutex m;
   std::vector<find_expensive_headers::result> results;
+  const cost cost_before = get_total_cost::from_graph(graph, sources).true_cost;
   const auto [begin, end] = vertices(graph);
-  std::for_each(std::execution::par, begin, end,
-                [&](const Graph::vertex_descriptor file) {
-                  // If we do not include this file ourselves, there is no point
-                  // performing the analysis
-                  if (graph[file].internal_incoming == 0) {
-                    return;
-                  }
+  std::for_each(
+      std::execution::par, begin, end,
+      [&](const Graph::vertex_descriptor file) {
+        // If we do not include this file ourselves, there is no point
+        // performing the analysis
+        if (graph[file].internal_incoming == 0) {
+          return;
+        }
 
-                  DFSHelper helper(graph, reach);
-                  const auto [saving, extra] =
-                      helper.total_file_size_of_unreachable(sources, file);
+        const std::optional<cost> saving = total_file_size_of_unreachable(
+            graph, cost_before, sources, file, minimum_token_count_cut_off);
 
-                  if (saving.token_count - extra.value_or(cost{}).token_count >=
-                      minimum_token_count_cut_off) {
-                    // There are ways to avoid this mutex, but if the
-                    // `minimum_size_cut_off` is large enough, it's relatively
-                    // rare to enter this if statement
-                    std::lock_guard g(m);
-                    results.emplace_back(file, saving, extra);
-                  }
-                });
+        if (saving.has_value() &&
+            saving->token_count >= minimum_token_count_cut_off) {
+          // There are ways to avoid this mutex, but if the
+          // `minimum_size_cut_off` is large enough, it's relatively
+          // rare to enter this if statement
+          std::lock_guard g(m);
+          results.emplace_back(file, *saving);
+        }
+      });
   return results;
 }
 
 std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
     const Graph &graph, std::initializer_list<Graph::vertex_descriptor> sources,
-    const int minimum_token_count_cut_off,
+    const std::int64_t minimum_token_count_cut_off,
     const unsigned maximum_dependencies) {
   return from_graph(graph, std::span(sources.begin(), sources.end()),
                     minimum_token_count_cut_off, maximum_dependencies);
@@ -182,8 +175,7 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
 
 bool operator==(const find_expensive_headers::result &lhs,
                 const find_expensive_headers::result &rhs) {
-  return lhs.v == rhs.v && lhs.saving == rhs.saving &&
-         lhs.new_source_cost == rhs.new_source_cost;
+  return lhs.v == rhs.v && lhs.saving == rhs.saving;
 }
 
 bool operator!=(const find_expensive_headers::result &lhs,
@@ -193,11 +185,7 @@ bool operator!=(const find_expensive_headers::result &lhs,
 
 std::ostream &operator<<(std::ostream &out,
                          const find_expensive_headers::result &v) {
-  out << '[' << v.v << " saving=" << v.saving;
-  if (v.new_source_cost.has_value()) {
-    out << "extra_cost=" << *v.new_source_cost;
-  }
-  return out << ']';
+  return out << '[' << v.v << " saving=" << v.saving << ']';
 }
 
 } // namespace IncludeGuardian

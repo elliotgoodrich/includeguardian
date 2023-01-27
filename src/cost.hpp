@@ -27,6 +27,8 @@ std::ostream &operator<<(std::ostream &stream, cost c);
 bool operator==(cost lhs, cost rhs);
 bool operator!=(cost lhs, cost rhs);
 
+cost operator-(cost v);
+
 cost &operator+=(cost &lhs, cost rhs);
 cost &operator-=(cost &lhs, cost rhs);
 cost operator+(cost lhs, cost rhs);

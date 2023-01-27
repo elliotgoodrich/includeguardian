@@ -37,7 +37,7 @@ public:
 
   dag_iterator &operator++() {
     // Pop this element and push all its children
-    const Graph::vertex_descriptor v = *m_it;
+    const GRAPH::vertex_descriptor v = *m_it;
     m_seen[v] = true;
     const auto [begin, end] = adjacent_vertices(v, *m_graph);
     m_it = std::prev(std::copy(begin, end, m_it));
@@ -70,6 +70,11 @@ template <typename GRAPH> struct temp_dag_range {
   temp_dag_range(const GRAPH &graph, typename GRAPH::vertex_descriptor start,
                  bool *seen, typename GRAPH::vertex_descriptor *stack)
       : m_graph(&graph), m_start(start), m_seen(seen), m_stack(stack) {}
+
+  temp_dag_range& skipping(const typename GRAPH::vertex_descriptor v) {
+      m_seen[v] = true;
+      return *this;
+  }
 
   dag_iterator<GRAPH> end() { return dag_iterator<GRAPH>(m_stack); }
 

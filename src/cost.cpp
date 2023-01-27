@@ -19,6 +19,10 @@ std::ostream &operator<<(std::ostream &stream, cost c) {
                 << ", " << c.file_size << '}';
 }
 
+cost operator-(cost v) {
+    return {-v.token_count, -v.file_size};
+}
+
 bool operator==(cost lhs, cost rhs) {
   return lhs.token_count == rhs.token_count && lhs.file_size == rhs.file_size;
 }

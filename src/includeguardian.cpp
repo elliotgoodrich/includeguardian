@@ -816,8 +816,8 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       std::sort(results.begin(), results.end(),
                 [](const find_expensive_headers::result &l,
                    const find_expensive_headers::result &r) {
-                  return l.total_saving().token_count >
-                         r.total_saving().token_count;
+                  return l.saving.token_count >
+                         r.saving.token_count;
                 });
 
       ArrayPrinter results_out = make_private.arr("results");
@@ -826,7 +826,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
         result_out.property("file", graph[i.v]);
         result_out.property("reference count", graph[i.v].internal_incoming);
         result_out.property("saving",
-                            percent((100.0 * i.total_saving().token_count) /
+                            percent((100.0 * i.saving.token_count) /
                                     project_cost.true_cost.token_count));
       }
     }
