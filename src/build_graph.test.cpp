@@ -1033,7 +1033,7 @@ TEST_P(BuildGraphTest, ExternalIncludeGuards) {
 // the filename instead of a backslash).
 TEST_P(BuildGraphTest, DifferentCapitalization) {
   const std::string_view windows_h_code = "#pragma once\n"
-      "#define min(x,y) ((x<y)?x:y)\n";
+                                          "#define min(x,y) ((x<y)?x:y)\n";
   const std::string_view main_cpp_code = "#include \"windows.h__\"\n";
   const std::string_view main2_cpp_code = "#include \"windows.h___\"\n";
 
@@ -1066,6 +1066,44 @@ TEST_P(BuildGraphTest, DifferentCapitalization) {
   EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
   EXPECT_THAT(results->missing_includes, IsEmpty());
   EXPECT_THAT(results->unguarded_files, IsEmpty());
+}
+
+// Test that we can have a source file recursively include itself.
+// This is sometimes seen in the wild in unit tests that want
+// parameterized tests for testing macros.
+TEST_P(BuildGraphTest, RecursiveSource) {
+  const std::string_view a_cpp_code = "#ifndef COUNT\n"
+                                      "  #define COUNT 0\n"
+                                      "  #include \"a.cpp\"\n"
+                                      "#elsif COUNT == 1\n"
+                                      "  #undef COUNT\n"
+                                      "  #define COUNT 2\n"
+                                      "  #include \"a.cpp\"\n"
+                                      "#elsif COUNT == 2\n"
+                                      "  #undef COUNT\n"
+                                      "  #define COUNT 3\n"
+                                      "  #include \"a.cpp\"\n"
+                                      "#endif\n";
+
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  fs->addFile((working_directory / "a.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(a_cpp_code));
+
+  Graph g;
+  const Graph::vertex_descriptor a_cpp =
+      add_vertex(file_node("a.cpp")
+                     .with_cost(1, 4 * a_cpp_code.size() * B)
+                     .set_internal_parents(1),
+                 g);
+
+  add_edge(a_cpp, a_cpp, {"\"a.cpp\"", 3}, g);
+
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, UnorderedElementsAre(a_cpp));
 }
 
 INSTANTIATE_TEST_CASE_P(

@@ -642,8 +642,12 @@ public:
 
     // Guess at whether this include is the interface for our source file
     // TODO: Check we are a source file
-    const bool is_component =
-        m_r.graph[from].path.stem() == m_r.graph[to].path.stem();
+
+    // We must check that we're not self-including as can be the case in
+    // certain strange situations where test drivers recursively include
+    // themselves in order to do parameterized testing.
+    const bool is_component = from != to && (m_r.graph[from].path.stem() ==
+                                             m_r.graph[to].path.stem());
 
     // If we are in the predefines section assume this include cannot be
     // removed
