@@ -934,7 +934,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       for (const find_unnecessary_sources::result &i : results) {
         ObjPrinter result_out = results_out.obj();
         result_out.property("source", graph[i.source].path);
-        result_out.property("token count",
+        result_out.property("saving",
                             percent((100.0 * i.total_saving().token_count) /
                                     project_cost.true_cost.token_count));
       }
