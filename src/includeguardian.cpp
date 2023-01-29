@@ -116,11 +116,13 @@ void yaml_value(std::ostream &o, cost d) {
 
 void yaml_value(std::ostream &o, std::string_view s) {
   if (std::any_of(s.begin(), s.end(),
-                  [](char c) { return c == '\\' || c == '"'; })) {
+                  [](char c) { return c == '\\' || c == '"' || c == '#'; })) {
     // If we contain a backslash or a double quote, then we need to
     // surround with single quotes and double up any single quotes.
     // This does not support non-printable characters, which need
     // to be surrounded by double quotes.
+    // We also surround strings that contain a `#` because VisualStudio
+    // code highlights these as a comment
     o << punc_color << '\'' << str_color;
     auto it = s.begin();
     while (true) {
