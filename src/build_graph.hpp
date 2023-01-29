@@ -36,6 +36,7 @@ struct build_graph {
 
   struct options {
     bool replace_file_optimization = false;
+    std::function<void(const std::filesystem::path &)> source_processed;
 
     options() = default;
 
@@ -78,8 +79,7 @@ struct build_graph {
                                      clang::SrcMgr::CharacteristicKind>>
                include_dirs,
            llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
-           std::function<file_type(std::string_view)> file_type,
-           options opts,
+           std::function<file_type(std::string_view)> file_type, options opts,
            std::span<const std::filesystem::path> forced_includes =
                std::span<const std::filesystem::path>());
   static llvm::Expected<result> from_dir(
@@ -92,7 +92,7 @@ struct build_graph {
       std::initializer_list<std::filesystem::path> forced_includes = {});
 };
 
-std::ostream& operator<<(std::ostream& out, build_graph::options opts);
+std::ostream &operator<<(std::ostream &out, build_graph::options opts);
 
 } // namespace IncludeGuardian
 

@@ -47,8 +47,8 @@ const bool LOG = false;
 // includes in order to debug more easily.  To enable, remove the
 // `return true` and add filenames to the `allow_list`.
 bool allowed(const clang::FileEntry *f) {
-    return true;
-    const std::initializer_list<llvm::StringRef> allow_list = {};
+  return true;
+  const std::initializer_list<llvm::StringRef> allow_list = {};
 
   return std::find_if(allow_list.begin(), allow_list.end(), [f](auto x) {
            return x ==
@@ -306,7 +306,8 @@ struct ReplaceWith {
   Graph::vertex_descriptor v;
 };
 
-using NeedsReplacing = std::unordered_map<llvm::sys::fs::UniqueID, ReplaceWith, Hasher>;
+using NeedsReplacing =
+    std::unordered_map<llvm::sys::fs::UniqueID, ReplaceWith, Hasher>;
 
 struct IncludeScanner : public clang::PPCallbacks {
   clang::SourceManager *m_sm;
@@ -319,7 +320,7 @@ struct IncludeScanner : public clang::PPCallbacks {
   std::uint64_t m_accounted_for_token_count;
   clang::Preprocessor *m_pp;
   std::filesystem::path m_working_dir;
-  bool m_replace_file_optimization;
+  build_graph::options &m_options;
   int m_skip_count = 0;
 
   void update_cost_when_leaving_file(const clang::FileEntry *file) {
@@ -391,12 +392,11 @@ public:
       build_graph::result &r, UniqueIdToNode &id_to_node,
       NeedsReplacing &needs_replacing, std::vector<bool> &replaced,
       clang::Preprocessor &pp, const std::filesystem::path &working_dir,
-      bool replace_file_optimization)
+      build_graph::options &options)
       : m_r(r), m_sm(&pp.getSourceManager()), m_id_to_node(id_to_node),
         m_needs_replacing(needs_replacing), m_replaced(replaced),
         m_file_type(file_type), m_pp(&pp), m_accounted_for_token_count{0u},
-        m_working_dir(working_dir),
-        m_replace_file_optimization(replace_file_optimization) {}
+        m_working_dir(working_dir), m_options(options) {}
 
   void FileChanged(clang::SourceLocation Loc, FileChangeReason Reason,
                    clang::SrcMgr::CharacteristicKind FileType,
@@ -421,7 +421,7 @@ public:
             std::filesystem::path(file->getName().str())
                 .lexically_relative(m_working_dir);
         it->second.v = add_vertex(rel, m_r.graph);
-        if (m_replace_file_optimization) {
+        if (m_options.replace_file_optimization) {
           m_replaced.resize(it->second.v + 1);
         }
 #ifdef _DEBUG
@@ -496,7 +496,7 @@ public:
         if (!state.fully_processed) {
           // If we are fully guarded, then make sure that subsequent includes
           // won't do anything.
-          if (m_replace_file_optimization && !m_replaced[state.v]) {
+          if (m_options.replace_file_optimization && !m_replaced[state.v]) {
             m_needs_replacing.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(file->getUniqueID()),
@@ -594,7 +594,7 @@ public:
                          .set_external(clang::SrcMgr::isSystem(FileType))
                          .set_precompiled(is_precompiled),
                      m_r.graph);
-      if (m_replace_file_optimization) {
+      if (m_options.replace_file_optimization) {
         m_replaced.resize(it->second.v + 1);
       }
 #ifdef _DEBUG
@@ -626,7 +626,7 @@ public:
     const char close = IsAngled ? '>' : '"';
     include.insert(include.cend(), &close, &close + 1);
 
-    if (m_replace_file_optimization && m_replaced[state.v]) {
+    if (m_options.replace_file_optimization && m_replaced[state.v]) {
       state.replacement_contents += "#include ";
       state.replacement_contents += include;
       state.replacement_contents += '\n';
@@ -713,7 +713,7 @@ public:
     if (m_skip_count) {
       return;
     }
-    if (!m_replace_file_optimization) {
+    if (!m_options.replace_file_optimization) {
       return;
     }
 
@@ -752,7 +752,7 @@ public:
     if (m_skip_count) {
       return;
     }
-    if (!m_replace_file_optimization) {
+    if (!m_options.replace_file_optimization) {
       return;
     }
 
@@ -782,6 +782,9 @@ public:
 
   void EndOfMainFile() final {
     assert(m_stack.size() == 1);
+    if (m_options.source_processed) {
+      m_options.source_processed(m_r.graph[m_stack[0].it->second.v].path);
+    }
     update_cost_when_leaving_file(
         m_sm->getFileEntryForID(m_sm->getMainFileID()));
     m_r.graph[m_stack.back().it->second.v].underlying_cost = m_stack.back().c;
@@ -799,6 +802,7 @@ class ExpensiveAction : public clang::PreprocessOnlyAction {
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_fs;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::filesystem::path m_working_dir;
+  build_graph::options &m_options;
 
 public:
   ExpensiveAction(
@@ -807,10 +811,11 @@ public:
       llvm::IntrusiveRefCntPtr<OverwriteFileSystem> in_memory_fs,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
-      const std::filesystem::path &working_dir, bool replace_file_optimization)
+      const std::filesystem::path &working_dir, build_graph::options &options)
       : m_f(), m_ci(nullptr), m_r(r), m_id_to_node(id_to_node),
         m_needs_replacing(), m_replaced(replaced), m_in_memory_fs(in_memory_fs),
-        m_fs(fs), m_file_type(file_type), m_working_dir(working_dir) {}
+        m_fs(fs), m_file_type(file_type), m_working_dir(working_dir),
+        m_options(options) {}
 
   bool BeginInvocation(clang::CompilerInstance &ci) final {
     ci.getDiagnostics().setSuppressAllDiagnostics(true);
@@ -831,7 +836,7 @@ public:
     getCompilerInstance().getPreprocessor().addPPCallbacks(
         std::make_unique<IncludeScanner>(
             m_file_type, m_r, m_id_to_node, m_needs_replacing, m_replaced,
-            m_ci->getPreprocessor(), m_working_dir, m_in_memory_fs != nullptr));
+            m_ci->getPreprocessor(), m_working_dir, m_options));
 
     clang::PreprocessOnlyAction::ExecuteAction();
   }
@@ -865,6 +870,7 @@ class find_graph_factory : public clang::tooling::FrontendActionFactory {
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_fs;
   std::function<build_graph::file_type(std::string_view)> m_file_type;
   std::filesystem::path m_working_dir;
+  build_graph::options m_options;
 
 public:
   /// Create a `print_graph_factory`.
@@ -873,10 +879,10 @@ public:
       llvm::IntrusiveRefCntPtr<OverwriteFileSystem> in_memory_fs,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
       const std::function<build_graph::file_type(std::string_view)> &file_type,
-      const std::filesystem::path &working_dir)
+      const std::filesystem::path &working_dir, build_graph::options &&options)
       : m_r(r), m_id_to_node(id_to_node), m_replaced(),
         m_in_memory_fs(in_memory_fs), m_fs(fs), m_working_dir(working_dir),
-        m_file_type(file_type) {}
+        m_file_type(file_type), m_options(std::move(options)) {}
 
   /// Invokes the compiler with a FrontendAction created by create().
   bool
@@ -913,9 +919,9 @@ public:
 
   /// Returns a new `clang::FrontendAction`.
   std::unique_ptr<clang::FrontendAction> create() final {
-    return std::make_unique<ExpensiveAction>(
-        m_r, m_id_to_node, m_replaced, m_in_memory_fs, m_fs, m_file_type,
-        m_working_dir, m_in_memory_fs != nullptr);
+    return std::make_unique<ExpensiveAction>(m_r, m_id_to_node, m_replaced,
+                                             m_in_memory_fs, m_fs, m_file_type,
+                                             m_working_dir, m_options);
   }
 };
 
@@ -966,7 +972,8 @@ llvm::Expected<build_graph::result> build_graph::from_compilation_db(
 
   UniqueIdToNode id_to_node;
   result r;
-  find_graph_factory f(r, id_to_node, in_memory, fs, file_type, working_dir);
+  find_graph_factory f(r, id_to_node, in_memory, fs, file_type, working_dir,
+                       std::move(opts));
   const int rc = tool.run(&f);
   if (rc != 0) {
     return llvm::createStringError(std::error_code(rc, std::generic_category()),
@@ -1021,7 +1028,8 @@ llvm::Expected<build_graph::result> build_graph::from_dir(
     }
   }
 
-  return from_compilation_db(db, source_dir, db.m_sources, file_type, fs, opts);
+  return from_compilation_db(db, source_dir, db.m_sources, file_type, fs,
+                             std::move(opts));
 }
 
 llvm::Expected<build_graph::result> build_graph::from_dir(
@@ -1034,7 +1042,7 @@ llvm::Expected<build_graph::result> build_graph::from_dir(
     std::initializer_list<std::filesystem::path> forced_includes) {
   return from_dir(source_dir,
                   std::span(include_dirs.begin(), include_dirs.end()), fs,
-                  file_type, opts,
+                  file_type, std::move(opts),
                   std::span(forced_includes.begin(), forced_includes.end()));
 }
 

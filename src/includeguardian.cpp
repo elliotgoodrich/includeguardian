@@ -168,6 +168,10 @@ class ArrayPrinter {
 public:
   ArrayPrinter(std::ostream &out, int indent) : o(out), m_indent(indent) {}
 
+  ArrayPrinter(ArrayPrinter &&other)
+      : o(other.o), m_indent(other.m_indent),
+        m_num_entries(std::exchange(other.m_num_entries, -1)) {}
+
   ~ArrayPrinter() {
     if (m_num_entries == 0) {
       o << "[]\n";
@@ -477,7 +481,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
   llvm::cl::opt<bool> show_sources(
       "show-sources", llvm::cl::desc("Whether to output all source files"),
-      llvm::cl::value_desc("enabled"), llvm::cl::init(false),
+      llvm::cl::value_desc("enabled"), llvm::cl::init(true),
       llvm::cl::cat(build_category));
 
   llvm::cl::OptionCategory topological_category("Topological Order Options");
@@ -557,7 +561,18 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
                                      ss.append(arg);
                                      return std::move(ss);
                                    }));
-    stats.key("processing time");
+  }
+
+  build_graph::options options;
+  options.enable_replace_file_optimization(smaller_file_opt);
+  std::optional<ArrayPrinter> sources_printer;
+  if (show_sources.getValue()) {
+    sources_printer.emplace(stats.arr("sources"));
+    options.source_processed = [&](const std::filesystem::path &source) {
+      sources_printer->value(source.string());
+    };
+  } else {
+    stats.comment("sources: pass --show-sources to list source files");
   }
 
   auto result = [&]() -> llvm::Expected<build_graph::result> {
@@ -566,7 +581,8 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       std::ifstream ifs(load_path.getValue()); // save to file
       boost::archive::text_iarchive ia(ifs);
       ia >> r.graph;
-      stats.value(timer.restart());
+      sources_printer.reset();
+      stats.property("processing time", timer.restart());
       return r;
     } else {
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs =
@@ -637,12 +653,12 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
           raw_sources.begin(), raw_sources.end(), source_files.begin(),
           [](const std::string &s) { return std::filesystem::path(s); });
 
-      auto result = build_graph::from_compilation_db(
-          *db, std::filesystem::current_path(), source_files, map_ext, fs,
-          build_graph::options().enable_replace_file_optimization(
-              smaller_file_opt));
+      auto result =
+          build_graph::from_compilation_db(*db, std::filesystem::current_path(),
+                                           source_files, map_ext, fs, options);
 
-      stats.value(timer.restart());
+      sources_printer.reset();
+      stats.property("processing time", timer.restart());
       return result;
     }
   }();
@@ -658,14 +674,6 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   const auto &missing = result->missing_includes;
   const auto &unguarded = result->unguarded_files;
 
-  if (show_sources.getValue()) {
-    ArrayPrinter arr = stats.arr("sources");
-    for (Graph::vertex_descriptor v : sources) {
-      arr.value(graph[v].path.string());
-    }
-  } else {
-    stats.comment("sources: pass --show-sources to list source files");
-  }
   stats.property("source count", sources.size());
   stats.property("file count", num_vertices(graph));
   stats.property("include directives", num_edges(graph));
@@ -816,8 +824,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       std::sort(results.begin(), results.end(),
                 [](const find_expensive_headers::result &l,
                    const find_expensive_headers::result &r) {
-                  return l.saving.token_count >
-                         r.saving.token_count;
+                  return l.saving.token_count > r.saving.token_count;
                 });
 
       ArrayPrinter results_out = make_private.arr("results");
