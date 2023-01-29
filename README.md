@@ -120,6 +120,24 @@ strive to have a quick response on new pull requests.
 Find a header/source pair where the header is not included by any other
 component
 
+### Bad include macro
+
+Check to see if its UB (i.e. leading underscore)
+
+### Combine results
+
+For example, some headers may only be necessary on certain platforms and we
+may accidentally report that some components are unused.  In the CI, we
+can combine these results to only warn for components that are unused
+across multiple settings.
+
+### Visualization
+
+For the CI, we should be able to have a really nice graph visualization where
+we can zoom in and out on our components.  Then if you click on a component
+we can zoom in to see the methods etc.  Clicking on a type used in a method
+signature would zoom us over to that component
+
 ### Conversion to modules
 
 Eventually IncludeGuardian is not going to be as useful as C++ projects would
