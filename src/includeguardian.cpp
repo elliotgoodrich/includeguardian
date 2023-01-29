@@ -741,9 +741,6 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
                  "second time");
       an.comment("for each source.");
       ObjPrinter unguarded_files = an.obj("unguarded files");
-      unguarded_files.property("time taken",
-                               std::chrono::steady_clock::duration::zero());
-      ArrayPrinter results = unguarded_files.arr("results");
       std::vector<Graph::vertex_descriptor> unguarded_copy;
       std::copy_if(unguarded.begin(), unguarded.end(),
                    std::back_inserter(unguarded_copy),
@@ -754,6 +751,9 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
                 [&](Graph::vertex_descriptor l, Graph::vertex_descriptor r) {
                   return in_degree(l, graph) > in_degree(r, graph);
                 });
+      unguarded_files.property("time taken", timer.restart());
+
+      ArrayPrinter results = unguarded_files.arr("results");
       std::for_each(unguarded_copy.begin(), unguarded_copy.end(),
                     [&](Graph::vertex_descriptor v) {
                       ObjPrinter result = results.obj();
@@ -767,6 +767,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       an.comment(
           "These are components that have a header file that is not included");
       an.comment("by any other component and may be a candidate for removal.");
+      ObjPrinter unreferenced = an.obj("unreferenced components");
 
       // Use an arbitrary minimum size because unused components can have a
       // small amount of code that we shouldn't care about too much as long as
@@ -774,13 +775,12 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       const int minimum_size = 10;
       std::vector<component_and_cost> results =
           find_unused_components::from_graph(graph, sources, 0u, minimum_size);
-      ObjPrinter unreferenced = an.obj("unreferenced components");
-      unreferenced.property("time taken", timer.restart());
       std::sort(results.begin(), results.end(),
                 [](const component_and_cost &l, const component_and_cost &r) {
                   return l.saving.token_count > r.saving.token_count;
                 });
 
+      unreferenced.property("time taken", timer.restart());
       ArrayPrinter results_out = unreferenced.arr("results");
       for (const component_and_cost &i : results) {
         ObjPrinter result = results_out.obj();
@@ -791,18 +791,18 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
     }
     {
       out << '\n';
+      an.comment("This is a list of the most costly #include directives.");
+      ObjPrinter include_directives = an.obj("include directives");
       std::vector<include_directive_and_cost> results =
           find_expensive_includes::from_graph(
               graph, sources,
               project_cost.true_cost.token_count * percent_cut_off);
-      an.comment("This is a list of the most costly #include directives.");
-      ObjPrinter include_directives = an.obj("include directives");
-      include_directives.property("time", timer.restart());
       std::sort(results.begin(), results.end(),
                 [](const include_directive_and_cost &l,
                    const include_directive_and_cost &r) {
                   return l.saving.token_count > r.saving.token_count;
                 });
+      include_directives.property("time", timer.restart());
 
       ArrayPrinter results_out = include_directives.arr("results");
       for (const include_directive_and_cost &i : results) {
@@ -818,21 +818,21 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
     {
       out << '\n';
-      std::vector<find_expensive_headers::result> results =
-          find_expensive_headers::from_graph(
-              graph, sources,
-              project_cost.true_cost.token_count * percent_cut_off);
       an.comment(
           "This is a list of all header files that should be considered");
       an.comment(
           "to not be included by other header files, but source files only");
       ObjPrinter make_private = an.obj("make private");
-      make_private.property("time", timer.restart());
+      std::vector<find_expensive_headers::result> results =
+          find_expensive_headers::from_graph(
+              graph, sources,
+              project_cost.true_cost.token_count * percent_cut_off);
       std::sort(results.begin(), results.end(),
                 [](const find_expensive_headers::result &l,
                    const find_expensive_headers::result &r) {
                   return l.saving.token_count > r.saving.token_count;
                 });
+      make_private.property("time", timer.restart());
 
       ArrayPrinter results_out = make_private.arr("results");
       for (const find_expensive_headers::result &i : results) {
@@ -847,21 +847,21 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
     {
       out << '\n';
+      an.comment(
+          "This is a list of all header files that should be considered");
+      an.comment("to be added to the precompiled header:");
+      ObjPrinter pch_additions = an.obj("pch additions");
       std::vector<recommend_precompiled::result> results =
           recommend_precompiled::from_graph(graph, sources,
                                             project_cost.true_cost.token_count *
                                                 percent_cut_off,
                                             pch_ratio.getValue());
-      an.comment(
-          "This is a list of all header files that should be considered");
-      an.comment("to be added to the precompiled header:");
-      ObjPrinter pch_additions = an.obj("pch additions");
-      pch_additions.property("time", timer.restart());
       std::sort(results.begin(), results.end(),
                 [](const recommend_precompiled::result &l,
                    const recommend_precompiled::result &r) {
                   return l.saving.token_count > r.saving.token_count;
                 });
+      pch_additions.property("time", timer.restart());
 
       ArrayPrinter results_out = pch_additions.arr("results");
       for (const recommend_precompiled::result &i : results) {
@@ -875,6 +875,10 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
     {
       out << '\n';
+      an.comment("This is a list of all comparatively large files that");
+      an.comment("should be considered to be simplified or split into");
+      an.comment("smaller parts and #includes updated:");
+      ObjPrinter large_files = an.obj("large files");
 
       // Assume that each "expensive" file could be reduced this much
       const double assumed_reduction = 0.50;
@@ -882,11 +886,6 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
           graph, sources,
           project_cost.true_cost.token_count * percent_cut_off /
               assumed_reduction);
-      an.comment("This is a list of all comparatively large files that");
-      an.comment("should be considered to be simplified or split into");
-      an.comment("smaller parts and #includes updated:");
-      ObjPrinter large_files = an.obj("large files");
-      large_files.property("time", timer.restart());
       large_files.property("assumed reduction",
                            percent(assumed_reduction * 100));
       std::sort(
@@ -897,6 +896,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
                    static_cast<std::size_t>(r.node->true_cost().token_count) *
                        r.sources;
           });
+      large_files.property("time", timer.restart());
 
       ArrayPrinter results_out = large_files.arr("results");
       for (const file_and_cost &i : results) {
@@ -912,22 +912,23 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
     {
       out << '\n';
-      std::vector<find_unnecessary_sources::result> results =
-          find_unnecessary_sources::from_graph(
-              graph, sources,
-              project_cost.true_cost.token_count * percent_cut_off);
       an.comment(
           "This is a list of all source files that should be considered");
       an.comment(
           "to be inlined into the header and then the source file removed:");
       ObjPrinter inline_sources = an.obj("inline sources");
-      inline_sources.property("time", timer.restart());
+
+      std::vector<find_unnecessary_sources::result> results =
+          find_unnecessary_sources::from_graph(
+              graph, sources,
+              project_cost.true_cost.token_count * percent_cut_off);
       std::sort(results.begin(), results.end(),
                 [](const find_unnecessary_sources::result &l,
                    const find_unnecessary_sources::result &r) {
                   return l.total_saving().token_count >
                          r.total_saving().token_count;
                 });
+      inline_sources.property("time", timer.restart());
 
       ArrayPrinter results_out = inline_sources.arr("results");
       for (const find_unnecessary_sources::result &i : results) {
