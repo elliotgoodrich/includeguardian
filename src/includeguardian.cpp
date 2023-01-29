@@ -748,7 +748,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       std::copy_if(unguarded.begin(), unguarded.end(),
                    std::back_inserter(unguarded_copy),
                    [&](const Graph::vertex_descriptor v) {
-                     return in_degree(v, graph) > 1;
+                     return !graph[v].is_external && in_degree(v, graph) > 1;
                    });
       std::sort(unguarded_copy.begin(), unguarded_copy.end(),
                 [&](Graph::vertex_descriptor l, Graph::vertex_descriptor r) {
