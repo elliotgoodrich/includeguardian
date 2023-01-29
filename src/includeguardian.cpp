@@ -767,8 +767,13 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       an.comment(
           "These are components that have a header file that is not included");
       an.comment("by any other component and may be a candidate for removal.");
+
+      // Use an arbitrary minimum size because unused components can have a
+      // small amount of code that we shouldn't care about too much as long as
+      // it's trivial.
+      const int minimum_size = 10;
       std::vector<component_and_cost> results =
-          find_unused_components::from_graph(graph, sources, 0u);
+          find_unused_components::from_graph(graph, sources, 0u, minimum_size);
       ObjPrinter unreferenced = an.obj("unreferenced components");
       unreferenced.property("time taken", timer.restart());
       std::sort(results.begin(), results.end(),
