@@ -47,6 +47,13 @@ std::optional<cost> total_file_size_of_unreachable(
     std::span<const Graph::vertex_descriptor> sources,
     Graph::vertex_descriptor file,
     const std::int64_t minimum_token_count_cut_off) {
+
+  // If we don't include this file ourselves then there's no need to
+  // check further
+  if (graph[file].internal_incoming == 0) {
+    return std::nullopt;
+  }
+
   const cost best_case_saving =
       get_total_cost::from_graph(graph, {file}).true_cost;
 
@@ -83,9 +90,9 @@ std::optional<cost> total_file_size_of_unreachable(
   int including_header_count = 0;
   for (const Graph::edge_descriptor &e :
        boost::make_iterator_range(edges(graph))) {
+    const Graph::vertex_descriptor s = source(e, graph);
     const Graph::vertex_descriptor t = target(e, graph);
-    if (t == file) {
-      const Graph::vertex_descriptor s = source(e, graph);
+    if (!graph[s].is_external && t == file) {
       if (!is_source[s]) {
         // If we're a header and we include `file`, then don't add
         // the edge, but instead add an edge between our source
@@ -114,7 +121,7 @@ std::optional<cost> total_file_size_of_unreachable(
       }
     }
 
-    add_edge(source(e, graph), t, new_graph);
+    add_edge(s, t, new_graph);
   }
 
   std::vector<Graph::vertex_descriptor> full_sources;
@@ -130,6 +137,16 @@ std::optional<cost> total_file_size_of_unreachable(
   return cost_before - cost_after;
 }
 
+int count_headers(const Graph &graph, const Graph::vertex_descriptor v,
+                  const std::vector<bool> &is_source) {
+  const auto [begin, end] = in_edges(v, graph);
+  return std::accumulate(
+      begin, end, 0, [&](int acc, const Graph::edge_descriptor &e) {
+        const Graph::vertex_descriptor s = source(e, graph);
+        return acc + (!graph[s].is_external && !is_source[s]);
+      });
+}
+
 } // namespace
 
 std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
@@ -137,6 +154,11 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
     const std::int64_t minimum_token_count_cut_off,
     const unsigned maximum_dependencies) {
   reachability_graph reach(graph);
+  std::vector<bool> is_source(num_vertices(graph));
+  for (const Graph::vertex_descriptor source : sources) {
+    is_source[source] = true;
+  }
+
   std::mutex m;
   std::vector<find_expensive_headers::result> results;
   const cost cost_before = get_total_cost::from_graph(graph, sources).true_cost;
@@ -159,7 +181,8 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
           // `minimum_size_cut_off` is large enough, it's relatively
           // rare to enter this if statement
           std::lock_guard g(m);
-          results.emplace_back(file, *saving);
+          results.emplace_back(file, *saving,
+                               count_headers(graph, file, is_source));
         }
       });
   return results;
@@ -175,7 +198,8 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
 
 bool operator==(const find_expensive_headers::result &lhs,
                 const find_expensive_headers::result &rhs) {
-  return lhs.v == rhs.v && lhs.saving == rhs.saving;
+  return lhs.v == rhs.v && lhs.saving == rhs.saving &&
+         lhs.header_reference_count == rhs.header_reference_count;
 }
 
 bool operator!=(const find_expensive_headers::result &lhs,
@@ -185,7 +209,8 @@ bool operator!=(const find_expensive_headers::result &lhs,
 
 std::ostream &operator<<(std::ostream &out,
                          const find_expensive_headers::result &v) {
-  return out << '[' << v.v << " saving=" << v.saving << ']';
+  return out << '[' << v.v << " saving=" << v.saving
+             << " hdr count=" << v.header_reference_count << ']';
 }
 
 } // namespace IncludeGuardian
