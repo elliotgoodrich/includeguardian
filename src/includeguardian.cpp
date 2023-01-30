@@ -866,7 +866,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       ArrayPrinter results_out = pch_additions.arr("results");
       for (const recommend_precompiled::result &i : results) {
         ObjPrinter result_out = results_out.obj();
-        result_out.property("file", graph[i.v].path);
+        result_out.property("file", graph[i.v]);
         result_out.property("saving",
                             percent((100.0 * i.saving.token_count) /
                                     project_cost.true_cost.token_count));
