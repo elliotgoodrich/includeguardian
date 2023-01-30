@@ -1,4 +1,5 @@
 #include "find_expensive_includes.hpp"
+#include "reachability_graph.hpp"
 
 #ifndef NDEBUG
 #include <boost/scope_exit.hpp>
@@ -31,12 +32,14 @@ class DFSHelper {
   };
 
   const Graph &m_graph;
+  const reachability_graph<file_node, include_edge>& m_reach;
   std::unique_ptr<search_state[]> m_state;
   std::vector<Graph::vertex_descriptor> m_stack;
 
 public:
-  explicit DFSHelper(const Graph &graph)
-      : m_graph(graph), m_state(std::make_unique_for_overwrite<search_state[]>(
+  explicit DFSHelper(const Graph &graph,
+  const reachability_graph<file_node, include_edge>& reach)
+      : m_graph(graph), m_reach(reach), m_state(std::make_unique_for_overwrite<search_state[]>(
                             num_vertices(m_graph))),
         m_stack() {
     // Note that it's fine to leave `m_state` uninitialized since it's the first
@@ -47,6 +50,13 @@ public:
   // `source` through `removed_edge` in the graph specified at constructon.
   cost total_file_size_of_unreachable(Graph::vertex_descriptor from,
                                       Graph::edge_descriptor removed_edge) {
+    // If we can reach the file who has the `removed_edge` then we won't
+    // gain anything
+    const Graph::vertex_descriptor includer = source(removed_edge, m_graph);
+    if (!m_reach.is_reachable(from, includer)) {
+        return cost{};
+    }
+
     std::fill(m_state.get(), m_state.get() + num_vertices(m_graph),
               search_state::not_seen);
 
@@ -99,12 +109,8 @@ public:
       }
     }
 
-    // If we never transitively included the file whose include directive
-    // we're removing, then there's no gains to be had
-    const Graph::vertex_descriptor includer = source(removed_edge, m_graph);
-    if (m_state[includer] == search_state::not_seen) {
-      return {};
-    }
+    // Check that we actually reached our includer
+    assert(m_state[includer] == search_state::seen_initial);
 
     cost savings;
 
@@ -160,6 +166,7 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
     const int minimum_token_count_cut_off) {
 
+  reachability_graph reach(graph);
   std::mutex m;
   std::vector<include_directive_and_cost> results;
   const auto [begin, end] = edges(graph);
@@ -179,7 +186,7 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
           return;
         }
 
-        DFSHelper helper(graph);
+        DFSHelper helper(graph, reach);
         const cost saved = std::accumulate(
             sources.begin(), sources.end(), cost{},
             [&](cost acc, Graph::vertex_descriptor source) {
