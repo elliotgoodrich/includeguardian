@@ -570,7 +570,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   std::optional<ArrayPrinter> sources_printer;
   if (show_sources.getValue()) {
     sources_printer.emplace(stats.arr("sources"));
-    options.source_processed = [&](const std::filesystem::path &source) {
+    options.source_started = [&](const std::filesystem::path &source) {
       sources_printer->value(source.string());
     };
   } else {

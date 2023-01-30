@@ -420,6 +420,10 @@ public:
         const std::filesystem::path rel =
             std::filesystem::path(file->getName().str())
                 .lexically_relative(m_working_dir);
+		if (m_options.source_started) {
+		  m_options.source_started(rel);
+		}
+
         it->second.v = add_vertex(rel, m_r.graph);
         if (m_options.replace_file_optimization) {
           m_replaced.resize(it->second.v + 1);
@@ -786,9 +790,6 @@ public:
 
   void EndOfMainFile() final {
     assert(m_stack.size() == 1);
-    if (m_options.source_processed) {
-      m_options.source_processed(m_r.graph[m_stack[0].it->second.v].path);
-    }
     update_cost_when_leaving_file(
         m_sm->getFileEntryForID(m_sm->getMainFileID()));
     m_r.graph[m_stack.back().it->second.v].underlying_cost = m_stack.back().c;

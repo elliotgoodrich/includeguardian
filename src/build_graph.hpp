@@ -36,7 +36,7 @@ struct build_graph {
 
   struct options {
     bool replace_file_optimization = false;
-    std::function<void(const std::filesystem::path &)> source_processed;
+    std::function<void(const std::filesystem::path &)> source_started;
 
     options() = default;
 
