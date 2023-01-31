@@ -552,7 +552,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
   ObjPrinter stats = root.obj("stats");
   {
-    stats.property("version", "0.0.4");
+    stats.property("version", "0.0.5");
     stats.property("command",
                    std::accumulate(argv, argv + argc, std::string(""),
                                    [](std::string &&ss, const char *arg) {
