@@ -546,7 +546,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
   out << comment_color << "# Visit " << termcolor::underline
       << "https://includeguardian.io/download" << termcolor::reset
       << comment_color << " for updates and\n"
-      << termcolor::underline << "# http://includeguarian.io/ci"
+      << "# " << termcolor::underline << "http://includeguarian.io/ci"
       << termcolor::reset << comment_color
       << " to keep your project building fast!\n";
 
