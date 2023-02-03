@@ -24,8 +24,8 @@
             <h1>About</h1>
             <p>IncludeGuardian is a free tool to help improve C and C++ build times.</p>
             <p>At this moment IncludeGuardian is not open source. But if you find a bug or have a suggestion please open
-                an issue in the <a href="https://github.com/includeguardian/includeguardian-tool">Github Issues</a>
-                page. For all other questions you can email <a
+                an issue in the <a href="https://github.com/IncludeGuardian/includeguardian-tool/issues/new">Github
+                    Issues</a> page. For all other questions you can email <a
                     href="mailto:hello@includeguardian.io">hello@includeguardian.io</a>.</p>
         </article>
     </main>

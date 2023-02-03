@@ -22,7 +22,8 @@
         </nav>
         <article>
             <h1>Instructions</h1>
-            <p>Download <a href="downloads/includeguardian-0.0.5-win64.zip">IncludeGuardian v0.0.5</a> for Windows x64.</p>
+            <p>Download <a href="downloads/includeguardian-0.0.5-win64.zip">IncludeGuardian v0.0.5</a> for Windows x64.
+            </p>
             <p>IncludeGuardian can be run directly from a compilation database or by specifying a directory and all the
                 compilation options that specify how your C/C++ is compiled.</p>
 
@@ -40,9 +41,9 @@
                 recommend editting these files. </p>
 
             <ol>
-                <li><code>includeguardian.exe --dir . -I include</code>
-                <li><code>includeguardian.exe --dir . -isystem thirdparty/boost/include -I mylib/include</code>
-                <li><code>includeguardian.exe -p compile_commands.json **/*.cpp -I override/mylib/include</code>
+                <li><code>includeguardian.exe --dir . --I include</code>
+                <li><code>includeguardian.exe --dir . -isystem thirdparty/boost/include --I mylib/include</code>
+                <li><code>includeguardian.exe -p compile_commands.json **/*.cpp --I override/mylib/include</code>
             </ol>
 
             <p>IncludeGuardian can serialize the graph of your solution and load it back up for analysis. To serialize
@@ -51,7 +52,7 @@
             </p>
 
             <ol>
-                <li><code>includeguardian.exe --dir . -Iinclude --save out.igg --analyze=false</code>
+                <li><code>includeguardian.exe --dir . --I include --save out.igg --analyze=false</code>
             </ol>
 
             <p>Then we can load it up to run analysis with <code>--load &lt;file path&gt;</code>
@@ -72,12 +73,6 @@
                                 optimization</a> implemented in most compilers that avoid reopening a file and parsing
                             it if that file is included multiple times within the same translation unit.</p>
 
-                        <h3><code>unguarded files</code></h3>
-                        <p>This section lists files that have been included more than once, but does not have a strict
-                            enough include guard in order to achieve the <a
-                                href="https://gcc.gnu.org/onlinedocs/cpp/Once-Only-Headers.html">multiple-inclusion
-                                optimization</a> implemented in most compilers that avoid reopening a file and parsing
-                            it if that file is included multiple times within the same translation unit.</p>
                         <p>A file is properly guarded if it includes <code>#pragma once</code> or an include guard
                             that wraps all <strong>non-comment, non-whitespace</strong> text within the file.</p>
 
