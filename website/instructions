@@ -36,13 +36,13 @@
 
             <p>When using a compilation database, this should include all of your additional include directories and
                 compilation flags. If you are using <code>--dir</code> then most likely you will need to specify these
-                as well using <code>-I</code> and <code>-isystem</code>. Both of these will specify include directories,
-                but files found with <code>-isystem</code> will be considered to be external and analysis will not
+                as well using <code>--I</code> and <code>--isystem</code>. Both of these will specify include directories,
+                but files found with <code>--isystem</code> will be considered to be external and analysis will not
                 recommend editting these files. </p>
 
             <ol>
                 <li><code>includeguardian.exe --dir . --I include</code>
-                <li><code>includeguardian.exe --dir . -isystem thirdparty/boost/include --I mylib/include</code>
+                <li><code>includeguardian.exe --dir . --isystem thirdparty/boost/include --I mylib/include</code>
                 <li><code>includeguardian.exe -p compile_commands.json **/*.cpp --I override/mylib/include</code>
             </ol>
 
