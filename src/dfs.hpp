@@ -9,6 +9,8 @@
 #include <iterator>
 #include <utility>
 
+#include <intrin.h>
+
 namespace IncludeGuardian {
 
 template <typename GRAPH> class dag_iterator {
