@@ -544,9 +544,9 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
   // Use direct printing to get underlined links
   out << comment_color << "# Visit " << termcolor::underline
-      << "https://includeguardian.io/download" << termcolor::reset
+      << "https://includeguardian.io" << termcolor::reset
       << comment_color << " for updates and\n"
-      << "# " << termcolor::underline << "http://includeguarian.io/ci"
+      << "# " << termcolor::underline << "http://includeguardian.io/ci"
       << termcolor::reset << comment_color
       << " to keep your project building fast!\n";
 
