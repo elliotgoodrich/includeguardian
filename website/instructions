@@ -22,7 +22,7 @@
         </nav>
         <article>
             <h1>Instructions</h1>
-            <p>Download <a href="downloads/includeguardian-0.0.5-win64.zip">IncludeGuardian v0.0.5</a> for Windows x64.
+            <p>Download <a href="downloads/includeguardian-0.0.6-win64.zip">IncludeGuardian v0.0.6</a> for Windows x64.
             </p>
             <p>IncludeGuardian can be run directly from a compilation database or by specifying a directory and all the
                 compilation options that specify how your C/C++ is compiled.</p>
