@@ -131,6 +131,11 @@ may accidentally report that some components are unused.  In the CI, we
 can combine these results to only warn for components that are unused
 across multiple settings.
 
+### Deprecated/Alternative/Banned includes
+
+For the CI, we should be able to have a ban/deprecate list of includes (such
+as <intrin.h>) and recommend alternatives.
+
 ### Visualization
 
 For the CI, we should be able to have a really nice graph visualization where
