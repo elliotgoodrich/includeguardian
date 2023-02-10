@@ -16,10 +16,11 @@
 
   1. [x] Implement functionality to list the most expensive includes
   2. [x] Implement functionality to list the most expensive files
-  3. [ ] Add webhook that is called from changes to the remote and stores the results in S3
-  4. [ ] Create a website to view these results
-  5. [ ] Implement a PR check to see if we may cause a slowdown
-  6. [ ] Figure out third party library dependencies
+  3. [x] Write a website and have a mailing list
+  4. [ ] Fix --dir when anything other than `.` as it errors
+  5. [ ] Fix or disable --save/--load as it currently crashes
+  6. [ ] Create a downloads page
+  7. [ ] Compile a Linux version
 
 ## Initial Setup
 
