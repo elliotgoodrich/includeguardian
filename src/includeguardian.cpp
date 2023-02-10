@@ -360,14 +360,15 @@ public:
 class ReplacementCompilationDatabase
     : public clang::tooling::CompilationDatabase {
 public:
-  std::filesystem::path m_working_directory;
+  std::filesystem::path m_working_directory; //< Directory of includeguardian
   std::vector<std::filesystem::path> m_sources;
 
   ReplacementCompilationDatabase(const std::filesystem::path &working_directory,
+                                 const std::filesystem::path &source_directory,
                                  llvm::vfs::FileSystem &fs)
       : m_working_directory(working_directory), m_sources() {
     std::vector<std::string> directories;
-    directories.push_back(working_directory.string());
+    directories.push_back(source_directory.string());
     const llvm::vfs::directory_iterator end;
     while (!directories.empty()) {
       const std::string dir_copy = std::move(directories.back());
@@ -544,8 +545,8 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
 
   // Use direct printing to get underlined links
   out << comment_color << "# Visit " << termcolor::underline
-      << "https://includeguardian.io" << termcolor::reset
-      << comment_color << " for updates and\n"
+      << "https://includeguardian.io" << termcolor::reset << comment_color
+      << " for updates and\n"
       << "# " << termcolor::underline << "https://includeguardian.io/ci"
       << termcolor::reset << comment_color
       << " to keep your project building fast!\n";
@@ -596,7 +597,9 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
             build_path, ErrorMessage);
       } else if (fake_compilation_db != "") {
         db = std::make_unique<ReplacementCompilationDatabase>(
-            std::filesystem::path(fake_compilation_db.getValue()), *fs);
+            std::filesystem::current_path(),
+            std::filesystem::current_path() / fake_compilation_db.getValue(),
+            *fs);
       } else if (!source_paths.empty()) {
         db = clang::tooling::CompilationDatabase::autoDetectFromSource(
             source_paths.front(), ErrorMessage);
