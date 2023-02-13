@@ -27,16 +27,21 @@ std::ostream &operator<<(std::ostream &out, const file_and_cost &v) {
 std::vector<file_and_cost> find_expensive_files::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
     const int minimum_token_count_cut_off) {
-  reachability_graph reach(graph);
   std::mutex m;
   std::vector<file_and_cost> results;
+  if (sources.empty()) {
+    return results;
+  }
+
+  reachability_graph reach(graph);
+
   const auto [begin, end] = vertices(graph);
   std::for_each(
       std::execution::par, begin, end,
       [&](const Graph::vertex_descriptor file) {
         // Ignore all files we have no control over
         if (graph[file].is_external) {
-            return;
+          return;
         }
 
         const double reachable_count = std::accumulate(

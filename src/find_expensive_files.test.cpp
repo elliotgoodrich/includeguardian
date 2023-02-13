@@ -50,4 +50,9 @@ TEST_F(LongChain, FindExpensiveFiles) {
               }));
 }
 
+TEST_F(NoSources, FindExpensiveFiles) {
+  EXPECT_THAT(find_expensive_files::from_graph(graph, sources(), 1u),
+              SizeIs(0));
+}
+
 } // namespace

@@ -42,4 +42,9 @@ TEST_F(LongChain, FindExpensiveIncludes) {
               }));
 }
 
+TEST_F(NoSources, FindExpensiveIncludes) {
+  EXPECT_THAT(find_expensive_includes::from_graph(graph, sources(), 1u),
+              SizeIs(0));
+}
+
 } // namespace

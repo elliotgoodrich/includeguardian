@@ -207,4 +207,8 @@ ComplexCascadingInclude::sources() const {
   return sources_arr;
 }
 
+std::span<const Graph::vertex_descriptor> NoSources::sources() const {
+  return {};
+}
+
 } // namespace IncludeGuardian

@@ -79,4 +79,9 @@ TEST_F(ComplexCascadingInclude, FindExpensiveHeaders) {
               }));
 }
 
+TEST_F(NoSources, FindExpensiveHeaders) {
+  EXPECT_THAT(find_expensive_headers::from_graph(graph, sources(), INT64_MIN),
+              SizeIs(0));
+}
+
 } // namespace

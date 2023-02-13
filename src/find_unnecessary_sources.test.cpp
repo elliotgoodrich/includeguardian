@@ -42,4 +42,9 @@ TEST_F(ComplexCascadingInclude, FindUnnecessarySourcesTest) {
       }));
 }
 
+TEST_F(NoSources, FindUnnecessarySourcesTest) {
+  EXPECT_THAT(find_unnecessary_sources::from_graph(graph, sources(), INT_MIN),
+              SizeIs(0));
+}
+
 } // namespace

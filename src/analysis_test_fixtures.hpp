@@ -289,6 +289,20 @@ protected:
   std::span<const Graph::vertex_descriptor> sources() const;
 };
 
+//      a   (a is not a source)
+//     / \
+//    b   c
+//     \ /
+//      d
+class NoSources : public DiamondGraph {
+protected:
+  using DiamondGraph::DiamondGraph;
+
+  std::span<const Graph::vertex_descriptor> sources() const;
+};
+
+
+
 } // namespace IncludeGuardian
 
 #endif

@@ -54,7 +54,7 @@ public:
     // gain anything
     const Graph::vertex_descriptor includer = source(removed_edge, m_graph);
     if (!m_reach.is_reachable(from, includer)) {
-        return cost{};
+      return cost{};
     }
 
     std::fill(m_state.get(), m_state.get() + num_vertices(m_graph),
@@ -165,10 +165,13 @@ std::ostream &operator<<(std::ostream &out,
 std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
     const int minimum_token_count_cut_off) {
-
-  reachability_graph reach(graph);
   std::mutex m;
   std::vector<include_directive_and_cost> results;
+  if (sources.empty()) {
+    return results;
+  }
+
+  reachability_graph reach(graph);
   const auto [begin, end] = edges(graph);
 
   // edge iterators fail the `forward iterator` concept check when using

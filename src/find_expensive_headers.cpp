@@ -153,14 +153,18 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
     const std::int64_t minimum_token_count_cut_off,
     const unsigned maximum_dependencies) {
+  std::mutex m;
+  std::vector<find_expensive_headers::result> results;
+  if (sources.empty()) {
+    return results;
+  }
+
   reachability_graph reach(graph);
   std::vector<bool> is_source(num_vertices(graph));
   for (const Graph::vertex_descriptor source : sources) {
     is_source[source] = true;
   }
 
-  std::mutex m;
-  std::vector<find_expensive_headers::result> results;
   const cost cost_before = get_total_cost::from_graph(graph, sources).true_cost;
   const auto [begin, end] = vertices(graph);
   std::for_each(

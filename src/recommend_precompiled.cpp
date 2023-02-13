@@ -24,9 +24,13 @@ std::vector<recommend_precompiled::result> recommend_precompiled::from_graph(
     const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
     const int minimum_token_count_cut_off, const double minimum_saving_ratio) {
   assert(minimum_saving_ratio > 0.0);
-  const reachability_graph reach(graph);
   std::mutex m;
   std::vector<recommend_precompiled::result> results;
+  if (sources.empty()) {
+    return results;
+  }
+
+  const reachability_graph reach(graph);
   const auto [begin, end] = vertices(graph);
   std::for_each(begin, end, [&](const Graph::vertex_descriptor file) {
     const file_node &f = graph[file];
