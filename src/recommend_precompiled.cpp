@@ -89,9 +89,8 @@ std::vector<recommend_precompiled::result> recommend_precompiled::from_graph(
     // as we know the extra size of the precompiled files, we have to
     // beat that by the specified ratio.
     const auto cutoff_token_count = std::max<int>(
-            minimum_saving_ratio * r.extra_precompiled_size.token_count,
-        minimum_token_count_cut_off
-    );
+        minimum_saving_ratio * r.extra_precompiled_size.token_count,
+        minimum_token_count_cut_off);
 
     // Go through all sources that included `file` and find what dependencies
     // of `file` are reachable through other means.
@@ -101,7 +100,7 @@ std::vector<recommend_precompiled::result> recommend_precompiled::from_graph(
       const int remaining_sources = sources.size() - i;
       if (r.extra_precompiled_size.token_count * remaining_sources +
               r.saving.token_count <
-          cutoff_token_count ) {
+          cutoff_token_count) {
         return;
       }
 
@@ -132,7 +131,7 @@ std::vector<recommend_precompiled::result> recommend_precompiled::from_graph(
 
     // TODO: Subtract the cost of the precompiled header
 
-    // 
+    //
     if (r.saving.token_count >= cutoff_token_count) {
       // There are ways to avoid this mutex, but if the
       // `minimum_size_cut_off` is large enough, it's relatively

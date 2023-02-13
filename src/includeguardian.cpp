@@ -729,6 +729,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
     output.key("save time");
     std::ofstream ofs(save_path.getValue()); // save to file
     boost::archive::text_oarchive oa(ofs);
+    oa << graph;
     output.value(timer.restart());
   }
 

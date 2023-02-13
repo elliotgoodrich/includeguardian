@@ -49,11 +49,9 @@ struct find_unused_components {
   /// the specified `sources`, that are not included by more than
   /// `included_by_at_most` other files (not included the component's
   /// source file)
-  static std::vector<component_and_cost>
-  from_graph(const Graph &graph,
-             std::span<const Graph::vertex_descriptor> sources,
-             unsigned included_by_at_most = 0u,
-             int minimum_token_count_cut_off = 0);
+  static std::vector<component_and_cost> from_graph(
+      const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
+      unsigned included_by_at_most = 0u, int minimum_token_count_cut_off = 0);
   static std::vector<component_and_cost>
   from_graph(const Graph &graph,
              std::initializer_list<Graph::vertex_descriptor> sources,

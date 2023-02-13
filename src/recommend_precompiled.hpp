@@ -47,18 +47,17 @@ struct recommend_precompiled {
   struct result {
     Graph::vertex_descriptor v; //< The header file
     cost saving; //< The saving if it was removed from all headers
-    cost extra_precompiled_size; //< The additional size added to the current precompiled header
+    cost extra_precompiled_size; //< The additional size added to the current
+                                 // precompiled header
   };
 
   /// Return the list of files that if added to a precompiled header, would
   /// give a saving of at least `minimum_token_count_cut_off` and they save
   /// a multiple of more than `minimum_saving_ratio` preprocessor tokens
   /// compared to the tokens added to the precompiled header.
-  static std::vector<result>
-  from_graph(const Graph &graph,
-             std::span<const Graph::vertex_descriptor> sources,
-             int minimum_token_count_cut_off = 0,
-             double minimum_saving_ratio = 1.5);
+  static std::vector<result> from_graph(
+      const Graph &graph, std::span<const Graph::vertex_descriptor> sources,
+      int minimum_token_count_cut_off = 0, double minimum_saving_ratio = 1.5);
   static std::vector<result>
   from_graph(const Graph &graph,
              std::initializer_list<Graph::vertex_descriptor> sources,

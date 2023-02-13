@@ -31,7 +31,7 @@ std::vector<component_and_cost> find_unused_components::from_graph(
   std::for_each(
       std::execution::par, sources.begin(), sources.end(),
       [&](const Graph::vertex_descriptor v) {
-        const std::optional<Graph::vertex_descriptor> &header =
+        const boost::optional<Graph::vertex_descriptor> &header =
             graph[v].component;
         if (!header) {
           return;

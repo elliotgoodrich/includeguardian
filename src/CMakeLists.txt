@@ -92,8 +92,10 @@ add_executable(
     find_unnecessary_sources.test.cpp
     find_unused_components.test.cpp
     get_total_cost.test.cpp
+    matchers.hpp
     reachability_graph.test.cpp
     topological_order.test.cpp
+    serialize_graph.test.cpp
 )
 target_precompile_headers(tests REUSE_FROM common)
 if(WIN32)

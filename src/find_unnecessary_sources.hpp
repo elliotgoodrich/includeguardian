@@ -47,12 +47,11 @@ namespace IncludeGuardian {
 struct find_unnecessary_sources {
   struct result {
     Graph::vertex_descriptor source; //< The source file
-    cost saving; //< The saving from removing the source
-    cost extra_cost; //< The extra cost from all sources including the larger header
+    cost saving;                     //< The saving from removing the source
+    cost extra_cost; //< The extra cost from all sources including the larger
+                     //header
 
-    cost total_saving() const {
-        return saving - extra_cost;
-    }
+    cost total_saving() const { return saving - extra_cost; }
   };
 
   /// Return the list of sources which, if removed and the contents put,

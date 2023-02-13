@@ -32,15 +32,16 @@ class DFSHelper {
   };
 
   const Graph &m_graph;
-  const reachability_graph<file_node, include_edge>& m_reach;
+  const reachability_graph<file_node, include_edge> &m_reach;
   std::unique_ptr<search_state[]> m_state;
   std::vector<Graph::vertex_descriptor> m_stack;
 
 public:
   explicit DFSHelper(const Graph &graph,
-  const reachability_graph<file_node, include_edge>& reach)
-      : m_graph(graph), m_reach(reach), m_state(std::make_unique_for_overwrite<search_state[]>(
-                            num_vertices(m_graph))),
+                     const reachability_graph<file_node, include_edge> &reach)
+      : m_graph(graph), m_reach(reach),
+        m_state(std::make_unique_for_overwrite<search_state[]>(
+            num_vertices(m_graph))),
         m_stack() {
     // Note that it's fine to leave `m_state` uninitialized since it's the first
     // thing we do in `total_file_size_of_unreachable`.

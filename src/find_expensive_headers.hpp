@@ -58,7 +58,7 @@ struct find_expensive_headers {
     cost saving; //< The saving if it was removed from all headers but added to
                  // the source
     int header_reference_count; //< The number of internal header files that
-                                //would need to be updated
+                                // would need to be updated
   };
 
   /// Return the list of header files along with the total cost if

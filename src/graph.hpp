@@ -18,27 +18,6 @@
 namespace boost {
 namespace serialization {
 
-template <typename Archive, typename T>
-void load(Archive &ar, std::optional<T> &t, const unsigned version) {
-  boost::optional<T> tmp;
-  ar &tmp;
-  t = std::move(*tmp);
-}
-
-template <typename Archive, typename T>
-void save(Archive &ar, const std::optional<T> &t, const unsigned version) {
-  boost::optional<const T *> tmp = nullptr;
-  if (t) {
-    tmp = &*t;
-  }
-  ar &tmp;
-}
-
-template <typename Archive, typename T>
-void serialize(Archive &ar, std::optional<T> &t, const unsigned version) {
-  boost::serialization::split_free(ar, t, version);
-}
-
 template <typename Archive>
 void load(Archive &ar, std::filesystem::path &t, const unsigned version) {
   std::string tmp;
@@ -68,36 +47,6 @@ using Graph =
     boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
                           file_node, include_edge>;
 
-} // namespace IncludeGuardian
-
-namespace boost {
-namespace serialization {
-
-template <typename Archive>
-void load(Archive &ar, IncludeGuardian::Graph::vertex_descriptor &t,
-          const unsigned version) {
-  boost::uint32_t x;
-  ar &x;
-  t = x;
-}
-
-template <typename Archive>
-void save(Archive &ar, const IncludeGuardian::Graph::vertex_descriptor &t,
-          const unsigned version) {
-  ar &boost::uint32_t(t);
-}
-
-template <typename Archive>
-void serialize(Archive &ar, IncludeGuardian::Graph::vertex_descriptor &t,
-               const unsigned version) {
-  boost::serialization::split_free(ar, t, version);
-}
-
-} // namespace serialization
-} // namespace boost
-
-namespace IncludeGuardian {
-
 class file_node {
 public:
   std::filesystem::path path; //< Note that this will most likely be
@@ -106,7 +55,7 @@ public:
                               //< as to what path it is relative to.
   bool is_external = false; //< Whether this file comes from an external library
   cost underlying_cost;
-  std::optional<Graph::vertex_descriptor>
+  boost::optional<Graph::vertex_descriptor>
       component; //< If this is not null then this
                  //< either the corresponding source or header,
                  //< depending on whether this is the header or
