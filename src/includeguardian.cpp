@@ -583,7 +583,13 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
       build_graph::result r;
       std::ifstream ifs(load_path.getValue()); // save to file
       boost::archive::text_iarchive ia(ifs);
-      ia >> r.graph;
+      ia >> r;
+      if (options.source_started) {
+        std::for_each(r.sources.begin(), r.sources.end(),
+                      [&](const Graph::vertex_descriptor source) {
+                        options.source_started(r.graph[source].path);
+                      });
+      }
       sources_printer.reset();
       stats.property("processing time", timer.restart());
       return r;
@@ -729,7 +735,7 @@ int run(int argc, const char **argv, std::ostream &out, std::ostream &err) {
     output.key("save time");
     std::ofstream ofs(save_path.getValue()); // save to file
     boost::archive::text_oarchive oa(ofs);
-    oa << graph;
+    oa << *result;
     output.value(timer.restart());
   }
 

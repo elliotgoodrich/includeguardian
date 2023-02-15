@@ -8,6 +8,11 @@
 
 #include <clang/Basic/SourceManager.h>
 
+#include <boost/serialization/set.hpp>
+#include <boost/serialization/string.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/unordered_set.hpp>
+
 #include <filesystem>
 #include <functional>
 #include <set>
@@ -32,6 +37,14 @@ struct build_graph {
     std::vector<Graph::vertex_descriptor> sources;
     std::set<std::string> missing_includes;
     std::unordered_set<Graph::vertex_descriptor> unguarded_files;
+
+    template <typename Archive>
+    void serialize(Archive &ar, const unsigned version) {
+      ar &graph;
+      ar &sources;
+      ar &missing_includes;
+      ar &unguarded_files;
+    }
   };
 
   struct options {

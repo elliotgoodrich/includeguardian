@@ -18,7 +18,7 @@
   2. [x] Implement functionality to list the most expensive files
   3. [x] Write a website and have a mailing list
   4. [x] Fix --dir when anything other than `.` as it errors
-  5. [ ] Fix or disable --save/--load as it currently crashes
+  5. [x] Fix --save/--load as it currently crashes
   6. [ ] Create a downloads page
   7. [ ] Compile a Linux version
 
