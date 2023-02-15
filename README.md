@@ -24,6 +24,8 @@
 
 ## Initial Setup
 
+### Windows
+
   1. Install Microsoft Visual Studio 2019
   2. Install Python 3
   3. `pip install conan`
@@ -41,6 +43,17 @@
   13. Add `termcolor_DIR` as `C:\Program Files\vcpkg\installed\x64-windows\share\termcolor` (search for `termcolorConfig.cmake`) when configuring in CMake
   14. Select the Visual Studio 2019 generator
   15. Click generate
+
+### Linux
+  0. `sudo apt update && sudo apt upgrade`
+  1. `sudo apt install clang`
+  2. `sudo apt install python3`
+  3. `pip install conan`
+  3. `sudo apt install cmake`
+  3. `sudo apt install pkg-config`
+  8. `cd vcpkg`
+    * `./vcpkg install llvm[tools,target-x86]:x64-linux`
+    * `./vcpkg install termcolor:x64-linux`
 
 ## Building
   1. Open `out\includeguardian.sln` with Microsoft Visual Studio
