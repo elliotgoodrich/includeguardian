@@ -44,20 +44,33 @@
   14. Select the Visual Studio 2019 generator
   15. Click generate
 
-### Linux
+### Linux (Ubuntu)
   0. `sudo apt update && sudo apt upgrade`
   1. `sudo apt install clang`
+  1. `sudo update-alternatives --config cc` (choose clang)+
   2. `sudo apt install python3`
   3. `pip install conan`
   3. `sudo apt install cmake`
   3. `sudo apt install pkg-config`
   8. `cd vcpkg`
-    * `./vcpkg install llvm[tools,target-x86]:x64-linux`
-    * `./vcpkg install termcolor:x64-linux`
+    * `./vcpkg install llvm[core,tools,target-x86,enable-rtti]`+
+    * `./vcpkg install termcolor`
+    * `./vcpkg install boost`
+    * `./vcpkg install gtest`
+    * `./vcpkg install benchmark`
+  9. `./vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
+  10. `mkdir build`
+  11. `cmake -S src build "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake"`
+  12. `make`
 
 ## Building
+
+### Windows
   1. Open `out\includeguardian.sln` with Microsoft Visual Studio
   2. Ctrl + Shift + B
+
+### Linux
+  1. `make -j`
 
 ## Testing
   1. Run `includeguardian.exe -p path/to/db source.cpp -output=X` where `path/to/db` contains a `compile_commands.json` file containing a [compilation database](https://clang.llvm.org/docs/JSONCompilationDatabase.html), `source.cpp` is the source file you want to operate on, and `X` is:
