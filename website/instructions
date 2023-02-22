@@ -7,7 +7,7 @@
     <meta content="#0772014" name="theme-color">
     <meta content="width=device-width,initial-scale=1" name="viewport">
     <meta content="The homepage of IncludeGuardian, a free tool to optimize C/C++ build times" name="description">
-    <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="stylesheet" type="text/css" href="./style.css">
 </head>
 
 <body>
@@ -15,14 +15,15 @@
         <nav>
             <a id="logo" href="./">IncludeGuardian</a>
             <ul>
-                <li><a href="instructions">Instructions</a></li>
-                <li><a href="ci">CI</a></li>
-                <li><a href="about">About</a></li>
+                <li><a href="./instructions">Instructions</a></li>
+                <li><a href="./ci">CI</a></li>
+                <li><a href="./about">About</a></li>
             </ul>
         </nav>
         <article>
             <h1>Instructions</h1>
-            <p>Download <a href="downloads/includeguardian-0.0.7-win64.zip">IncludeGuardian v0.0.7</a> for Windows x64.
+            <p>Download <a href="./downloads/includeguardian-0.0.7-win64.zip">IncludeGuardian v0.0.7</a> for Windows
+                x64.
             </p>
             <p>IncludeGuardian can be run directly from a compilation database or by specifying a directory and all the
                 compilation options that specify how your C/C++ is compiled.</p>
@@ -36,7 +37,8 @@
 
             <p>When using a compilation database, this should include all of your additional include directories and
                 compilation flags. If you are using <code>--dir</code> then most likely you will need to specify these
-                as well using <code>--I</code> and <code>--isystem</code>. Both of these will specify include directories,
+                as well using <code>--I</code> and <code>--isystem</code>. Both of these will specify include
+                directories,
                 but files found with <code>--isystem</code> will be considered to be external and analysis will not
                 recommend editting these files. </p>
 
@@ -109,8 +111,14 @@
                             library as you may speed up the build of this library, but slow down builds of other
                             dependent libraries/applications.</p>
                     </section>
-
         </article>
+        <hr />
+        <footer>
+            <p>© 2023 IncludeGuardian<p>
+                    <p><a href="/privacy-policy">Privacy Policy</a> | <a href="mailto:hello@includeguardian.io">Email
+                            Us</a> | <a href="https://github.com/includeguardian">GitHub</a> | <a
+                            href="https://twitter.com/includeguardian">Twitter</a></p>
+        </footer>
     </main>
 
 </body>
