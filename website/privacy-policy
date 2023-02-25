@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>IncludeGuardian - Privacy Policy</title>
+    <meta content="#0772014" name="theme-color">
+    <meta content="width=device-width,initial-scale=1" name="viewport">
+    <meta content="Privacy Policy for the data collected on the IncludeGuardian website" name="description">
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+
+<body>
+    <main>
+        <nav>
+            <a id="logo" href="./">IncludeGuardian</a>
+            <ul>
+                <li><a href="instructions">Instructions</a></li>
+                <li><a href="ci">CI</a></li>
+                <li><a href="about">About</a></li>
+            </ul>
+        </nav>
+        <article>
+            <h1>Privacy Policy</h1>
+
+            <p>Our contact details:</p>
+            <ul>
+                <li>E-mail: <a href="mailto:hello@includeguardian.io">hello@includeguardian.io</a>.</li>
+            </ul>
+
+            <h2>The type of personal information we collect</h2>
+            <p>We currently collect and process the following information:</p>
+            <ul>
+                <li>Personal identifiers, contacts and characteristics (for example, name and contact details)</li>
+            </ul>
+
+            <h2>How we get the personal information and why we have it</h2>
+            <p>Most of the personal information we process is provided to us directly by you for one of the following
+                reasons:</p>
+            <ul>
+                <li>Signing up for our email newsletter.</li>
+            </ul>
+
+            <p>We use the information that you have given us in order to send regular email newsletters to you.</p>
+
+            <p>Under the UK General Data Protection Regulation (UK GDPR), the lawful bases we rely on for processing
+                this information are:</p>
+            <ol style="list-style-type:lower-alpha">
+                <li>Your consent. You are able to remove your consent at any time. You can do this by contacting <a
+                        href="mailto:hello@includeguardian.io">hello@includeguardian.io</a> or clicking the unsubscribe
+                    link at the end of each email.</li>
+            </ol>
+
+            <h2>How we store your personal information</h2>
+            <p>Your information is securely stored. We keep email addresses for as long as we have your consent to be
+                on our mailing list. We will then dispose your information by deleting it permanently.</p>
+
+            <h2>Your data protection rights</h2>
+            <p>Under data protection law, you have rights including:</p>
+            <ul>
+                <li><strong>Your right of access</strong> - You have the right to ask us for copies of your personal
+                    information.</li>
+                <li><strong>Your right to rectification</strong> - You have the right to ask us to rectify personal
+                    information you think is inaccurate. You also have the right to ask us to complete information you
+                    think is incomplete.</li>
+                <li><strong>Your right to erasure</strong> - You have the right to ask us to erase your personal
+                    information in certain circumstances.</li>
+                <li><strong>Your right to restriction of processing</strong> - You have the right to ask us to restrict
+                    the processing of your personal information in certain circumstances.</li>
+                <li><strong>Your right to object to processing</strong> - You have the the right to object to the
+                    processing of your personal information in certain circumstances.</li>
+                <li><strong>Your right to data portability</strong> - You have the right to ask that we transfer the
+                    personal information you gave us to another organisation, or to you, in certain circumstances.</li>
+            </ul>
+            <p>You are not required to pay any charge for exercising your rights. If you make a request, we have one
+                month to respond to you.</p>
+            <p>Please contact us at <a href="mailto:hello@includeguardian.io">hello@includeguardian.io</a> if you wish
+                to make a request.</p>
+
+            <h2>How to complain</h2>
+            <p>If you have any concerns about our use of your personal information, you can make a complaint to us at <a
+                    href="mailto:hello@includeguardian.io">hello@includeguardian.io</a>.</p>
+            <p>You can also complain to the ICO if you are unhappy with how we have used your data.</p>
+            <p>The ICO's address:</p>
+            <p>Information Commissioner's Office<br>
+                Wycliffe House<br>
+                Water Lane<br>
+                Wilmslow<br>
+                Cheshire<br>
+                SK9 5AF</p>
+
+            <p>Helpline number: 0303 123 1113</p>
+            <p>ICO website: <a href="https://www.ico.org.uk">www.ico.org.uk</a></p>
+
+        </article>
+    </main>
+
+</body>
+
+</html>

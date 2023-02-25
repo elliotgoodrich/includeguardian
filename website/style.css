@@ -48,6 +48,10 @@ article {
     margin: auto .5rem;
 }
 
+h2 {
+    font-size: 1.25rem;
+}
+
 a {
     color: #50b2c0;
 }
