@@ -46,8 +46,8 @@ std::vector<component_and_cost> find_unused_components::from_graph(
           // There are ways to avoid this mutex, but if the
           // `minimum_size_cut_off` is large enough, it's relatively
           // rare to enter this if statement
-          results.emplace_back(
-              &graph[v], get_total_cost::from_graph(graph, {v}).true_cost);
+          results.push_back({
+              &graph[v], get_total_cost::from_graph(graph, {v}).true_cost});
         }
       });
   return results;

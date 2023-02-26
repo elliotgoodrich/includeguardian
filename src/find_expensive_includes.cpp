@@ -203,9 +203,9 @@ std::vector<include_directive_and_cost> find_expensive_includes::from_graph(
           // `minimum_token_count_cut_off` is large enough, it's
           // relatively rare to enter this if statement
           std::lock_guard g(m);
-          results.emplace_back(
+          results.push_back({
               std::filesystem::path(graph[source(include, graph)].path), saved,
-              &graph[include]);
+              &graph[include]});
         }
       });
   return results;

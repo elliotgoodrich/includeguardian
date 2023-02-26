@@ -185,8 +185,8 @@ std::vector<find_expensive_headers::result> find_expensive_headers::from_graph(
           // `minimum_size_cut_off` is large enough, it's relatively
           // rare to enter this if statement
           std::lock_guard g(m);
-          results.emplace_back(file, *saving,
-                               count_headers(graph, file, is_source));
+          results.push_back({file, *saving,
+                               count_headers(graph, file, is_source)});
         }
       });
   return results;

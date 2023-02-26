@@ -13,7 +13,7 @@ namespace IncludeGuardian {
 template <typename NODE, typename EDGE> class reachability_graph {
 public:
   using handle =
-      boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
+      typename boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
                             NODE, EDGE>::vertex_descriptor;
 
 private:

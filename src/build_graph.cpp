@@ -285,6 +285,9 @@ struct FileState {
                         //< contain a C++ file that is equivalent
                         //< when this is included by another file
                         //< (i.e. only the preprocessor definitions)
+
+
+  FileState(Graph::vertex_descriptor v): v(v) {}
 };
 
 using UniqueIdToNode =
@@ -304,6 +307,13 @@ struct ReplaceWith {
   std::unique_ptr<llvm::MemoryBuffer> contents;
   std::string path;
   Graph::vertex_descriptor v;
+
+  ReplaceWith(std::unique_ptr<llvm::MemoryBuffer>&& contents,
+              std::string_view path,
+	      Graph::vertex_descriptor v)
+	  : contents(std::move(contents))
+	  , path(path)
+	  , v(v) {}
 };
 
 using NeedsReplacing =

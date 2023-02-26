@@ -157,7 +157,7 @@ find_unnecessary_sources::from_graph(
           // `minimum_token_count_cut_off` is large enough, it's relatively rare
           // to enter this if statement
           std::lock_guard g(m);
-          results.emplace_back(source, saving, extra);
+          results.push_back({source, saving, extra});
         }
       });
   return results;

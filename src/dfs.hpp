@@ -37,7 +37,7 @@ public:
 
   dag_iterator &operator++() {
     // Pop this element and push all its children
-    const GRAPH::vertex_descriptor v = *m_it;
+    const typename GRAPH::vertex_descriptor v = *m_it;
     m_seen[v] = true;
     const auto [begin, end] = adjacent_vertices(v, *m_graph);
     m_it = std::prev(std::copy(begin, end, m_it));

@@ -13,6 +13,9 @@ namespace IncludeGuardian {
 struct file_and_cost {
   const file_node *node;
   unsigned sources;
+
+  file_and_cost(const file_node *node,
+                unsigned sources): node(node), sources(sources) {}
 };
 
 bool operator==(const file_and_cost &lhs, const file_and_cost &rhs);

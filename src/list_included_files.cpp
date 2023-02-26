@@ -37,7 +37,7 @@ std::vector<list_included_files::result> list_included_files::from_graph(
   std::vector<result> r;
   r.reserve(num_vertices(graph));
   for (std::size_t i = 0; i < count.size(); ++i) {
-    r.emplace_back(i, count[i].load());
+    r.push_back({i, count[i].load()});
   }
   return r;
 }

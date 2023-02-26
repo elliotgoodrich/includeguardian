@@ -91,11 +91,11 @@ template <typename TIME> std::string format_time(TIME t) {
   return ss.str();
 }
 
-const auto key_color = termcolor::bright_blue;
-const auto str_color = termcolor::bright_yellow;
-const auto num_color = termcolor::bright_red;
-const auto punc_color = termcolor::bright_white;
-const auto comment_color = termcolor::green;
+#define key_color termcolor::bright_blue
+#define str_color &termcolor::bright_yellow
+#define num_color &termcolor::bright_red
+#define punc_color &termcolor::bright_white
+#define comment_color &termcolor::green
 
 void yaml_value(std::ostream &o, int i) { o << num_color << i << '\n'; }
 
