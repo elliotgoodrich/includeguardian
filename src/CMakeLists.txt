@@ -1,35 +1,34 @@
 cmake_minimum_required(VERSION 3.13.4)
 project(includeguardian)
 
-SET(CMAKE_CXX_STANDARD 20)
-SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Download automatically, you can also just copy the conan.cmake file
-if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-    file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/release/0.17/conan.cmake"
-                "${CMAKE_BINARY_DIR}/conan.cmake")
-endif()
+enable_testing()
 
+find_package(GTest CONFIG REQUIRED)
 
-include(${CMAKE_BINARY_DIR}/conan.cmake)
-
-conan_cmake_run(CONANFILE conanfile.txt
-                BASIC_SETUP CMAKE_TARGETS
-                BUILD missing)
+set(Boost_USE_STATIC_LIBS_ON)
+find_package(Boost REQUIRED COMPONENTS system graph serialization)
 
 find_package(LLVM CONFIG REQUIRED)
-message("found LLVM ${LLVM_CMAKE_DIR}")
+message (STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+message (STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+
+include(HandleLLVMOptions)
+separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
+llvm_map_components_to_libnames(llvm_libs Core Support)
 
 find_package(Clang CONFIG REQUIRED)
 
-list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-include(HandleLLVMOptions)
-add_definitions(${LLVM_DEFINITIONS})
+find_path(TERMCOLOR_INCLUDE_DIRS "termcolor/termcolor.hpp")
 
+###################
+# common          #
+###################
 add_library(
     common
-    STATIC
+    SHARED
     cost.hpp cost.cpp
     graph.hpp graph.cpp
     build_graph.hpp build_graph.cpp
@@ -48,12 +47,19 @@ add_library(
     topological_order.hpp topological_order.cpp
 )
 
-find_package(GTest)
-include(GoogleTest)
-target_link_libraries(common CONAN_PKG::gtest)
+target_compile_definitions(common PUBLIC ${LLVM_DEFINITIONS_LIST})
+
+target_include_directories(common PUBLIC ${Boost_INCLUDE_DIRS})
+target_include_directories(common PUBLIC ${LLVM_INCLUDE_DIRS})
+target_include_directories(common PUBLIC ${TERMCOLOR_INCLUDE_DIRS})
+
+target_link_libraries(common PUBLIC GTest::gtest GTest::gmock)
+target_link_libraries(common PUBLIC Boost::system Boost::graph Boost::headers Boost::serialization)
+target_link_libraries(common PUBLIC ${llvm_libs})
+target_link_libraries(common PUBLIC clangTooling)
 
 target_precompile_headers(common
-  PRIVATE
+  PUBLIC
     <boost/graph/adjacency_list.hpp>
     <boost/units/io.hpp>
     <boost/units/quantity.hpp>
@@ -61,25 +67,14 @@ target_precompile_headers(common
     <filesystem>
     <execution>
 )
-target_link_libraries(common CONAN_PKG::boost)
-target_link_libraries(common clangTooling)
-
-# Find the libraries that correspond to the LLVM components
-# that we wish to use
-llvm_map_components_to_libnames(llvm_libs Support)
-
-target_include_directories(common PUBLIC ${LLVM_INCLUDE_DIRS})
-
-# Link against LLVM libraries
-target_link_libraries(common ${llvm_libs})
-
-find_package(termcolor CONFIG REQUIRED)
-target_link_libraries(common termcolor::termcolor)
 
 if(WIN32)
     target_compile_options(common PRIVATE /EHsc /FS)
 endif()
 
+###################
+# tests           #
+###################
 add_executable(
     tests
     analysis_test_fixtures.hpp analysis_test_fixtures.cpp
@@ -101,14 +96,13 @@ target_precompile_headers(tests REUSE_FROM common)
 if(WIN32)
     target_compile_options(tests PRIVATE /EHsc /FS)
 endif()
-target_link_libraries(tests CONAN_PKG::gtest)
-target_link_libraries(tests common)
-gtest_add_tests(TARGET      tests
-                TEST_SUFFIX .noArgs
-                TEST_LIST   noArgsTests
-)
 
-# IncludeGuardian
+target_link_libraries(tests PRIVATE GTest::gtest_main GTest::gmock_main)
+target_link_libraries(tests PUBLIC common)
+
+###################
+# includeguardian #
+###################
 add_executable(
     includeguardian
     main.m.cpp
@@ -116,11 +110,11 @@ add_executable(
 if(WIN32)
     target_compile_options(includeguardian PRIVATE /EHsc /FS)
 endif()
-find_package(benchmark CONFIG REQUIRED)
-target_link_libraries(includeguardian PRIVATE common)
-target_precompile_headers(includeguardian REUSE_FROM common)
+target_link_libraries(includeguardian PUBLIC common)
 
-# benchmarks
+###################
+# benchmarks      #
+###################
 add_executable(
     benchmarks
     benchmarks.m.cpp
@@ -129,5 +123,4 @@ if(WIN32)
     target_compile_options(benchmarks PRIVATE /EHsc /FS)
 endif()
 find_package(benchmark CONFIG REQUIRED)
-target_link_libraries(benchmarks PRIVATE common benchmark::benchmark)
-target_precompile_headers(benchmarks REUSE_FROM common)
+target_link_libraries(benchmarks PUBLIC common benchmark::benchmark)
