@@ -4,6 +4,8 @@
 
 #include <llvm/Support/VirtualFileSystem.h>
 
+#include <boost/predef.h>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -39,8 +41,11 @@ const std::function<build_graph::file_type(std::string_view)> get_file_type =
       }
     };
 
-// Needs to be fixed on non-window's systems
+#if BOOST_OS_WINDOWS
 static const std::filesystem::path root = "C:\\";
+#else
+static const std::filesystem::path root = "/home/";
+#endif
 
 // Create an in-memory file system that would create the specified `graph`.
 llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>
@@ -513,8 +518,12 @@ TEST_P(BuildGraphTest, ForcedIncludes) {
                      .with_cost(0, 0 * B)
                      .set_internal_parents(1),
                  g);
-  add_edge(main_cpp, forced_hpp,
-           {"\"C:\\working_dir\\foo\\forced.hpp\"", 0, not_removable}, g);
+  const std::string expected = [&] {
+    std::ostringstream ss;
+    ss << (working_directory / foo / "forced.hpp");
+    return ss.str();
+  }();
+  add_edge(main_cpp, forced_hpp, {expected, 0, not_removable}, g);
   add_edge(main_cpp, include_hpp, {"\"include.hpp\"", 1, removable}, g);
   add_edge(forced_hpp, forced_sub_hpp,
            {"\"../foo/forced_sub.hpp\"", 2, removable}, g);
