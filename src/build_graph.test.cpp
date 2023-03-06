@@ -160,15 +160,15 @@ TEST_P(BuildGraphTest, FileStats) {
                                       "#if 100 > 99\n"
                                       "    DEFINE_FOO;\n"
                                       "    DEFINE_FOO;\n"
-                                      "#else\n";
-  "    DEFINE_FOO;\n"
-  "    DEFINE_FOO;\n"
-  "    DEFINE_FOO;\n"
-  "    DEFINE_FOO;\n"
-  "    DEFINE_FOO;\n"
-  "    DEFINE_FOO;\n"
-  "    DEFINE_FOO;\n"
-  "#endif\n";
+                                      "#else\n"
+                                      "    DEFINE_FOO;\n"
+                                      "    DEFINE_FOO;\n"
+                                      "    DEFINE_FOO;\n"
+                                      "    DEFINE_FOO;\n"
+                                      "    DEFINE_FOO;\n"
+                                      "    DEFINE_FOO;\n"
+                                      "    DEFINE_FOO;\n"
+                                      "#endif\n";
   fs->addFile((working_directory / "a.hpp").string(), 0,
               llvm::MemoryBuffer::getMemBufferCopy(a_hpp_code));
 
