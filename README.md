@@ -71,6 +71,12 @@
 
 ### Linux
   1. `make -j`
+  2. `./tests`
+
+## Debugging
+  1. `cmake -S src -B build "-DCMAKE_BUILD_TYPE=Debug" "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake"`
+  2. `gdb -tui --args ./tests --gtest_filter=*`
+  3. `set debug-file-directory .`
 
 ## Testing
   1. Run `includeguardian.exe -p path/to/db source.cpp -output=X` where `path/to/db` contains a `compile_commands.json` file containing a [compilation database](https://clang.llvm.org/docs/JSONCompilationDatabase.html), `source.cpp` is the source file you want to operate on, and `X` is:
