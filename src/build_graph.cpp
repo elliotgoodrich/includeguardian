@@ -265,6 +265,23 @@ public:
   }
 };
 
+// There is an interesting assert that occurs only during unit tests
+// when we have a file `idempotent.hpp` that would be identical
+// to the `enable_replace_file_optimization` replacement.  This is
+// because in both unit tests and when doing the optimization we
+// use `InMemoryFileSystem`.  This generates the `UniqueID` for the
+// file based on its file and content, so in our case we would get
+// identical `UniqueID` for the original and replacement, even though
+// they occur in different `InMemoryFileSystem` instances.  This hits
+// an assert in our code `assert(new_id != id)` in `build_graph.cpp`
+// where we want to check that the replacement has occurred.
+//
+// This is "fixed" by putting a comment at the top of each replacement
+// file that shouldn't occur during unit tests.
+//
+// See BuildGraphTest.IdempotentFile unit test.
+#define INCLUDEGUARDIAN_WORKAROUND "// IncludeGuardian\n"
+
 const Graph::vertex_descriptor empty =
     boost::graph_traits<Graph>::null_vertex();
 
@@ -281,6 +298,7 @@ struct FileState {
   // A file becomes fully processed once it has been exited and the
   // corresponding entry in the `Graph` is complete.
   std::string replacement_contents =
+      INCLUDEGUARDIAN_WORKAROUND
       "#pragma once\n"; //< If we are `fully_processed` this will
                         //< contain a C++ file that is equivalent
                         //< when this is included by another file

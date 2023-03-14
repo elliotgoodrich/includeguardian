@@ -711,6 +711,54 @@ TEST_P(BuildGraphTest, NaughtyIncludes) {
                              Field(&file_node::path, Eq("b.hpp")))));
 }
 
+// There is an interesting assert that occurs only during unit tests
+// when we have a file `idempotent.hpp` that would be identical
+// to the `enable_replace_file_optimization` replacement.  This is
+// because in both unit tests and when doing the optimization we
+// use `InMemoryFileSystem`.  This generates the `UniqueID` for the
+// file based on its file and content, so in our case we would get
+// identical `UniqueID` for the original and replacement, even though
+// they occur in different `InMemoryFileSystem` instances.  This hits
+// an assert in our code `assert(new_id != id)` in `build_graph.cpp`
+// where we want to check that the replacement has occurred.
+//
+// This is "fixed" by putting a comment at the top of each replacement
+// file that shouldn't occur during unit tests.
+TEST_P(BuildGraphTest, IdempotentFile) {
+  const std::string_view idempotent_hpp_code = "#pragma once\n"
+  "#define FOO 1\n";
+  const std::string_view main_cpp_code = "#include \"idempotent.hpp\"\n";
+
+  auto fs = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  const std::filesystem::path working_directory = root / "working_dir";
+  fs->addFile((working_directory / "idempotent.hpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(idempotent_hpp_code));
+  fs->addFile((working_directory / "main.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+  fs->addFile((working_directory / "main2.cpp").string(), 0,
+              llvm::MemoryBuffer::getMemBufferCopy(main_cpp_code));
+
+  Graph g;
+  const Graph::vertex_descriptor idempotent_hpp =
+      add_vertex(file_node("idempotent.hpp")
+                     .with_cost(0, idempotent_hpp_code.size() * B)
+                     .set_internal_parents(2),
+                 g);
+  const Graph::vertex_descriptor main_cpp = add_vertex(
+      file_node("main.cpp").with_cost(1, main_cpp_code.size() * B), g);
+  const Graph::vertex_descriptor main2_cpp = add_vertex(
+      file_node("main2.cpp").with_cost(1, main_cpp_code.size() * B), g);
+
+  add_edge(main_cpp, idempotent_hpp, {"\"idempotent.hpp\"", 1}, g);
+  add_edge(main2_cpp, idempotent_hpp, {"\"idempotent.hpp\"", 1}, g);
+
+  llvm::Expected<build_graph::result> results = build_graph::from_dir(
+      working_directory, {}, fs, get_file_type, GetParam());
+  EXPECT_THAT(results->graph, GraphsAreEquivalent(g));
+  EXPECT_THAT(results->missing_includes, IsEmpty());
+  EXPECT_THAT(results->unguarded_files, IsEmpty());
+}
+
 // We want to test that for our generated files:
 //   - Any defines are kept
 //   - Guarded files are still guarded
