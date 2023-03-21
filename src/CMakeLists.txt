@@ -30,7 +30,7 @@ find_path(TERMCOLOR_INCLUDE_DIRS "termcolor/termcolor.hpp")
 ###################
 add_library(
     common
-    SHARED
+    STATIC
     cost.hpp cost.cpp
     graph.hpp graph.cpp
     build_graph.hpp build_graph.cpp
