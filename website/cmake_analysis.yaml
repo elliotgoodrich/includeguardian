@@ -1,0 +1,1387 @@
+---
+# Visit https://includeguardian.io for updates and
+# https://includeguardian.io/ci to keep your project building fast!
+stats: 
+  version: 0.0.7
+  command: includeguardian -p compile_commands.json **/*.cpp
+  sources: 
+    - Source/cmMakefileUtilityTargetGenerator.cxx
+    - Utilities/cmexpat/lib/xmltok_impl.c
+    - Source/cmAddCustomCommandCommand.cxx
+    - Utilities/cmbzip2/blocksort.c
+    - Tests/CMakeLib/run_compile_commands.cxx
+    - Source/cmFileLock.cxx
+    - Source/kwsys/SystemInformation.cxx
+    - Utilities/cmcurl/lib/vauth/spnego_gssapi.c
+    - Source/cmcmd.cxx
+    - Utilities/cmcurl/lib/slist.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_xar.c
+    - Source/CursesDialog/form/frm_data.c
+    - Utilities/cmcurl/lib/ftplistparser.c
+    - Source/CursesDialog/cmCursesBoolWidget.cxx
+    - Source/LexerParser/cmFortranLexer.cxx
+    - Utilities/cmzlib/trees.c
+    - Source/cmLoadCommandCommand.cxx
+    - Utilities/cmcurl/lib/setopt.c
+    - Utilities/cmnghttp2/lib/nghttp2_hd_huffman_data.c
+    - Source/cmInstallTargetGenerator.cxx
+    - Source/cmGlobalGhsMultiGenerator.cxx
+    - Source/cmExecuteProcessCommand.cxx
+    - Source/cmTargetLinkDirectoriesCommand.cxx
+    - Source/cmakemain.cxx
+    - Source/cmGeneratorExpressionDAGChecker.cxx
+    - Utilities/cmcurl/lib/krb5.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_empty.c
+    - Utilities/cmlibarchive/libarchive/archive_acl.c
+    - Tests/RunCMake/pseudo_emulator.c
+    - Utilities/cmcurl/lib/curl_addrinfo.c
+    - Source/CursesDialog/cmCursesCacheEntryComposite.cxx
+    - Source/kwsys/Glob.cxx
+    - Utilities/cmcurl/lib/curl_threads.c
+    - Utilities/cmliblzma/liblzma/check/crc32_fast.c
+    - Utilities/cmliblzma/liblzma/simple/arm.c
+    - Utilities/cmcurl/lib/easygetopt.c
+    - Utilities/cmcurl/lib/md4.c
+    - Utilities/cmcurl/lib/getenv.c
+    - Utilities/cmcurl/lib/multi.c
+    - Utilities/KWIML/test/test_include_CXX.cxx
+    - Utilities/cmexpat/lib/xmltok_ns.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_xar.c
+    - Source/CPack/IFW/cmCPackIFWGenerator.cxx
+    - Source/cmWorkerPool.cxx
+    - Tests/RunCMake/pseudo_cppcheck.c
+    - Utilities/cmcurl/lib/openldap.c
+    - Source/cmInstallFilesGenerator.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_ar.c
+    - Source/cmSourceGroup.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_lha.c
+    - Utilities/cmnghttp2/lib/nghttp2_session.c
+    - Source/cmGlobalCommonGenerator.cxx
+    - Source/CTest/cmCTestBuildHandler.cxx
+    - Source/cmGccDepfileLexerHelper.cxx
+    - Utilities/cmcurl/lib/ldap.c
+    - Utilities/cmliblzma/liblzma/simple/simple_decoder.c
+    - Utilities/cmlibuv/src/unix/sysinfo-loadavg.c
+    - Source/cmFindPackageCommand.cxx
+    - Source/cmTargetCompileFeaturesCommand.cxx
+    - Source/cmListFileCache.cxx
+    - Utilities/cmcurl/lib/vtls/nss.c
+    - Utilities/cmjsoncpp/src/lib_json/json_writer.cpp
+    - Source/CursesDialog/form/fld_just.c
+    - Utilities/cmcurl/lib/http2.c
+    - Utilities/cmliblzma/liblzma/lzma/lzma_decoder.c
+    - Source/cmFileAPIConfigureLog.cxx
+    - Source/cmState.cxx
+    - Source/CTest/cmCTestBZR.cxx
+    - Source/cmAddDefinitionsCommand.cxx
+    - Source/cmContinueCommand.cxx
+    - Utilities/cmcurl/lib/file.c
+    - Source/cmSubdirCommand.cxx
+    - Utilities/cmcurl/lib/rand.c
+    - Source/CursesDialog/form/fld_user.c
+    - Utilities/cmcurl/lib/vquic/curl_msh3.c
+    - Source/CTest/cmCTestCurl.cxx
+    - Utilities/cmliblzma/liblzma/common/stream_encoder_mt.c
+    - Source/CursesDialog/form/fld_max.c
+    - Utilities/cmzstd/lib/compress/zstd_double_fast.c
+    - Utilities/cmcurl/lib/curl_log.c
+    - Source/CPack/cmCPackExternalGenerator.cxx
+    - Utilities/cmliblzma/liblzma/lz/lz_decoder.c
+    - Utilities/cmcurl/lib/vtls/gskit.c
+    - Utilities/cmliblzma/liblzma/simple/sparc.c
+    - Utilities/cmlibuv/src/unix/pipe.c
+    - Source/cmMessageCommand.cxx
+    - Utilities/cmlibrhash/librhash/sha512.c
+    - Utilities/cmcurl/lib/http_proxy.c
+    - Source/CursesDialog/form/fty_ipv4.c
+    - Source/cmExperimental.cxx
+    - Source/cmXMLSafe.cxx
+    - Utilities/cmliblzma/liblzma/common/block_encoder.c
+    - Source/cmString.cxx
+    - Source/CTest/cmParseBlanketJSCoverage.cxx
+    - Source/CPack/IFW/cmCPackIFWPackage.cxx
+    - Utilities/cmnghttp2/lib/nghttp2_callbacks.c
+    - Utilities/cmliblzma/liblzma/common/vli_size.c
+    - Utilities/KWIML/test/test.c
+    - Source/cmFileAPIToolchains.cxx
+    - Source/CursesDialog/form/fty_alpha.c
+    - Source/cmArgumentParser.cxx
+    - Utilities/cmbzip2/crctable.c
+    - Source/CTest/cmCTestTestCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_disk_set_standard_lookup.c
+    - Source/cmCPackPropertiesGenerator.cxx
+    - Utilities/cmliblzma/liblzma/common/filter_flags_encoder.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_ustar.c
+    - Source/cmFortranParserImpl.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_ar.c
+    - Utilities/cmcurl/lib/fopen.c
+    - Source/CTest/cmCTestGlobalVC.cxx
+    - Source/cmExportCommand.cxx
+    - Utilities/cmliblzma/liblzma/check/crc64_table.c
+    - Source/cmLocalUnixMakefileGenerator3.cxx
+    - Utilities/cmcurl/lib/curl_path.c
+    - Source/cmUVProcessChain.cxx
+    - Source/cmMakefileExecutableTargetGenerator.cxx
+    - Source/cmCMakePresetsGraphReadJSONWorkflowPresets.cxx
+    - Utilities/cmcurl/lib/sendf.c
+    - Source/CTest/cmCTestUpdateCommand.cxx
+    - Utilities/cmliblzma/liblzma/check/check.c
+    - Source/CursesDialog/form/fld_def.c
+    - Source/cmSourceGroupCommand.cxx
+    - Utilities/cmcurl/lib/parsedate.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_by_code.c
+    - Source/LexerParser/cmGccDepfileLexer.cxx
+    - Utilities/cmcurl/lib/noproxy.c
+    - Source/cmCryptoHash.cxx
+    - Source/cmGlobalNinjaGenerator.cxx
+    - Source/CTest/cmCTestCoverageHandler.cxx
+    - Utilities/cmlibarchive/libarchive/archive_util.c
+    - Source/CursesDialog/form/frm_def.c
+    - Source/CTest/cmParseJacocoCoverage.cxx
+    - Source/bindexplib.cxx
+    - Source/CTest/cmCTestResourceSpec.cxx
+    - Tests/CMakeLib/testCMExtMemory.cxx
+    - Source/kwsys/Base64.c
+    - Source/kwsys/Base64.c
+    - Source/cmQtAutoRcc.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write.c
+    - Source/cmGetSourceFilePropertyCommand.cxx
+    - Source/CTest/cmCTestUploadHandler.cxx
+    - Source/cmTargetPropertyComputer.cxx
+    - Utilities/cmnghttp2/lib/nghttp2_mem.c
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_lz4.c
+    - Source/cmInstallExportGenerator.cxx
+    - Utilities/cmcurl/lib/doh.c
+    - Source/cmMakefileLibraryTargetGenerator.cxx
+    - Source/CTest/cmCTestLaunchReporter.cxx
+    - Tests/CMakeLib/CMakeLibTests.cxx
+    - Tests/RunCMake/pseudo_iwyu.c
+    - Utilities/cmcurl/lib/http.c
+    - Utilities/cmzlib/compress.c
+    - Utilities/cmcurl/lib/conncache.c
+    - Utilities/cmlibarchive/libarchive/archive_pack_dev.c
+    - Utilities/cmcurl/lib/hash.c
+    - Utilities/cmcurl/lib/version.c
+    - Source/cmFileAPICMakeFiles.cxx
+    - Source/cmBuildCommand.cxx
+    - Source/cmMacroCommand.cxx
+    - Source/CursesDialog/form/fld_opts.c
+    - Source/cmInstallScriptGenerator.cxx
+    - Source/cmVariableRequiresCommand.cxx
+    - Source/CTest/cmCTestConfigureHandler.cxx
+    - Utilities/cmlibarchive/libarchive/archive_version_details.c
+    - Utilities/cmliblzma/liblzma/common/easy_encoder.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_lrzip.c
+    - Source/CTest/cmCTestEmptyBinaryDirectoryCommand.cxx
+    - Source/CTest/cmCTestRunScriptCommand.cxx
+    - Utilities/cmcurl/lib/curl_gssapi.c
+    - Utilities/cmcurl/lib/headers.c
+    - Utilities/cmlibuv/src/uv-common.c
+    - Utilities/cmlibuv/src/unix/dl.c
+    - Source/LexerParser/cmExprParser.cxx
+    - Utilities/cmcurl/lib/curl_memrchr.c
+    - Utilities/cmcurl/lib/vauth/cleartext.c
+    - Source/cmWriteFileCommand.cxx
+    - Source/CPack/cmCPackRPMGenerator.cxx
+    - Utilities/cmcurl/lib/mime.c
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_compress.c
+    - Source/cmGhsMultiGpj.cxx
+    - Source/CursesDialog/form/fty_int.c
+    - Source/cmForEachCommand.cxx
+    - Source/CPack/IFW/cmCPackIFWCommon.cxx
+    - Utilities/cmcurl/lib/system_win32.c
+    - Source/cmFindFileCommand.cxx
+    - Tests/RunCMake/CTestResourceAllocation/ctresalloc.cxx
+    - Source/cmEnableTestingCommand.cxx
+    - Source/cmInstallRuntimeDependencySet.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_lzop.c
+    - Source/cmPropertyDefinition.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_cab.c
+    - Utilities/cmlibarchive/libarchive/archive_write_open_fd.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_7zip.c
+    - Utilities/cmlibarchive/libarchive/archive_read_extract2.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_grzip.c
+    - Source/kwsys/testSystemTools.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_7zip.c
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_uuencode.c
+    - Utilities/cmcurl/lib/hostasyn.c
+    - Source/cmFileTimes.cxx
+    - Source/cmTransformDepfile.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_zstd.c
+    - Source/cmCMakeHostSystemInformationCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_blake2s_ref.c
+    - Source/cm_get_date.c
+    - Utilities/cmzlib/deflate.c
+    - Utilities/cmliblzma/liblzma/common/stream_encoder.c
+    - Source/cmExtraCodeLiteGenerator.cxx
+    - Source/CursesDialog/form/fld_dup.c
+    - Utilities/cmcurl/lib/vauth/digest_sspi.c
+    - Utilities/cmliblzma/liblzma/lz/lz_encoder_mf.c
+    - Utilities/cmlibuv/src/unix/linux-core.c
+    - Tests/RunCMake/exit_code.c
+    - Utilities/cmcurl/lib/sha256.c
+    - Source/CTest/cmParsePHPCoverage.cxx
+    - Utilities/cmcurl/lib/tftp.c
+    - Source/cmExtraCodeBlocksGenerator.cxx
+    - Source/cmNinjaLinkLineDeviceComputer.cxx
+    - Tests/CMakeLib/testXMLSafe.cxx
+    - Source/cmUseMangledMesaCommand.cxx
+    - Utilities/cmliblzma/liblzma/common/alone_decoder.c
+    - Utilities/cmlibrhash/librhash/sha256.c
+    - Source/cmExportSet.cxx
+    - Utilities/cmcurl/lib/psl.c
+    - Source/cmUuid.cxx
+    - Utilities/cmliblzma/liblzma/lzma/fastpos_table.c
+    - Utilities/cmlibarchive/libarchive/archive_read_open_filename.c
+    - Source/CursesDialog/form/fld_newftyp.c
+    - Utilities/cmzstd/lib/common/fse_decompress.c
+    - Utilities/cmzstd/lib/compress/zstd_opt.c
+    - Utilities/cmliblzma/liblzma/lzma/lzma_encoder_presets.c
+    - Utilities/cmliblzma/liblzma/common/easy_preset.c
+    - Source/cmLocalGenerator.cxx
+    - Utilities/cmzlib/zutil.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_compress.c
+    - Utilities/cmzstd/lib/compress/zstd_compress_superblock.c
+    - Utilities/cmcurl/lib/socketpair.c
+    - Utilities/cmlibarchive/libarchive/archive_blake2sp_ref.c
+    - Source/cmExportLibraryDependenciesCommand.cxx
+    - Utilities/cmcurl/lib/c-hyper.c
+    - Utilities/cmlibuv/src/unix/udp.c
+    - Source/cmCxxModuleMapper.cxx
+    - Source/cmCMakeMinimumRequired.cxx
+    - Tests/CMakeLib/testCTestResourceGroups.cxx
+    - Source/cmInstallTargetsCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_none.c
+    - Utilities/cmlibuv/src/inet.c
+    - Source/CursesDialog/cmCursesDummyWidget.cxx
+    - Utilities/cmcurl/lib/curl_gethostname.c
+    - Utilities/KWIML/test/test_abi_C.c
+    - Source/cmListCommand.cxx
+    - Utilities/cmbzip2/compress.c
+    - Utilities/cmnghttp2/lib/nghttp2_http.c
+    - Source/cmLinkItemGraphVisitor.cxx
+    - Source/cmDependsCompiler.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_gzip.c
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter.c
+    - Source/LexerParser/cmFortranParser.cxx
+    - Source/CPack/cmCPackDebGenerator.cxx
+    - Utilities/cmcurl/lib/amigaos.c
+    - Utilities/cmliblzma/liblzma/delta/delta_decoder.c
+    - Tests/CMakeLib/testUVRAII.cxx
+    - Source/cmBinUtilsWindowsPEObjdumpGetRuntimeDependenciesTool.cxx
+    - Source/cmTargetCompileDefinitionsCommand.cxx
+    - Source/cmFindPathCommand.cxx
+    - Source/cmSetDirectoryPropertiesCommand.cxx
+    - Utilities/cmcurl/lib/ftp.c
+    - Source/cmDocumentation.cxx
+    - Utilities/cmcurl/lib/nonblock.c
+    - Utilities/cmzstd/lib/deprecated/zbuff_compress.c
+    - Utilities/cmcurl/lib/hostsyn.c
+    - Utilities/cmlibarchive/libarchive/archive_entry_link_resolver.c
+    - Utilities/cmcurl/lib/http_ntlm.c
+    - Source/CTest/cmCTestBinPacker.cxx
+    - Utilities/cmzlib/inffast.c
+    - Source/CTest/cmCTestVC.cxx
+    - Utilities/cmliblzma/liblzma/common/block_header_decoder.c
+    - Utilities/cmcurl/lib/vauth/oauth2.c
+    - Source/CPack/IFW/cmCPackIFWRepository.cxx
+    - Utilities/cmliblzma/liblzma/check/sha256.c
+    - Source/cmStateDirectory.cxx
+    - Source/cmCMakePresetsGraph.cxx
+    - Utilities/cmlibuv/src/strscpy.c
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_b64encode.c
+    - Utilities/cmcurl/lib/vquic/curl_ngtcp2.c
+    - Source/kwsys/RegularExpression.cxx
+    - Source/cmDepends.cxx
+    - Utilities/cmcurl/lib/cf-https-connect.c
+    - Utilities/cmcurl/lib/vtls/wolfssl.c
+    - Source/cmExportFileGenerator.cxx
+    - Source/CTest/cmCTestGenericHandler.cxx
+    - Source/CTest/cmCTestMemCheckCommand.cxx
+    - Utilities/cmliblzma/liblzma/rangecoder/price_table.c
+    - Source/CTest/cmCTestHandlerCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_raw.c
+    - Source/cmCMakePresetsGraphReadJSONConfigurePresets.cxx
+    - Source/cmPolicies.cxx
+    - Utilities/KWIML/test/test_abi_CXX.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_gnutar.c
+    - Source/cmScriptGenerator.cxx
+    - Utilities/cmbzip2/randtable.c
+    - Tests/CMakeLib/testEncoding.cxx
+    - Source/LexerParser/cmDependsJavaLexer.cxx
+    - Source/cmTargetPropCommandBase.cxx
+    - Source/cmTestGenerator.cxx
+    - Utilities/cmcurl/lib/vtls/rustls.c
+    - Utilities/cmliblzma/liblzma/common/filter_encoder.c
+    - Source/cmArchiveWrite.cxx
+    - Source/cmInstallCxxModuleBmiGenerator.cxx
+    - Utilities/cmcurl/lib/vquic/curl_quiche.c
+    - Tests/RunCMake/pseudo_emulator_custom_command.c
+    - Source/CursesDialog/form/frm_user.c
+    - Utilities/cmzlib/inftrees.c
+    - Utilities/cmlibarchive/libarchive/archive_entry_strmode.c
+    - Source/cmCustomCommand.cxx
+    - Utilities/cmzlib/inflate.c
+    - Utilities/cmexpat/lib/xmlparse.c
+    - Source/cmSetTargetPropertiesCommand.cxx
+    - Source/cmInstallProgramsCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_lz4.c
+    - Source/cmPropertyMap.cxx
+    - Source/CTest/cmCTestResourceAllocator.cxx
+    - Tests/CMakeLib/testUVProcessChainHelper.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_open_file.c
+    - Utilities/cmlibarchive/libarchive/archive_read.c
+    - Source/CTest/cmCTestSubmitCommand.cxx
+    - Utilities/cmliblzma/liblzma/common/easy_encoder_memusage.c
+    - Utilities/cmcurl/lib/splay.c
+    - Source/cmSubcommandTable.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_raw.c
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_lrzip.c
+    - Utilities/cmcurl/lib/speedcheck.c
+    - Utilities/cmnghttp2/lib/nghttp2_option.c
+    - Source/CTest/cmCTestTestMeasurementXMLParser.cxx
+    - Source/cmAddLibraryCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_cryptor.c
+    - Utilities/cmzstd/lib/compress/zstd_compress.c
+    - Utilities/cmlibarchive/libarchive/archive_read_extract.c
+    - Utilities/cmcurl/lib/http_digest.c
+    - Source/cmFunctionCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_cmdline.c
+    - Utilities/cmjsoncpp/src/lib_json/json_reader.cpp
+    - Source/cmDyndepCollation.cxx
+    - Source/cmFLTKWrapUICommand.cxx
+    - Utilities/cmnghttp2/lib/nghttp2_hd_huffman.c
+    - Source/cmGeneratorTarget.cxx
+    - Utilities/cmcurl/lib/vauth/krb5_sspi.c
+    - Source/cmCacheManager.cxx
+    - Source/cmBuildNameCommand.cxx
+    - Source/cmSeparateArgumentsCommand.cxx
+    - Source/kwsys/testDirectory.cxx
+    - Utilities/cmliblzma/liblzma/lzma/lzma2_encoder.c
+    - Utilities/cmcurl/lib/vtls/hostcheck.c
+    - Source/kwsys/testDynamicLoader.cxx
+    - Source/kwsys/testEncode.c
+    - Utilities/cmzstd/lib/compress/zstd_compress_literals.c
+    - Utilities/cmlibarchive/libarchive/archive_write_open_memory.c
+    - Utilities/cmliblzma/liblzma/common/index_encoder.c
+    - Tests/CMakeLib/testGeneratedFileStream.cxx
+    - Utilities/cmzstd/lib/decompress/zstd_ddict.c
+    - Source/cm_codecvt.cxx
+    - Utilities/cmlibarchive/libarchive/archive_entry_sparse.c
+    - Source/CTest/cmCTestSleepCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_grzip.c
+    - Source/cmConsoleBuf.cxx
+    - Source/cmExportTryCompileFileGenerator.cxx
+    - Source/CursesDialog/cmCursesLongMessageForm.cxx
+    - Source/cmExtraKateGenerator.cxx
+    - Source/cmGeneratorExpression.cxx
+    - Utilities/cmcurl/lib/timeval.c
+    - Utilities/cmcurl/lib/progress.c
+    - Utilities/cmlibarchive/libarchive/archive_entry.c
+    - Utilities/cmlibrhash/librhash/byte_order.c
+    - Utilities/cmcurl/lib/vtls/openssl.c
+    - Source/cmOutputRequiredFilesCommand.cxx
+    - Source/cmGetCMakePropertyCommand.cxx
+    - Utilities/cmliblzma/liblzma/common/stream_flags_common.c
+    - Utilities/cmliblzma/liblzma/common/vli_decoder.c
+    - Source/CursesDialog/ccmake.cxx
+    - Source/cmLinkLibrariesCommand.cxx
+    - Source/cmTargetIncludeDirectoriesCommand.cxx
+    - Source/cmCommandArgumentParserHelper.cxx
+    - Utilities/cmlibarchive/libarchive/archive_entry_xattr.c
+    - Source/cmSetPropertyCommand.cxx
+    - Source/cmRulePlaceholderExpander.cxx
+    - Source/cmLoadCacheCommand.cxx
+    - Utilities/cmliblzma/liblzma/delta/delta_common.c
+    - Source/LexerParser/cmExprLexer.cxx
+    - Utilities/cmzstd/lib/dictBuilder/fastcover.c
+    - Source/cmExecProgramCommand.cxx
+    - Source/cmCustomCommandGenerator.cxx
+    - Source/cmMSVC60LinkLineComputer.cxx
+    - Source/CursesDialog/cmCursesStringWidget.cxx
+    - Utilities/cmliblzma/liblzma/common/block_buffer_encoder.c
+    - Source/cmGeneratorExpressionEvaluator.cxx
+    - Tests/RunCMake/fake_build_command.c
+    - Utilities/cmcurl/lib/imap.c
+    - Utilities/cmcurl/lib/rtsp.c
+    - Utilities/cmnghttp2/lib/nghttp2_rcbuf.c
+    - Source/kwsys/FStream.cxx
+    - Utilities/cmlibuv/src/unix/async.c
+    - Utilities/cmliblzma/liblzma/common/filter_common.c
+    - Utilities/cmlibarchive/libarchive/archive_ppmd8.c
+    - Utilities/cmlibuv/src/unix/signal.c
+    - Utilities/cmzlib/gzread.c
+    - Utilities/cmzstd/lib/common/zstd_common.c
+    - Source/cmQtAutoGenInitializer.cxx
+    - Utilities/cmcurl/lib/vauth/digest.c
+    - Utilities/cmzstd/lib/compress/huf_compress.c
+    - Utilities/cmcurl/lib/hmac.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_program.c
+    - Source/LexerParser/cmCommandArgumentLexer.cxx
+    - Source/CursesDialog/form/frm_opts.c
+    - Source/cmAddLinkOptionsCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_all.c
+    - Source/cmLocalNinjaGenerator.cxx
+    - Source/CPack/cpack.cxx
+    - Source/cmComputeTargetDepends.cxx
+    - Source/cmXMLParser.cxx
+    - Source/cmTimestamp.cxx
+    - Source/CTest/cmCTestBuildCommand.cxx
+    - Source/CursesDialog/form/frm_post.c
+    - Tests/CMakeLib/testCTestResourceSpec.cxx
+    - Utilities/cmlibuv/src/threadpool.c
+    - Source/cmStringCommand.cxx
+    - Utilities/cmcurl/lib/vtls/gtls.c
+    - Utilities/cmnghttp2/lib/nghttp2_extpri.c
+    - Utilities/std/cm/bits/fs_path.cxx
+    - Source/CursesDialog/cmCursesFilePathWidget.cxx
+    - Source/cmQTWrapUICommand.cxx
+    - Source/CursesDialog/form/fty_enum.c
+    - Source/CTest/cmCTestCVS.cxx
+    - Utilities/cmcurl/lib/http_negotiate.c
+    - Source/cmLinkLineComputer.cxx
+    - Utilities/cmcurl/lib/vtls/x509asn1.c
+    - Utilities/cmcurl/lib/fileinfo.c
+    - Tests/CMakeLib/testRST.cxx
+    - Source/CursesDialog/form/fld_ftlink.c
+    - Source/cmIncludeDirectoryCommand.cxx
+    - Utilities/cmliblzma/liblzma/lzma/lzma_encoder_optimum_fast.c
+    - Source/cmQtAutoMocUic.cxx
+    - Source/CTest/cmCTestStartCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_data_into_fd.c
+    - Source/cmGetPropertyCommand.cxx
+    - Source/CTest/cmCTestHG.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_disk_set_standard_lookup.c
+    - Utilities/cmlibarchive/libarchive/archive_read_add_passphrase.c
+    - Source/cmLDConfigLDConfigTool.cxx
+    - Source/cmAddCustomTargetCommand.cxx
+    - Source/CTest/cmParseMumpsCoverage.cxx
+    - Source/cmInstallRuntimeDependencySetGenerator.cxx
+    - Source/cmIfCommand.cxx
+    - Tests/RunCMake/pseudo_emulator_custom_command_arg.c
+    - Source/cmComputeLinkInformation.cxx
+    - Utilities/cmzstd/lib/decompress/zstd_decompress.c
+    - Tests/RunCMake/print_stdin.c
+    - Utilities/cmcurl/lib/asyn-ares.c
+    - Utilities/cmcurl/lib/rename.c
+    - Utilities/cmcurl/lib/vtls/schannel_verify.c
+    - Utilities/cmliblzma/liblzma/check/crc32_table.c
+    - Utilities/cmlibuv/src/idna.c
+    - Utilities/cmcurl/lib/content_encoding.c
+    - Utilities/cmcurl/lib/curl_range.c
+    - Utilities/cmnghttp2/lib/nghttp2_hd.c
+    - Utilities/cmzstd/lib/compress/hist.c
+    - Utilities/cmlibuv/src/unix/thread.c
+    - Utilities/cmlibuv/src/unix/loop.c
+    - Source/cmTargetPrecompileHeadersCommand.cxx
+    - Source/cmCurl.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_shar.c
+    - Source/cmQtAutoGen.cxx
+    - Source/cmTargetCompileOptionsCommand.cxx
+    - Utilities/cmcurl/lib/curl_fnmatch.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_zip.c
+    - Utilities/cmcurl/lib/vssh/wolfssh.c
+    - Utilities/cmlibrhash/librhash/sha1.c
+    - Utilities/cmlibuv/src/fs-poll.c
+    - Utilities/cmcurl/lib/curl_get_line.c
+    - Source/cmFilePathChecksum.cxx
+    - Utilities/cmlibuv/src/uv-data-getter-setters.c
+    - Source/CTest/cmParseCoberturaCoverage.cxx
+    - Utilities/cmzlib/gzwrite.c
+    - Utilities/cmnghttp2/lib/nghttp2_frame.c
+    - Source/cmFileLockResult.cxx
+    - Source/cmMathCommand.cxx
+    - Source/cmGeneratorExpressionEvaluationFile.cxx
+    - Utilities/cmcurl/lib/connect.c
+    - Tests/CMakeLib/testSystemTools.cxx
+    - Source/cmMarkAsAdvancedCommand.cxx
+    - Source/cmNinjaLinkLineComputer.cxx
+    - Source/cmIncludeGuardCommand.cxx
+    - Utilities/cmcurl/lib/vauth/gsasl.c
+    - Utilities/cmliblzma/liblzma/lzma/lzma_encoder_optimum_normal.c
+    - Source/cmCommonTargetGenerator.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_set_passphrase.c
+    - Source/cmVariableWatchCommand.cxx
+    - Source/cmValue.cxx
+    - Utilities/cmcurl/lib/vssh/libssh.c
+    - Source/cmReturnCommand.cxx
+    - Source/CTest/cmCTestCoverageCommand.cxx
+    - Source/cmNinjaTargetGenerator.cxx
+    - Tests/CMakeLib/testFindPackageCommand.cxx
+    - Source/CursesDialog/form/fty_alnum.c
+    - Utilities/cmliblzma/liblzma/common/block_decoder.c
+    - Utilities/cmliblzma/liblzma/common/hardware_cputhreads.c
+    - Source/cmVersion.cxx
+    - Source/cmBinUtilsMacOSMachOLinker.cxx
+    - Source/cmAddTestCommand.cxx
+    - Utilities/cmcurl/lib/mqtt.c
+    - Source/CursesDialog/form/fld_type.c
+    - Utilities/cmnghttp2/lib/nghttp2_submit.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_uu.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_cpio.c
+    - Source/CPack/cmCPackLog.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_cpio.c
+    - Utilities/cmcurl/lib/curl_des.c
+    - Source/CTest/cmCTestUploadCommand.cxx
+    - Utilities/cmnghttp2/lib/nghttp2_buf.c
+    - Source/cmCoreTryCompile.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_zip.c
+    - Source/cmGeneratorExpressionNode.cxx
+    - Utilities/cmlibuv/src/unix/procfs-exepath.c
+    - Source/cmDependsFortran.cxx
+    - Source/cmGetPipes.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_open_fd.c
+    - Utilities/cmlibuv/src/version.c
+    - Utilities/cmcurl/lib/transfer.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_options.c
+    - Utilities/cmliblzma/liblzma/common/filter_flags_decoder.c
+    - Utilities/cmliblzma/liblzma/simple/x86.c
+    - Source/CTest/cmCTestLaunch.cxx
+    - Utilities/cmcurl/lib/vtls/sectransp.c
+    - Utilities/KWIML/test/test_include_C.c
+    - Source/CTest/cmCTestConfigureCommand.cxx
+    - Source/cmVariableWatch.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_gzip.c
+    - Source/cmLocalGhsMultiGenerator.cxx
+    - Source/cmLinkItem.cxx
+    - Source/cmTargetLinkOptionsCommand.cxx
+    - Source/CTest/cmCTestResourceGroupsLexerHelper.cxx
+    - Utilities/cmlibarchive/libarchive/archive_hmac.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_cpio_odc.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c
+    - Source/cmEnableLanguageCommand.cxx
+    - Source/cmPathLabel.cxx
+    - Utilities/cmcurl/lib/timediff.c
+    - Source/cmFileInstaller.cxx
+    - Utilities/cmzlib/gzlib.c
+    - Utilities/cmzstd/lib/compress/zstd_lazy.c
+    - Source/cmFSPermissions.cxx
+    - Source/cmGlobalWatcomWMakeGenerator.cxx
+    - Source/kwsys/CommandLineArguments.cxx
+    - Utilities/cmcurl/lib/version_win32.c
+    - Utilities/cmlibuv/src/unix/linux-syscalls.c
+    - Utilities/cmlibrhash/librhash/sha3.c
+    - Source/cmFunctionBlocker.cxx
+    - Utilities/cmlibrhash/librhash/rhash.c
+    - Source/cmOutputConverter.cxx
+    - Source/cmSourceFileLocation.cxx
+    - Utilities/cmzstd/lib/common/error_private.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_rpm.c
+    - Source/cmGeneratedFileStream.cxx
+    - Tests/CMakeLib/testCMExtEnumSet.cxx
+    - Utilities/cmcurl/lib/hostip.c
+    - Utilities/cmlibuv/src/unix/core.c
+    - Utilities/cmcurl/lib/if2ip.c
+    - Source/cmCreateTestSourceList.cxx
+    - Source/cmFileCommand.cxx
+    - Tests/CMakeLib/testUTF8.cxx
+    - Source/cmDependsC.cxx
+    - Utilities/cmliblzma/liblzma/simple/powerpc.c
+    - Utilities/cmnghttp2/lib/nghttp2_stream.c
+    - Utilities/cmlibarchive/libarchive/archive_digest.c
+    - Utilities/cmlibuv/src/unix/linux-inotify.c
+    - Source/cmConditionEvaluator.cxx
+    - Utilities/cmnghttp2/lib/nghttp2_map.c
+    - Utilities/cmzstd/lib/compress/zstd_fast.c
+    - Source/cmComputeComponentGraph.cxx
+    - Utilities/cmliblzma/liblzma/common/filter_buffer_encoder.c
+    - Utilities/cmnghttp2/lib/nghttp2_priority_spec.c
+    - Utilities/cmcurl/lib/vtls/schannel.c
+    - Source/kwsys/testSystemInformation.cxx
+    - Source/cmInstallGetRuntimeDependenciesGenerator.cxx
+    - Source/cmExpandedCommandArgument.cxx
+    - Source/cmCMakePresetsGraphReadJSON.cxx
+    - Source/cmUnsetCommand.cxx
+    - Source/cmTryRunCommand.cxx
+    - Tests/CMakeLib/PseudoMemcheck/NoLog/ret0.c
+    - Tests/CMakeLib/PseudoMemcheck/NoLog/ret0.c
+    - Tests/CMakeLib/PseudoMemcheck/NoLog/ret0.c
+    - Utilities/cmcurl/lib/strcase.c
+    - Source/kwsys/testCommandLineArguments.cxx
+    - Utilities/cmliblzma/liblzma/common/stream_flags_encoder.c
+    - Utilities/cmcurl/lib/vauth/cram.c
+    - Source/cmBase32.cxx
+    - Source/cmCMakePresetsGraphReadJSONBuildPresets.cxx
+    - Source/cmDependsJava.cxx
+    - Utilities/cmcurl/lib/smtp.c
+    - Source/cmInstallFileSetGenerator.cxx
+    - Utilities/cmcurl/lib/md5.c
+    - Utilities/cmcurl/lib/vauth/ntlm.c
+    - Source/cmStandardLevelResolver.cxx
+    - Source/CursesDialog/cmCursesMainForm.cxx
+    - Source/CursesDialog/form/fld_move.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_mtree.c
+    - Source/CursesDialog/form/fld_arg.c
+    - Utilities/cmliblzma/liblzma/common/stream_decoder.c
+    - Utilities/cmliblzma/liblzma/simple/armthumb.c
+    - Utilities/cmcurl/lib/vtls/vtls.c
+    - Source/cmAddSubDirectoryCommand.cxx
+    - Source/kwsys/testCommandLineArguments1.cxx
+    - Source/cmFileAPICache.cxx
+    - Source/cmSourceFile.cxx
+    - Utilities/cmcurl/lib/getinfo.c
+    - Utilities/cmlibarchive/libarchive/archive_virtual.c
+    - Utilities/cmcurl/lib/formdata.c
+    - Utilities/cmliblzma/liblzma/common/auto_decoder.c
+    - Utilities/cmlibuv/src/unix/epoll.c
+    - Source/CursesDialog/form/fty_num.c
+    - Utilities/cmlibarchive/libarchive/xxhash.c
+    - Utilities/cmcurl/lib/netrc.c
+    - Source/CursesDialog/form/frm_driver.c
+    - Utilities/cmzlib/adler32.c
+    - Utilities/cmliblzma/liblzma/common/stream_buffer_encoder.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_iso9660.c
+    - Utilities/cmzstd/lib/dictBuilder/zdict.c
+    - Source/cmGlobalUnixMakefileGenerator3.cxx
+    - Source/CTest/cmCTestSVN.cxx
+    - Utilities/cmliblzma/liblzma/common/common.c
+    - Source/cmCMakePolicyCommand.cxx
+    - Source/kwsys/ProcessUNIX.c
+    - Source/kwsys/ProcessUNIX.c
+    - Utilities/cmcurl/lib/urlapi.c
+    - Utilities/cmcurl/lib/escape.c
+    - Source/kwsys/testDynload.c
+    - Source/CTest/cmParseGTMCoverage.cxx
+    - Utilities/cmbzip2/bzlib.c
+    - Source/cmCMakeLanguageCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_mtree.c
+    - Source/cmInstallFilesCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_getdate.c
+    - Source/cmFindCommon.cxx
+    - Source/cmInstallCommandArguments.cxx
+    - Source/CTest/cmCTestRunTest.cxx
+    - Source/cmXMLWriter.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_disk_posix.c
+    - Utilities/KWIML/test/test_int_CXX.cxx
+    - Source/cmFindBase.cxx
+    - Utilities/cmlibuv/src/unix/tcp.c
+    - Source/CTest/cmCTestMultiProcessHandler.cxx
+    - Source/cmInstalledFile.cxx
+    - Utilities/cmcurl/lib/idn.c
+    - Source/CursesDialog/form/fld_pad.c
+    - Source/cmWindowsRegistry.cxx
+    - Source/cmUtilitySourceCommand.cxx
+    - Tests/CMakeLib/testCTestResourceAllocator.cxx
+    - Source/LexerParser/cmCTestResourceGroupsLexer.cxx
+    - Utilities/cmliblzma/liblzma/check/crc64_fast.c
+    - Source/kwsys/Terminal.c
+    - Source/kwsys/Terminal.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_bzip2.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_rar.c
+    - Source/kwsys/SystemTools.cxx
+    - Source/cmGeneratorExpressionLexer.cxx
+    - Utilities/KWIML/test/test_int_C.c
+    - Source/cmBinUtilsMacOSMachOOToolGetRuntimeDependenciesTool.cxx
+    - Source/cmInstallCommand.cxx
+    - Source/cmExportInstallFileGenerator.cxx
+    - Utilities/cmcurl/lib/vauth/vauth.c
+    - Utilities/cmcurl/lib/select.c
+    - Source/cmScanDepFormat.cxx
+    - Source/cmNinjaNormalTargetGenerator.cxx
+    - Utilities/cmlibuv/src/strtok.c
+    - Source/CursesDialog/cmCursesWidget.cxx
+    - Utilities/cmzstd/lib/dictBuilder/cover.c
+    - Source/kwsys/cmsysTestsC.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_warc.c
+    - Utilities/cmlibarchive/libarchive/archive_read_open_file.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_warc.c
+    - Source/kwsys/EncodingC.c
+    - Source/kwsys/EncodingC.c
+    - Source/cmLinkLineDeviceComputer.cxx
+    - Utilities/cmlibuv/src/unix/getaddrinfo.c
+    - Utilities/cmcurl/lib/curl_ntlm_core.c
+    - Source/cmCommand.cxx
+    - Source/cmNewLineStyle.cxx
+    - Source/cmQtAutoGenerator.cxx
+    - Source/cmTryCompileCommand.cxx
+    - Source/cmGraphVizWriter.cxx
+    - Source/cmSetTestsPropertiesCommand.cxx
+    - Source/cmCMakePath.cxx
+    - Source/cmBinUtilsLinker.cxx
+    - Utilities/cmliblzma/liblzma/simple/simple_encoder.c
+    - Source/cmNinjaUtilityTargetGenerator.cxx
+    - Tests/RunCMake/pseudo_llvm-rc.c
+    - Utilities/cmlibuv/src/unix/process.c
+    - Utilities/cmcurl/lib/share.c
+    - Source/cmGccDepfileReader.cxx
+    - Utilities/cmliblzma/liblzma/common/index.c
+    - Source/CursesDialog/form/frm_scale.c
+    - Source/CursesDialog/form/fty_regex.c
+    - Utilities/cmliblzma/liblzma/lzma/lzma_encoder.c
+    - Utilities/cmlibuv/src/unix/sysinfo-memory.c
+    - Utilities/cmcurl/lib/hsts.c
+    - Source/kwsys/testTerminal.c
+    - Source/LexerParser/cmDependsJavaParser.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_xz.c
+    - Utilities/cmliblzma/liblzma/common/filter_decoder.c
+    - Utilities/cmlibarchive/libarchive/archive_string.c
+    - Source/kwsys/testEncoding.cxx
+    - Utilities/cmcurl/lib/strdup.c
+    - Utilities/cmliblzma/liblzma/lz/lz_encoder.c
+    - Source/cmAddExecutableCommand.cxx
+    - Utilities/cmzstd/lib/compress/zstd_compress_sequences.c
+    - Source/cmAddDependenciesCommand.cxx
+    - Utilities/cmexpat/lib/xmltok.c
+    - Utilities/cmcurl/lib/altsvc.c
+    - Utilities/cmlibarchive/libarchive/archive_read_disk_entry_from_file.c
+    - Source/cmELF.cxx
+    - Source/cmExportInstallAndroidMKGenerator.cxx
+    - Source/kwsys/EncodingCXX.cxx
+    - Source/cmFileAPI.cxx
+    - Source/cmIncludeExternalMSProjectCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_by_name.c
+    - Tests/CMakeLib/testCMExtAlgorithm.cxx
+    - Source/cmGlobVerificationManager.cxx
+    - Source/CursesDialog/form/frm_sub.c
+    - Utilities/cmcurl/lib/socks_sspi.c
+    - Source/cmLinkDirectoriesCommand.cxx
+    - Tests/CMakeLib/testCTestBinPacker.cxx
+    - Source/cmBinUtilsWindowsPELinker.cxx
+    - Utilities/cmliblzma/liblzma/common/easy_buffer_encoder.c
+    - Utilities/cmlibarchive/libarchive/archive_read_open_memory.c
+    - Source/cmBinUtilsWindowsPEGetRuntimeDependenciesTool.cxx
+    - Source/cmAuxSourceDirectoryCommand.cxx
+    - Utilities/cmlibuv/src/unix/tty.c
+    - Source/cmAffinity.cxx
+    - Utilities/cmnghttp2/lib/nghttp2_outbound_item.c
+    - Source/cmLocalCommonGenerator.cxx
+    - Source/cmHexFileConverter.cxx
+    - Source/cmExtraEclipseCDT4Generator.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_disk_posix.c
+    - Source/CursesDialog/form/fld_page.c
+    - Source/LexerParser/cmCommandArgumentParser.cxx
+    - Utilities/cmliblzma/liblzma/lzma/lzma2_decoder.c
+    - Source/CursesDialog/form/fld_current.c
+    - Source/cmFileTime.cxx
+    - Source/cmake.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_pax.c
+    - Source/cmInstallDirectoryGenerator.cxx
+    - Utilities/cmliblzma/liblzma/common/index_decoder.c
+    - Utilities/cmcurl/lib/warnless.c
+    - Tests/CMakeLib/testAffinity.cxx
+    - Source/cmGeneratorExpressionContext.cxx
+    - Utilities/cmnghttp2/lib/nghttp2_pq.c
+    - Utilities/cmzstd/lib/common/xxhash.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_all.c
+    - Source/cmRuntimeDependencyArchive.cxx
+    - Utilities/cmcurl/lib/asyn-thread.c
+    - Source/kwsys/String.c
+    - Source/kwsys/String.c
+    - Utilities/cmlibarchive/libarchive/archive_string_sprintf.c
+    - Utilities/cmcurl/lib/mprintf.c
+    - Utilities/cmcurl/lib/curl_endian.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format.c
+    - Utilities/cmcurl/lib/vtls/mbedtls.c
+    - Tests/CMakeLib/testUVStreambuf.cxx
+    - Tests/FindPackageModeMakefileTest/foo.cpp
+    - Utilities/cmcurl/lib/ws.c
+    - Utilities/cmzstd/lib/compress/zstd_ldm.c
+    - Source/kwsys/System.c
+    - Source/kwsys/System.c
+    - Source/cmOSXBundleGenerator.cxx
+    - Source/CPack/cmCPackArchiveGenerator.cxx
+    - Source/CPack/cmCPackNuGetGenerator.cxx
+    - Utilities/cmzlib/uncompr.c
+    - Utilities/cmcurl/lib/cookie.c
+    - Source/cmCMakePresetsGraphReadJSONPackagePresets.cxx
+    - Utilities/cmliblzma/liblzma/common/index_hash.c
+    - Utilities/cmlibuv/src/unix/stream.c
+    - Utilities/cmnghttp2/lib/nghttp2_debug.c
+    - Utilities/std/cm/bits/string_view.cxx
+    - Utilities/cmlibarchive/libarchive/archive_pathmatch.c
+    - Source/CTest/cmCTestScriptHandler.cxx
+    - Utilities/cmcurl/lib/vtls/keylog.c
+    - Utilities/cmnghttp2/lib/nghttp2_npn.c
+    - Source/cmFileSet.cxx
+    - Utilities/cmcurl/lib/strtok.c
+    - Utilities/cmcurl/lib/dynbuf.c
+    - Source/CTest/cmParseDelphiCoverage.cxx
+    - Source/kwsys/testConsoleBuf.cxx
+    - Utilities/cmcurl/lib/vssh/libssh2.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_tar.c
+    - Source/cmProcessTools.cxx
+    - Source/CTest/cmCTestTestHandler.cxx
+    - Tests/RunCMake/pseudo_tidy.c
+    - Utilities/cmlibarchive/libarchive/archive_options.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_filter_by_ext.c
+    - Source/CursesDialog/form/frm_cursor.c
+    - Source/CursesDialog/form/fld_info.c
+    - Utilities/cmzstd/lib/decompress/zstd_decompress_block.c
+    - Source/cmSetSourceFilesPropertiesCommand.cxx
+    - Source/cmFileTimeCache.cxx
+    - Utilities/cmliblzma/liblzma/common/block_buffer_decoder.c
+    - Source/cmExtraSublimeTextGenerator.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_append_filter.c
+    - Utilities/cmcurl/lib/vauth/spnego_sspi.c
+    - Source/CursesDialog/form/fld_attr.c
+    - Utilities/cmcurl/lib/strerror.c
+    - Source/CursesDialog/form/frm_win.c
+    - Source/cmBinUtilsLinuxELFObjdumpGetRuntimeDependenciesTool.cxx
+    - Source/cmMakefileTargetGenerator.cxx
+    - Source/cmTarget.cxx
+    - Source/CTest/cmParseCacheCoverage.cxx
+    - Source/CursesDialog/form/fld_ftchoice.c
+    - Source/cmBinUtilsLinuxELFLinker.cxx
+    - Source/cmSystemTools.cxx
+    - Source/CTest/cmCTestUpdateHandler.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_xz.c
+    - Source/cmGhsMultiTargetGenerator.cxx
+    - Source/CursesDialog/cmCursesOptionsWidget.cxx
+    - Source/cmInstallSubdirectoryGenerator.cxx
+    - Utilities/cmcurl/lib/bufref.c
+    - Source/cmQTWrapCPPCommand.cxx
+    - Source/cmFileLockPool.cxx
+    - Source/cmCTest.cxx
+    - Utilities/cmcurl/lib/base64.c
+    - Source/CursesDialog/form/frm_hook.c
+    - Source/cmDocumentationFormatter.cxx
+    - Utilities/cmzstd/lib/decompress/huf_decompress.c
+    - Source/kwsys/Directory.cxx
+    - Utilities/cmexpat/lib/xmlrole.c
+    - Tests/CMakeLib/testXMLParser.cxx
+    - Source/cmOptionCommand.cxx
+    - Source/kwsys/DynamicLoader.cxx
+    - Utilities/cmliblzma/liblzma/common/easy_decoder_memusage.c
+    - Source/cmSearchPath.cxx
+    - Utilities/cmcurl/lib/vquic/vquic.c
+    - Utilities/cmzstd/lib/common/entropy_common.c
+    - Utilities/cmcurl/lib/smb.c
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_bzip2.c
+    - Utilities/cmcurl/lib/gopher.c
+    - Utilities/cmcurl/lib/memdebug.c
+    - Utilities/cmlibuv/src/unix/proctitle.c
+    - Source/cmSubdirDependsCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_format_rar5.c
+    - Tests/CMakeLib/testGccDepfileReader.cxx
+    - Source/cmGetFilenameComponentCommand.cxx
+    - Source/cmFindLibraryCommand.cxx
+    - Tests/RunCMake/color_warning.c
+    - Utilities/cmliblzma/liblzma/common/outqueue.c
+    - Source/cmBreakCommand.cxx
+    - Utilities/cmbzip2/decompress.c
+    - Utilities/cmzstd/lib/common/pool.c
+    - Utilities/cmlibarchive/libarchive/archive_write_open_filename.c
+    - Source/CursesDialog/cmCursesColor.cxx
+    - Source/cmTargetSourcesCommand.cxx
+    - Tests/CMakeLib/testString.cxx
+    - Utilities/cmcurl/lib/strtoofft.c
+    - Source/cmStateSnapshot.cxx
+    - Utilities/cmliblzma/liblzma/common/alone_encoder.c
+    - Utilities/cmcurl/lib/vauth/krb5_gssapi.c
+    - Utilities/cmlibrhash/librhash/hex.c
+    - Source/CTest/cmCTestGIT.cxx
+    - Utilities/cmcurl/lib/curl_sspi.c
+    - Source/kwsys/testConfigure.cxx
+    - Utilities/cmnghttp2/lib/nghttp2_version.c
+    - Utilities/cmlibuv/src/timer.c
+    - Source/cmIncludeRegularExpressionCommand.cxx
+    - Utilities/cmzstd/lib/deprecated/zbuff_decompress.c
+    - Utilities/cmcurl/lib/pop3.c
+    - Source/cmExprParserHelper.cxx
+    - Source/cmStringAlgorithms.cxx
+    - Source/cmMakeDirectoryCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_match.c
+    - Source/CPack/cmCPackGenerator.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_set_format.c
+    - Source/cmExternalMakefileProjectGenerator.cxx
+    - Source/cmFileCopier.cxx
+    - Source/CursesDialog/form/frm_req_name.c
+    - Source/cmConfigureLog.cxx
+    - Source/cmLDConfigTool.cxx
+    - Source/cmDuration.cxx
+    - Source/CursesDialog/form/fld_stat.c
+    - Source/cmMakefileProfilingData.cxx
+    - Utilities/cmcurl/lib/llist.c
+    - Source/cmDependsJavaParserHelper.cxx
+    - Utilities/cmlibarchive/libarchive/archive_ppmd7.c
+    - Source/cmWorkingDirectory.cxx
+    - Source/cm_utf8.c
+    - Utilities/cmzlib/crc32.c
+    - Source/cmRST.cxx
+    - Source/CTest/cmCTestP4.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_set_options.c
+    - Utilities/cmnghttp2/lib/nghttp2_queue.c
+    - Source/cmBinUtilsWindowsPEDumpbinGetRuntimeDependenciesTool.cxx
+    - Source/cmGeneratorExpressionParser.cxx
+    - Source/cmAddCompileDefinitionsCommand.cxx
+    - Utilities/cmcurl/lib/hostip4.c
+    - Utilities/cmliblzma/liblzma/delta/delta_encoder.c
+    - Utilities/cmlibarchive/libarchive/archive_entry_copy_stat.c
+    - Source/cmStringReplaceHelper.cxx
+    - Source/cmCMakePresetsGraphReadJSONTestPresets.cxx
+    - Utilities/cmcurl/lib/inet_ntop.c
+    - Source/cmProjectCommand.cxx
+    - Source/cmCommands.cxx
+    - Source/CPack/cmCPackSTGZGenerator.cxx
+    - Utilities/cmzstd/lib/common/threading.c
+    - Utilities/cmlibuv/src/unix/getnameinfo.c
+    - Utilities/cmlibarchive/libarchive/archive_check_magic.c
+    - Utilities/cmcurl/lib/http_chunks.c
+    - Source/cmCustomCommandLines.cxx
+    - Utilities/cmbzip2/huffman.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_cpio_binary.c
+    - Utilities/cmliblzma/liblzma/common/block_header_encoder.c
+    - Utilities/cmliblzma/common/tuklib_cpucores.c
+    - Utilities/cmcurl/lib/curl_rtmp.c
+    - Source/cmSiteNameCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_rb.c
+    - Source/cmTest.cxx
+    - Source/CTest/cmCTestReadCustomFilesCommand.cxx
+    - Utilities/cmcurl/lib/cf-socket.c
+    - Tests/CMakeLib/testRange.cxx
+    - Source/cmInstallImportedRuntimeArtifactsGenerator.cxx
+    - Utilities/cmlibarchive/libarchive/archive_random.c
+    - Utilities/cmcurl/lib/curl_ntlm_wb.c
+    - Source/cmDefinePropertyCommand.cxx
+    - Source/cmQtAutoGenGlobalInitializer.cxx
+    - Source/CPack/cmCPackNSISGenerator.cxx
+    - Source/cmWhileCommand.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_add_filter_program.c
+    - Source/CPack/IFW/cmCPackIFWInstaller.cxx
+    - Utilities/cmliblzma/liblzma/simple/simple_coder.c
+    - Source/cmFileAPICodemodel.cxx
+    - Tests/CMakeLib/testJSONHelpers.cxx
+    - Source/cmBlockCommand.cxx
+    - Utilities/cmlibrhash/librhash/algorithms.c
+    - Source/cmBinUtilsMacOSMachOGetRuntimeDependenciesTool.cxx
+    - Source/cmComputeLinkDepends.cxx
+    - Source/cmRemoveCommand.cxx
+    - Utilities/cmcurl/lib/telnet.c
+    - Source/kwsys/cmsysTestsCxx.cxx
+    - Source/CTest/cmCTestBuildAndTestHandler.cxx
+    - Source/cmGetDirectoryPropertyCommand.cxx
+    - Source/cmPlaceholderExpander.cxx
+    - Source/cmCLocaleEnvironmentScope.cxx
+    - Source/kwsys/Status.cxx
+    - Utilities/cmcurl/lib/vtls/mbedtls_threadlock.c
+    - Utilities/cmlibuv/src/unix/loop-watcher.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_lzop.c
+    - Utilities/cmcurl/lib/curl_sasl.c
+    - Source/kwsys/testProcess.c
+    - Source/cmUVHandlePtr.cxx
+    - Source/cmProcessOutput.cxx
+    - Source/kwsys/testFStream.cxx
+    - Utilities/cmzlib/gzclose.c
+    - Utilities/cmcurl/lib/hostip6.c
+    - Source/kwsys/MD5.c
+    - Source/kwsys/MD5.c
+    - Source/CTest/cmProcess.cxx
+    - Utilities/cmzstd/lib/compress/fse_compress.c
+    - Utilities/cmzstd/lib/deprecated/zbuff_common.c
+    - Utilities/cmliblzma/liblzma/common/filter_buffer_decoder.c
+    - Source/cmExportBuildFileGenerator.cxx
+    - Source/CursesDialog/form/fld_link.c
+    - Source/cmMakefile.cxx
+    - Source/cmDefinitions.cxx
+    - Source/cmAddCompileOptionsCommand.cxx
+    - Utilities/cmzstd/lib/compress/zstdmt_compress.c
+    - Utilities/cmcurl/lib/cfilters.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_by_name.c
+    - Tests/CMakeLib/PseudoMemcheck/ret0.cxx
+    - Tests/CMakeLib/PseudoMemcheck/ret0.cxx
+    - Tests/CMakeLib/PseudoMemcheck/ret0.cxx
+    - Tests/CMakeLib/PseudoMemcheck/ret0.cxx
+    - Source/cmDynamicLoader.cxx
+    - Source/cmConfigureFileCommand.cxx
+    - Source/CPack/cmCPackComponentGroup.cxx
+    - Source/cmMessenger.cxx
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_zstd.c
+    - Source/CursesDialog/cmCursesLabelWidget.cxx
+    - Utilities/cmcurl/lib/socks_gssapi.c
+    - Source/CTest/cmCTestMemCheckHandler.cxx
+    - Source/cmExportBuildAndroidMKGenerator.cxx
+    - Source/CPack/cmCPackGeneratorFactory.cxx
+    - Source/kwsys/testConsoleBufChild.cxx
+    - Utilities/cmliblzma/liblzma/common/stream_flags_decoder.c
+    - Source/ctest.cxx
+    - Utilities/cmcurl/lib/easy.c
+    - Utilities/cmlibarchive/libarchive/archive_entry_stat.c
+    - Source/cmOrderDirectories.cxx
+    - Tests/CMakeLib/testOptional.cxx
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_cpio_newc.c
+    - Source/cmGetTestPropertyCommand.cxx
+    - Utilities/cmzstd/lib/dictBuilder/divsufsort.c
+    - Utilities/cmcurl/lib/socks.c
+    - Utilities/cmcurl/lib/dict.c
+    - Utilities/cmcurl/lib/vtls/bearssl.c
+    - Source/cmRemoveDefinitionsCommand.cxx
+    - Tests/CMakeLib/testArgumentParser.cxx
+    - Source/cmParseArgumentsCommand.cxx
+    - Source/cmTargetLinkLibrariesCommand.cxx
+    - Tests/RunCMake/pseudo_cpplint.c
+    - Utilities/cmlibarchive/libarchive/filter_fork_posix.c
+    - Utilities/cmcurl/curltest.c
+    - Utilities/cmcurl/lib/inet_pton.c
+    - Source/CursesDialog/form/frm_page.c
+    - Utilities/cmlibrhash/librhash/md5.c
+    - Source/cmBinUtilsLinuxELFGetRuntimeDependenciesTool.cxx
+    - Source/cmFindProgramCommand.cxx
+    - Source/CursesDialog/cmCursesPathWidget.cxx
+    - Source/cmInstallGenerator.cxx
+    - Source/kwsys/testStatus.cxx
+    - Tests/CMakeLib/testUVProcessChain.cxx
+    - Source/CTest/cmCTestSubmitHandler.cxx
+    - Utilities/cmcurl/lib/pingpong.c
+    - Tests/CMakeLib/testStringAlgorithms.cxx
+    - Source/cmGetTargetPropertyCommand.cxx
+    - Utilities/cmliblzma/liblzma/common/block_util.c
+    - Utilities/cmlibuv/src/unix/fs.c
+    - Utilities/cmliblzma/liblzma/common/vli_encoder.c
+    - Utilities/cmcurl/lib/url.c
+    - Utilities/cmcurl/lib/h2h3.c
+    - Utilities/cmcurl/lib/http_aws_sigv4.c
+    - Utilities/cmnghttp2/lib/nghttp2_helper.c
+    - Utilities/cmlibarchive/libarchive/archive_write_set_format_v7tar.c
+    - Source/CursesDialog/cmCursesForm.cxx
+    - Utilities/cmliblzma/liblzma/common/stream_buffer_decoder.c
+    - Source/cmIncludeCommand.cxx
+    - Utilities/cmcurl/lib/easyoptions.c
+    - Source/LexerParser/cmListFileLexer.c
+    - Source/cmSetCommand.cxx
+    - Utilities/cmlibuv/src/unix/poll.c
+    - Source/cmCMakePathCommand.cxx
+    - Tests/CMakeLib/PseudoMemcheck/ret1.cxx
+    - Utilities/cmjsoncpp/src/lib_json/json_value.cpp
+    - Utilities/cmcurl/lib/vauth/ntlm_sspi.c
+    - Utilities/cmlibarchive/libarchive/archive_read_support_filter_none.c
+    - Source/cmGlobalGenerator.cxx
+    - Utilities/cmcurl/lib/curl_multibyte.c
+    - Utilities/cmliblzma/liblzma/simple/ia64.c
+  processing time: 37.108 # seconds
+  source count: 1042
+  file count: 2427
+  include directives: 12773
+  # These are the stats of all the files found.  This would be
+  # similar to the cost of a "unity build".
+  preprocessed: 
+    byte count: 37208724 # 35.0 MiB
+    token count: 3457383
+  # These are the stats of all postprocessed
+  # translation units passed to the compiler.
+  postprocessed: 
+    byte count: 2275759765 # 2.00 GiB
+    token count: 160509192
+  # These are the stats of the actual build, i.e. all
+  # postprocessed translation units passed to the compiler subtracting the
+  # cost of precompiled header:
+  actual: 
+    byte count: 2275759765 # 2.00 GiB
+    token count: 160509192
+  missing files: 
+    - emmintrin.h
+    - limits.h
+    - stdarg.h
+    - stdbool.h
+    - stddef.h
+
+analysis: 
+  # Below are the files that do not have an include guard or
+  # include guard that is not strict enough to enable the multiple-include
+  # optimization where compilers will skip opening a file a second time
+  # for each source.
+  unguarded files: 
+    time taken: 0 # seconds
+    results: 
+      - file: '"Utilities/cmcurl/lib/vauth/curl_setup.h"'
+        count: 229
+      - file: '"curl/curl.h"'
+        count: 63
+      - file: '"Source/kwsys/kwsysPrivate.h"'
+        count: 39
+      - file: '"Source/CursesDialog/form/form.priv.h"'
+        count: 39
+      - file: '"config.h"'
+        count: 24
+      - file: '"Utilities/cmzstd/lib/common/zstd_deps.h"'
+        count: 22
+      - file: '"Utilities/cmzstd/lib/common/fse.h"'
+        count: 13
+      - file: '"Utilities/cmzstd/lib/common/huf.h"'
+        count: 9
+      - file: '"Utilities/cmzstd/lib/zstd.h"'
+        count: 8
+      - file: '"Utilities/cmbzip2/bzlib_private.h"'
+        count: 7
+      - file: '"Utilities/KWIML/test/test.h"'
+        count: 6
+      - file: '"Utilities/cmliblzma/liblzma/common/easy_preset.h"'
+        count: 6
+      - file: '"Utilities/cmzstd/lib/compress/hist.h"'
+        count: 6
+      - file: '"Utilities/cmzstd/lib/common/xxhash.h"'
+        count: 5
+      - file: '"Utilities/cmzlib/gzguts.h"'
+        count: 5
+      - file: '"Utilities/cmzstd/lib/deprecated/zbuff.h"'
+        count: 3
+      - file: '"Utilities/cmzlib/inftrees.h"'
+        count: 3
+      - file: '"Utilities/cmexpat/lib/ascii.h"'
+        count: 3
+      - file: '"expat_config.h"'
+        count: 3
+      - file: '"Utilities/cmexpat/lib/internal.h"'
+        count: 3
+      - file: '"Utilities/cmliblzma/liblzma/check/crc_macros.h"'
+        count: 2
+      - file: '"Utilities/cmliblzma/liblzma/common/outqueue.h"'
+        count: 2
+      - file: '"Utilities/KWIML/test/test_abi_endian.h"'
+        count: 2
+      - file: '"Utilities/cmzlib/inffast.h"'
+        count: 2
+      - file: '"Source/CTest/cmCTestTestMeasurementXMLParser.h"'
+        count: 2
+      - file: '"Utilities/KWIML/test/test_int_format.h"'
+        count: 2
+      - file: '"Utilities/cmcurl/lib/easy_lock.h"'
+        count: 2
+      - file: '"Utilities/cmzlib/inflate.h"'
+        count: 2
+      - file: '"Source/kwsys/testDynload.h"'
+        count: 2
+      - file: '"Utilities/cmzstd/lib/dictBuilder/cover.h"'
+        count: 2
+
+  # These are components that have a header file that is not included
+  # by any other component and may be a candidate for removal.
+  unreferenced components: 
+    time taken: 0.006 # seconds
+    results: 
+      - source: '"Source/cmGlobalWatcomWMakeGenerator.cxx"'
+        saving: 0.26 # (%)
+      - source: '"Tests/CMakeLib/testXMLParser.cxx"'
+        saving: 0.07 # (%)
+      - source: '"Utilities/cmzstd/lib/compress/zstdmt_compress.c"'
+        saving: 0.03 # (%)
+      - source: '"Utilities/cmcurl/lib/vauth/digest.c"'
+        saving: 0.02 # (%)
+      - source: '"Utilities/cmnghttp2/lib/nghttp2_submit.c"'
+        saving: 0.01 # (%)
+      - source: '"Utilities/cmcurl/lib/vtls/keylog.c"'
+        saving: 0.01 # (%)
+      - source: '"Utilities/cmcurl/lib/curl_threads.c"'
+        saving: 0.01 # (%)
+      - source: '"Utilities/cmcurl/lib/curl_endian.c"'
+        saving: 0.01 # (%)
+      - source: '"Utilities/cmcurl/lib/curl_gethostname.c"'
+        saving: 0.01 # (%)
+      - source: '"Utilities/cmnghttp2/lib/nghttp2_queue.c"'
+        saving: 0.01 # (%)
+      - source: '"Utilities/cmnghttp2/lib/nghttp2_npn.c"'
+        saving: 0.01 # (%)
+      - source: '"Utilities/cmzlib/crc32.c"'
+        saving: 0.00 # (%)
+      - source: '"Tests/FindPackageModeMakefileTest/foo.cpp"'
+        saving: 0.00 # (%)
+
+  # This is a list of the most costly #include directives.
+  include directives: 
+    time: 6.40 # seconds
+    results: 
+      - directive: '#include <chrono>'
+        file: '"cmDuration.h"'
+        line: 5
+        saving: 2.43 # (%)
+      - directive: '#include "cmDuration.h"'
+        file: '"cmSystemTools.h"'
+        line: 26
+        saving: 2.04 # (%)
+      - directive: '#include <functional>'
+        file: '"cmSystemTools.h"'
+        line: 12
+        saving: 1.32 # (%)
+
+  # This is a list of all header files that should be considered
+  # to not be included by other header files, but source files only
+  make private: 
+    time: 78.44 # seconds
+    results: 
+      - file: '"Source/cmDuration.h"'
+        reference count: 9
+        saving: 2.91 # (%)
+      - file: <chrono>
+        reference count: 7
+        saving: 2.83 # (%)
+      - file: <sstream>
+        reference count: 7
+        saving: 1.61 # (%)
+      - file: '"Source/cmSystemTools.h"'
+        reference count: 8
+        saving: 1.21 # (%)
+
+  # This is a list of all header files that should be considered
+  # to be added to the precompiled header:
+  pch additions: 
+    time: 12.42 # seconds
+    results: 
+      - file: <cmjsoncpp/include/json/reader.h>
+        saving: 62.55 # (%)
+      - file: <cm3p/json/reader.h>
+        saving: 62.55 # (%)
+      - file: <cmext/algorithm>
+        saving: 61.84 # (%)
+      - file: <cm3p/json/writer.h>
+        saving: 60.40 # (%)
+      - file: <cmjsoncpp/include/json/value.h>
+        saving: 60.40 # (%)
+      - file: <cm3p/json/value.h>
+        saving: 60.40 # (%)
+      - file: <cm/vector>
+        saving: 55.73 # (%)
+      - file: <cm/string>
+        saving: 55.73 # (%)
+      - file: <cm/filesystem>
+        saving: 51.52 # (%)
+      - file: <cmjsoncpp/include/json/config.h>
+        saving: 51.04 # (%)
+      - file: <cm/iomanip>
+        saving: 43.35 # (%)
+      - file: <iomanip>
+        saving: 43.35 # (%)
+      - file: <cm/algorithm>
+        saving: 41.54 # (%)
+      - file: <algorithm>
+        saving: 41.54 # (%)
+      - file: <functional>
+        saving: 40.58 # (%)
+      - file: <mutex>
+        saving: 40.52 # (%)
+      - file: <condition_variable>
+        saving: 40.50 # (%)
+      - file: <locale>
+        saving: 39.15 # (%)
+      - file: <fstream>
+        saving: 37.03 # (%)
+      - file: <sstream>
+        saving: 36.94 # (%)
+      - file: <iostream>
+        saving: 35.92 # (%)
+      - file: <istream>
+        saving: 35.92 # (%)
+      - file: <ostream>
+        saving: 34.06 # (%)
+      - file: <cmext/enum_set>
+        saving: 33.42 # (%)
+      - file: <cm/memory>
+        saving: 31.34 # (%)
+      - file: <memory>
+        saving: 31.34 # (%)
+      - file: <cmext/string_view>
+        saving: 30.27 # (%)
+      - file: <cm/string_view>
+        saving: 30.26 # (%)
+      - file: <cm/iterator>
+        saving: 30.26 # (%)
+      - file: <iterator>
+        saving: 30.03 # (%)
+      - file: <streambuf>
+        saving: 29.39 # (%)
+      - file: <thread>
+        saving: 27.42 # (%)
+      - file: <bitset>
+        saving: 27.08 # (%)
+      - file: <stdexcept>
+        saving: 26.78 # (%)
+      - file: <string>
+        saving: 26.16 # (%)
+      - file: <unordered_map>
+        saving: 25.83 # (%)
+      - file: <unordered_set>
+        saving: 25.05 # (%)
+      - file: <map>
+        saving: 23.26 # (%)
+      - file: <queue>
+        saving: 22.10 # (%)
+      - file: <set>
+        saving: 18.50 # (%)
+      - file: <vector>
+        saving: 17.42 # (%)
+      - file: <stack>
+        saving: 15.41 # (%)
+      - file: <deque>
+        saving: 15.02 # (%)
+      - file: <tuple>
+        saving: 14.38 # (%)
+      - file: <cmath>
+        saving: 13.38 # (%)
+      - file: <list>
+        saving: 12.17 # (%)
+      - file: <array>
+        saving: 11.18 # (%)
+      - file: <chrono>
+        saving: 9.44 # (%)
+      - file: <cm/optional>
+        saving: 8.59 # (%)
+      - file: <cmlibuv/include/uv.h>
+        saving: 5.35 # (%)
+      - file: <cm3p/uv.h>
+        saving: 5.35 # (%)
+      - file: <atomic>
+        saving: 5.30 # (%)
+      - file: <cm/utility>
+        saving: 5.29 # (%)
+      - file: <utility>
+        saving: 5.29 # (%)
+      - file: <ratio>
+        saving: 4.82 # (%)
+      - file: <cmext/memory>
+        saving: 4.00 # (%)
+      - file: <cm/type_traits>
+        saving: 3.88 # (%)
+      - file: <type_traits>
+        saving: 3.87 # (%)
+      - file: <cm3p/archive.h>
+        saving: 3.06 # (%)
+      - file: <cm3p/curl/curl.h>
+        saving: 2.60 # (%)
+      - file: <ncurses.h>
+        saving: 2.46 # (%)
+      - file: <pthread.h>
+        saving: 2.28 # (%)
+      - file: <limits>
+        saving: 1.82 # (%)
+      - file: <cm3p/expat.h>
+        saving: 1.55 # (%)
+      - file: <cmexpat/lib/expat.h>
+        saving: 1.55 # (%)
+      - file: <stdlib.h>
+        saving: 1.54 # (%)
+      - file: <cstdlib>
+        saving: 1.54 # (%)
+      - file: <stdlib.h>
+        saving: 1.51 # (%)
+      - file: <cm3p/bzlib.h>
+        saving: 1.44 # (%)
+      - file: <cm3p/rhash.h>
+        saving: 1.44 # (%)
+      - file: <cmlibrhash/librhash/rhash.h>
+        saving: 1.44 # (%)
+      - file: <cstdio>
+        saving: 1.44 # (%)
+      - file: <stdio.h>
+        saving: 1.44 # (%)
+      - file: <iosfwd>
+        saving: 1.42 # (%)
+      - file: <sys/un.h>
+        saving: 1.38 # (%)
+      - file: <string.h>
+        saving: 1.38 # (%)
+      - file: <cstring>
+        saving: 1.38 # (%)
+      - file: <cm3p/archive_entry.h>
+        saving: 1.12 # (%)
+
+  # This is a list of all comparatively large files that
+  # should be considered to be simplified or split into
+  # smaller parts and #includes updated:
+  large files: 
+    assumed reduction: 50.00 # (%)
+    time: 0.25 # seconds
+    results: []
+
+  # This is a list of all source files that should be considered
+  # to be inlined into the header and then the source file removed:
+  inline sources: 
+    time: 0.33 # seconds
+    results: []
