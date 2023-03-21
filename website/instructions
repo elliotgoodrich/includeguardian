@@ -6,7 +6,8 @@
     <title>IncludeGuardian - Instructions</title>
     <meta content="#0772014" name="theme-color">
     <meta content="width=device-width,initial-scale=1" name="viewport">
-    <meta content="The homepage of IncludeGuardian, a free tool to optimize C/C++ build times" name="description">
+    <meta content="The homepage of IncludeGuardian, a free tool to optimize C/C++ build times"
+        name="description">
     <link rel="stylesheet" type="text/css" href="./style.css">
 </head>
 
@@ -22,105 +23,113 @@
         </nav>
         <article>
             <h1>Instructions</h1>
-            <p>Download <a href="./downloads/includeguardian-0.0.7-win64.zip">IncludeGuardian v0.0.7</a> for Windows
-                x64.
-            </p>
-            <p>IncludeGuardian can be run directly from a compilation database or by specifying a directory and all the
-                compilation options that specify how your C/C++ is compiled.</p>
-
+            <p>Download <a href="./downloads/includeguardian-0.0.7-win64.zip">IncludeGuardian v0.0.7
+                    for Windows x64</a> or <a
+                    href="./downloads/includeguardian-0.0.7-linux64.tar.gz">IncludeGuardian v0.0.7
+                    for Linux x64</a>.</p>
+            <p>IncludeGuardian can either be run directly from a compilation database with
+                <code>-p</code> and a list of source files,</p>
             <ol>
-                <li><code>includeguardian.exe -p compile_commands.json main.cpp my_other_source.cpp</code>
+                <li><code>includeguardian.exe -p compile_commands.json main.cpp
+                        my_other_source.cpp</code>
                 <li><code>includeguardian.exe -p compile_commands.json **/*.cpp</code> (with
                     <code>shopt -s globstar</code> enabled)
+            </ol>
+            <p> or by specifying a directory with <code>--dir</code> all the compilation options
+                that specify how your C/C++ is compiled, </p>
+            <ol>
                 <li><code>includeguardian.exe --dir .</code>
             </ol>
-
-            <p>When using a compilation database, this should include all of your additional include directories and
-                compilation flags. If you are using <code>--dir</code> then most likely you will need to specify these
-                as well using <code>--I</code> and <code>--isystem</code>. Both of these will specify include
-                directories,
-                but files found with <code>--isystem</code> will be considered to be external and analysis will not
-                recommend editting these files. </p>
-
+            <p>When using a compilation database, this should already include all of your additional
+                include directories and compilation flags. However, if you are using
+                <code>--dir</code> then most likely you will need to specify additional directories
+                with <code>--I</code> and <code>--isystem</code>. Both of these will specify include
+                directories, but files found with <code>--isystem</code> will be considered to be
+                external and analysis will not recommend editting these files.</p>
             <ol>
                 <li><code>includeguardian.exe --dir . --I include</code>
-                <li><code>includeguardian.exe --dir . --isystem thirdparty/boost/include --I mylib/include</code>
-                <li><code>includeguardian.exe -p compile_commands.json **/*.cpp --I override/mylib/include</code>
+                <li><code>includeguardian.exe --dir . --isystem thirdparty/boost/include --I
+                        mylib/include</code>
+                <li><code>includeguardian.exe -p compile_commands.json **/*.cpp --I
+                        override/mylib/include</code>
             </ol>
-
-            <p>IncludeGuardian can serialize the graph of your solution and load it back up for analysis. To serialize
-                add <code>--save &lt;file path&gt;</code> and you may want to run with <code>--analyze=false</code> to
-                avoid extra work.
-            </p>
-
+            <p>IncludeGuardian can serialize the graph of your solution and load it back up for
+                analysis later on. To serialize add <code>--save &lt;file path&gt;</code> and you
+                may want to run with <code>--analyze=false</code> to avoid running the analysis
+                immediately after writing the file.</p>
             <ol>
-                <li><code>includeguardian.exe --dir . --I include --save out.igg --analyze=false</code>
+                <li><code>includeguardian.exe --dir . --I include --save out.igg
+                        --analyze=false</code>
             </ol>
-
             <p>Then we can load it up to run analysis with <code>--load &lt;file path&gt;</code>
                 <ol>
                     <li><code>includeguardian.exe --load out.igg</code>
                 </ol>
-                <p>This will allow you to rerun analysis with different options such as <code>--pch-ratio</code> and
-                    </code>--cutoff</code>.</p>
+                <p>This will allow you to rerun analysis with different options such as
+                    <code>--pch-ratio</code> and </code>--cutoff</code>.</p>
                 <section>
                     <h2>Understanding the Results</h2>
-                    <p></p>
-
                     <section>
                         <h3><code>unguarded files</code></h3>
-                        <p>This section lists files that have been included more than once, but does not have a strict
-                            enough include guard in order to achieve the <a
+                        <p>This section lists files that have been included more than once, but do
+                            not have a strict enough include guard in order to achieve the <a
                                 href="https://gcc.gnu.org/onlinedocs/cpp/Once-Only-Headers.html">multiple-inclusion
-                                optimization</a> implemented in most compilers that avoid reopening a file and parsing
-                            it if that file is included multiple times within the same translation unit.</p>
-
-                        <p>A file is properly guarded if it includes <code>#pragma once</code> or an include guard
-                            that wraps all <strong>non-comment, non-whitespace</strong> text within the file.</p>
-
+                                optimization</a> implemented in most compilers that avoid reopening
+                            a file and parsing it if that file is included multiple times within the
+                            same translation unit.</p>
+                        <p>A file is properly guarded if it includes <code>#pragma once</code> or an
+                            include guard that wraps all <strong>non-comment,
+                                non-whitespace</strong> text within the file.</p>
                         <h3><code>unreferenced components</code></h3>
-                        <p>This section lists source files that have a corresponding header that is not included by any
-                            other file. These files may be candidates for removal.</p>
-
+                        <p>This section lists source files that have a corresponding header that is
+                            not included by any other file. These files may be candidates for
+                            removal.</p>
                         <h3><code>include directives</code></h3>
                         <p>This section lists individual include directives (e.g. <code>#include
-                                &quot;string&quot;</code>) within scanned files and lists the ones that are the most
-                            expensive. Sometimes these directives can be removed completely as they are no longer
-                            needed, or they may be replaced with forward declarations.</p>
-
+                                &lt;string&gt;</code>) that are the most expensive. Sometimes these
+                            directives can be <ul>
+                                <li>removed completely as they are no longer needed,</li>
+                                <li>replaced with forward declarations,</li>
+                                <li>replaced with smaller headers (e.g.
+                                    <code>&lt;iostream&gt;</code> with
+                                    <code>&lt;ostream&gt;</code>).</li>
+                            </ul>
+                        </p>
                         <h3><code>make private</code></h3>
-                        <p>This section lists expensive header files that are included by other headers and the saving
-                            if these includes could be moved to the corresponding source files. Sometimes a large header
-                            (such as <code>&lt;algorithm&gt;</code> is an implementation detail and does not need to be
-                            included in the header. Or perhaps the pimpl idiom could be used to hide member variables of
-                            a class so that they do not need to be included in the header.</p>
-
+                        <p>This section lists expensive header files that are included by other
+                            headers, and the saving if these includes could be moved to the
+                            corresponding source files. Sometimes a large header (such as
+                            <code>&lt;algorithm&gt;</code>) is an implementation detail and does not
+                            need to be included in the header. Or perhaps the pimpl idiom could be
+                            used to hide member variables of a class so that they do not need to be
+                            included in the header.</p>
                         <h3><code>pch additions</code></h3>
-                        <p>This section lists external files (those found in include directories specified with
-                            <code>-isystem</code>) that would save the most time if added to a precompiled header.</p>
-
+                        <p>This section lists external files (those found in include directories
+                            specified with <code>-isystem</code>) that would save the most time if
+                            added to a precompiled header.</p>
                         <h3><code>large files</code></h3>
-                        <p>This sections lists header files that are comparatively large and would benefit from being
-                            split into smaller headers or made smaller by removing unnecessary code.</p>
-
+                        <p>This sections lists header files that are comparatively large and would
+                            benefit from being split into smaller headers or made smaller by
+                            removing unnecessary code.</p>
                         <h3><code>inline sources</code></h3>
-                        <p>This sections lists sources files that are comparatively small compared to their header
-                            files. The overall build may be faster if these sources were removed and their content
-                            inlined into their respective header files.</p>
-                        <p>Note that this may be a pessimization if you are running IncludeGuardian on a commonly used
-                            library as you may speed up the build of this library, but slow down builds of other
-                            dependent libraries/applications.</p>
+                        <p>This sections lists sources files that are comparatively small compared
+                            to their header files. The overall build may be faster if these sources
+                            were removed and their content inlined into their respective header
+                            files.</p>
+                        <p>Note that this may be a pessimization if you are running IncludeGuardian
+                            on a commonly used library. You may speed up the build of this library,
+                            but slow down builds of other dependent libraries/applications. </p>
                     </section>
         </article>
         <hr />
         <footer>
             <p>© 2023 IncludeGuardian<p>
-                    <p><a href="/privacy-policy">Privacy Policy</a> | <a href="mailto:hello@includeguardian.io">Email
-                            Us</a> | <a href="https://github.com/includeguardian">GitHub</a> | <a
+                    <p><a href="/privacy-policy">Privacy Policy</a> | <a
+                            href="mailto:hello@includeguardian.io">Email Us</a> | <a
+                            href="https://github.com/includeguardian">GitHub</a> | <a
                             href="https://twitter.com/includeguardian">Twitter</a></p>
         </footer>
     </main>
-
 </body>
 
 </html>

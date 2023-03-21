@@ -6,7 +6,8 @@
     <title>IncludeGuardian - Home</title>
     <meta content="#0772014" name="theme-color">
     <meta content="width=device-width,initial-scale=1" name="viewport">
-    <meta content="The homepage of IncludeGuardian, a free tool to optimize C and C++ build times" name="description">
+    <meta content="The homepage of IncludeGuardian, a free tool to optimize C and C++ build times"
+        name="description">
     <link rel="stylesheet" type="text/css" href="./style.css">
 </head>
 
@@ -22,14 +23,15 @@
         </nav>
         <article>
             <h1>IncludeGuardian</h1>
-            <p>IncludeGuardian is a free tool to help improve C and C++ build times. The majority of C++ build times are
-                not in compiling or linking, but in syntax checking files that have been <code>#include</code>ed. A
-                simple "Hello World" application in C++ will be preprocessed to a 1GB file from only the <code>#include
-                    &lt;iostream&gt;</code> line. This is all run through the C++ compiler and will take 400ms to check.
-            </p>
-            <p>IncludeGuardian makes recommendations for your project on how to reduce work the compiler needs to do.
-                These suggestions include:</p>
-
+            <p>IncludeGuardian is a free tool to <strong>help improve C and C++ build
+                    times</strong>. The most time consuming part of C++ build times is usually not
+                compiling or linking, but in preprocessing and syntax checking files that have been
+                <code>#include</code>ed. A simple "Hello World" application in C++ will be
+                preprocessed to almost a 1MB file from only the <code>#include
+                    &lt;iostream&gt;</code> line. This is all run through the C++ compiler and will
+                take an additional 150ms to check. </p>
+            <p>IncludeGuardian makes recommendations for your project on how to reduce work the
+                compiler needs to do. These suggestions include:</p>
             <ul>
                 <li>What files to add to a precompiled header
                 <li>Which <code>#include</code> directives are the most expensive
@@ -38,21 +40,22 @@
                 <li>Which header+source files should be combined to be header-only
                 <li>Which files have an incorrect include guard
             </ul>
-
-            <p>With each suggestion IncludeGuardian will give a percentage saving for the number of preprocessing tokens
-                when compiling. Although this is not a perfect substitute for the actual time saved it is a reasonable
-                alternative that will give a deterministic result in a fraction of the time.</p>
-            <p>See the <a href="instructions">instructions</a> page on how to download and run IncludeGuardian.</p>
+            <p>With each suggestion IncludeGuardian will give a percentage saving for the number of
+                preprocessing tokens that need to be compiled. Although this is not a perfect
+                substitute for the actual time saved, it is a reasonable alternative that will give
+                a deterministic result in a fraction of the time.</p>
+            <p>See the <a href="instructions">instructions</a> page on how to download and run
+                IncludeGuardian.</p>
         </article>
         <hr />
         <footer>
             <p>© 2023 IncludeGuardian<p>
-                    <p><a href="/privacy-policy">Privacy Policy</a> | <a href="mailto:hello@includeguardian.io">Email
-                            Us</a> | <a href="https://github.com/includeguardian">GitHub</a> | <a
+                    <p><a href="/privacy-policy">Privacy Policy</a> | <a
+                            href="mailto:hello@includeguardian.io">Email Us</a> | <a
+                            href="https://github.com/includeguardian">GitHub</a> | <a
                             href="https://twitter.com/includeguardian">Twitter</a></p>
         </footer>
     </main>
-
 </body>
 
 </html>
