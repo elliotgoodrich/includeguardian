@@ -24,12 +24,14 @@
         <article>
             <h1>IncludeGuardian</h1>
             <p>IncludeGuardian is a free tool to <strong>help improve C and C++ build
-                    times</strong>. The most time consuming part of C++ build times is usually not
-                compiling or linking, but in preprocessing and syntax checking files that have been
+                    times</strong>. The most time consuming part of build times is usually not
+                compiling or linking, but preprocessing and syntax checking files that have been
                 <code>#include</code>ed. A simple "Hello World" application in C++ will be
                 preprocessed to almost a 1MB file from only the <code>#include
-                    &lt;iostream&gt;</code> line. This is all run through the C++ compiler and will
-                take an additional 150ms to check. </p>
+                    &lt;iostream&gt;</code> line. This is all run through the compiler and will take
+                an additional 150ms. If a commonly used header in your application is particularly
+                large, or includes a large number of other headers, this can add minutes to your
+                build time if includes in hundreds source files.</p>
             <p>IncludeGuardian makes recommendations for your project on how to reduce work the
                 compiler needs to do. These suggestions include:</p>
             <ul>

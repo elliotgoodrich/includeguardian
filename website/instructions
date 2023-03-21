@@ -27,16 +27,17 @@
                     for Windows x64</a> or <a
                     href="./downloads/includeguardian-0.0.7-linux64.tar.gz">IncludeGuardian v0.0.7
                     for Linux x64</a>.</p>
-            <p>IncludeGuardian can either be run directly from a compilation database with
-                <code>-p</code> and a list of source files,</p>
+            <p>IncludeGuardian can either be run specifying a <a
+                    href="https://sarcasm.github.io/notes/dev/compilation-database.html">compilation
+                    database</a> with <code>-p</code> and a list of source files,</p>
             <ol>
                 <li><code>includeguardian.exe -p compile_commands.json main.cpp
                         my_other_source.cpp</code>
                 <li><code>includeguardian.exe -p compile_commands.json **/*.cpp</code> (with
                     <code>shopt -s globstar</code> enabled)
             </ol>
-            <p> or by specifying a directory with <code>--dir</code> all the compilation options
-                that specify how your C/C++ is compiled, </p>
+            <p> or by specifying the directory containing all source files (either directly or
+                within subdirectories) with <code>--dir</code>, </p>
             <ol>
                 <li><code>includeguardian.exe --dir .</code>
             </ol>
@@ -54,9 +55,9 @@
                         override/mylib/include</code>
             </ol>
             <p>IncludeGuardian can serialize the graph of your solution and load it back up for
-                analysis later on. To serialize add <code>--save &lt;file path&gt;</code> and you
-                may want to run with <code>--analyze=false</code> to avoid running the analysis
-                immediately after writing the file.</p>
+                analysis later on with the <code>--save &lt;file path&gt;</code> argument (you may
+                want to run with <code>--analyze=false</code> to avoid running the analysis
+                immediately after writing the file).</p>
             <ol>
                 <li><code>includeguardian.exe --dir . --I include --save out.igg
                         --analyze=false</code>
@@ -66,7 +67,11 @@
                     <li><code>includeguardian.exe --load out.igg</code>
                 </ol>
                 <p>This will allow you to rerun analysis with different options such as
-                    <code>--pch-ratio</code> and </code>--cutoff</code>.</p>
+                    <code>--cutoff [percentage]</code> that controls the minimum saving required to
+                    show a recommendation. The default is <code>--cutoff 1</code> to only show
+                    recommendations for changes that will give at least a 1% saving. Lowering the
+                    cutoff will increase the number of recommendations but will take additional
+                    time.</p>
                 <section>
                     <h2>Understanding the Results</h2>
                     <section>
@@ -105,8 +110,9 @@
                             included in the header.</p>
                         <h3><code>pch additions</code></h3>
                         <p>This section lists external files (those found in include directories
-                            specified with <code>-isystem</code>) that would save the most time if
-                            added to a precompiled header.</p>
+                            specified with <code>--isystem</code>) that would save the most time if
+                            added to a precompiled header. The <code>--pch-ratio</code> flag can
+                            change</p>
                         <h3><code>large files</code></h3>
                         <p>This sections lists header files that are comparatively large and would
                             benefit from being split into smaller headers or made smaller by
