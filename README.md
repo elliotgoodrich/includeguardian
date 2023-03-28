@@ -36,6 +36,13 @@
   8. vcpkg
     * vcpkg install llvm[tools,target-x86]:x64-windows
     * vcpkg install termcolor:x64-windows
+    * `vcpkg install boost`
+    * `vcpkg install gtest`
+    * `vcpkg install benchmark`
+  9. `vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
+  10. Open CMake GUI
+  11. Add a `CMAKE_TOOLCHAIN_FILE` variable
+
   9. Open CMake GUI to `src`, set build directory to be `../out` and set the `LLVM_DIR`/`Clang_DIR` `${VCPKG_DIR}/installed/x64-windows/share/clang`/`llvm`
   10. Set `ZLIB_ROOT` to the `C:/Users/Elliot/.conan/data/zlib/1.2.12/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab` (use the conan output path)
   11. vcpkg install benchmark:x64-windows
@@ -59,9 +66,9 @@
     * `./vcpkg install gtest`
     * `./vcpkg install benchmark`
   9. `./vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
-  10. `mkdir build`
-  11. `cmake -S src build "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake"`
-  12. `make`
+  10. `cmake -S src -B release "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Release"` or `cmake -S src -B debug "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Debug`
+  11. `cd` into the correct directory
+  12. `make -j`
 
 ## Building
 
