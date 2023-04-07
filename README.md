@@ -34,7 +34,7 @@
   6. Install [vcpkg](https://vcpkg.io/en/getting-started.html)
   7. Open `cmd` as admin
   8. vcpkg
-    * vcpkg install llvm[tools,target-x86]:x64-windows
+    * vcpkg install llvm[core,clang,tools,target-x86,enable-rtti]:x64-windows
     * vcpkg install termcolor:x64-windows
     * `vcpkg install boost`
     * `vcpkg install gtest`
@@ -52,15 +52,27 @@
   15. Click generate
 
 ### Linux (Ubuntu)
+If you don't have a GCC version supporting C++20 then follow https://askubuntu.com/a/1163021
+  1. `sudo add-apt-repository ppa:ubuntu-toolchain-r/test`
+  2. `sudo apt-get update`
+  3. `sudo apt-get install gcc-9 g++-9`
+  4. `gcc-9 --version`
+  5. `sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9`
+  6. `sudo apt install libtbb-dev` (may not be necessary)
+
   0. `sudo apt update && sudo apt upgrade`
   1. `sudo apt install clang`
-  1. `sudo update-alternatives --config cc` (choose clang)+
+  1. `sudo update-alternatives --config cc` (choose clang)+ (not needed for Ubuntu 18)
   2. `sudo apt install python3`
+  2. `sudo apt install python3-pip`
   3. `pip install conan`
   3. `sudo apt install cmake`
   3. `sudo apt install pkg-config`
+  3. `sudo apt install curl zip unzip tar`
+  7. `git clone https://github.com/Microsoft/vcpkg.git`
+  8. `./vcpkg/bootstrap-vcpkg.sh`
   8. `cd vcpkg`
-    * `./vcpkg install llvm[core,tools,target-x86,enable-rtti]`+
+    * `./vcpkg install llvm[core,clang,tools,target-x86,enable-rtti]`+
     * `./vcpkg install termcolor`
     * `./vcpkg install boost`
     * `./vcpkg install gtest`
