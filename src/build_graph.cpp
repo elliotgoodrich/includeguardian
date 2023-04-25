@@ -297,19 +297,23 @@ struct FileState {
   bool fully_processed = false;
   // A file becomes fully processed once it has been exited and the
   // corresponding entry in the `Graph` is complete.
-  std::string replacement_contents =
-      INCLUDEGUARDIAN_WORKAROUND
+  std::string replacement_contents = INCLUDEGUARDIAN_WORKAROUND
       "#pragma once\n"; //< If we are `fully_processed` this will
                         //< contain a C++ file that is equivalent
                         //< when this is included by another file
                         //< (i.e. only the preprocessor definitions)
 
-
-  FileState(Graph::vertex_descriptor v): v(v) {}
+  FileState(Graph::vertex_descriptor v) : v(v) {}
 };
 
 using UniqueIdToNode =
     std::unordered_map<llvm::sys::fs::UniqueID, FileState, Hasher>;
+
+enum class SeenFirst {
+  None,
+  If,
+  Ifndef,
+};
 
 struct InProgress {
   UniqueIdToNode::iterator it;
@@ -317,6 +321,7 @@ struct InProgress {
   std::optional<std::uint64_t> overridden_token_count;
   std::optional<boost::units::quantity<boost::units::information::info>>
       overridden_file_size;
+  SeenFirst seen_first = SeenFirst::None;
 
   InProgress(UniqueIdToNode::iterator it) : it(it) {}
 };
@@ -326,12 +331,9 @@ struct ReplaceWith {
   std::string path;
   Graph::vertex_descriptor v;
 
-  ReplaceWith(std::unique_ptr<llvm::MemoryBuffer>&& contents,
-              std::string_view path,
-	      Graph::vertex_descriptor v)
-	  : contents(std::move(contents))
-	  , path(path)
-	  , v(v) {}
+  ReplaceWith(std::unique_ptr<llvm::MemoryBuffer> &&contents,
+              std::string_view path, Graph::vertex_descriptor v)
+      : contents(std::move(contents)), path(path), v(v) {}
 };
 
 using NeedsReplacing =
@@ -448,9 +450,9 @@ public:
         const std::filesystem::path rel =
             std::filesystem::path(file->getName().str())
                 .lexically_relative(m_working_dir);
-		if (m_options.source_started) {
-		  m_options.source_started(rel);
-		}
+        if (m_options.source_started) {
+          m_options.source_started(rel);
+        }
 
         it->second.v = add_vertex(rel, m_r.graph);
         if (m_options.replace_file_optimization) {
@@ -512,9 +514,23 @@ public:
       FileState &state = p.it->second;
 
       // If we are unguarded then move the total cost into the includer.
-      const bool guarded =
+      const bool clang_guarded =
           m_pp->getHeaderSearchInfo().isFileMultipleIncludeGuarded(file);
+
+      const clang::HeaderFileInfo *headerInfo =
+          m_pp->getHeaderSearchInfo().getExistingFileInfo(file);
+
+      // MSVC supports `#pragma once`, but it only supports include guards using
+      // `#ifndef` instead and doesn't support `#if !defined` like clang+gcc do.
+      const bool msvc_guarded =
+          headerInfo->isPragmaOnce ||
+          ((headerInfo->ControllingMacro || headerInfo->ControllingMacroID) &&
+           p.seen_first == SeenFirst::Ifndef);
+      const bool guarded = clang_guarded && msvc_guarded;
       if (!guarded) {
+        // We may be guarded the second time around, for example if this file
+        // recursively includes itself and only on the top-level/first include
+        // does it contain `#pragma once` at the very end.
         m_r.unguarded_files.insert(state.v);
 
         // If we're not guarded then push the cost to our includer
@@ -524,6 +540,7 @@ public:
 
         state.fully_processed = true;
       } else {
+        m_r.unguarded_files.erase(state.v);
         file_node &node = m_r.graph[state.v];
         if (!state.fully_processed) {
           // If we are fully guarded, then make sure that subsequent includes
@@ -814,6 +831,20 @@ public:
     state.replacement_contents += "#undef ";
     state.replacement_contents += MacroNameTok.getIdentifierInfo()->getName();
     state.replacement_contents += '\n';
+  }
+
+  void If(clang::SourceLocation Loc, clang::SourceRange ConditionRange,
+          ConditionValueKind ConditionValue) {
+    if (m_stack.back().seen_first == SeenFirst::None) {
+      m_stack.back().seen_first = SeenFirst::If;
+    }
+  }
+
+  void Ifndef(clang::SourceLocation Loc, const clang::Token &MacroNameTok,
+              const clang::MacroDefinition &MD) {
+    if (m_stack.back().seen_first == SeenFirst::None) {
+      m_stack.back().seen_first = SeenFirst::Ifndef;
+    }
   }
 
   void EndOfMainFile() final {

@@ -85,6 +85,7 @@ add_executable(
     find_expensive_files.test.cpp
     find_expensive_headers.test.cpp
     find_expensive_includes.test.cpp
+    is_guarded.test.cpp
     list_included_files.test.cpp
     find_unnecessary_sources.test.cpp
     find_unused_components.test.cpp
@@ -99,7 +100,8 @@ if(WIN32)
     target_compile_options(tests PRIVATE /EHsc /FS)
 endif()
 
-target_link_libraries(tests PRIVATE GTest::gtest_main GTest::gmock_main)
+add_test(gtests tests)
+target_link_libraries(tests PUBLIC GTest::gtest GTest::gmock GTest::gtest_main)
 target_link_libraries(tests PUBLIC common)
 
 ###################
