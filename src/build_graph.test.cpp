@@ -1067,7 +1067,7 @@ TEST_P(BuildGraphTest, RecursiveSource) {
   EXPECT_THAT(results->unguarded_files, UnorderedElementsAre(a_cpp));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     SmallFileOptimization, BuildGraphTest,
     Values(build_graph::options(),
            build_graph::options().enable_replace_file_optimization(true)));
