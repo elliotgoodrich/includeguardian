@@ -447,7 +447,6 @@ TEST_P(BuildGraphTest, UnremovableHeaders) {
 
 TEST_P(BuildGraphTest, PrecompiledHeaders) {
   Graph g;
-  const bool precompiled = true;
   const std::filesystem::path include = "include";
   const Graph::vertex_descriptor a_cpp = add_vertex(
       file_node("a.cpp").with_cost(1, 100 * B).set_internal_parents(0), g);
