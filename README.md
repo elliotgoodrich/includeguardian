@@ -1,11 +1,6 @@
 # IncludeGuardian
 
 ## TODO
-  * Make improvement to clang to not disable include guards if `#` is
-    encountered.  Must remove a call to `MIOpt.NextToken()` inside
-    `Lexer.cpp`.
-    This is inline with what GCC does https://gcc.gnu.org/onlinedocs/cppinternals/Guard-Macros.html
-    and will improve the performance of `boost/preprocessor`.
   * For another analysis, see if we can look if a set of includes have the
     exact same set of includers, and figure out the benefit of combining these
     components.
