@@ -29,9 +29,9 @@
   6. Install [vcpkg](https://vcpkg.io/en/getting-started.html)
   7. Open `cmd` as admin
   8. vcpkg
-    * vcpkg install llvm[core,clang,tools,target-x86,enable-rtti]:x64-windows
-    * vcpkg install termcolor:x64-windows
-    * `vcpkg install boost`
+    * `vcpkg install llvm[core,clang,tools,target-x86,enable-rtti]:x64-windows`
+    * `vcpkg install termcolor:x64-windows`
+    * `vcpkg install boost:x64-windows` (I think it's this and not `vcpkg install boost:x64-windows-static`)
     * `vcpkg install gtest`
     * `vcpkg install benchmark`
   9. `vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
