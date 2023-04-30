@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13.4)
-project(includeguardian)
+project(includeguardian VERSION 0.0.8)
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
@@ -50,6 +50,7 @@ add_library(
 )
 
 target_compile_definitions(common PUBLIC ${LLVM_DEFINITIONS_LIST})
+target_compile_definitions(common PUBLIC INCLUDEGUARDIAN_VERSION="${CMAKE_PROJECT_VERSION}")
 
 target_include_directories(common PUBLIC ${Boost_INCLUDE_DIRS})
 target_include_directories(common PUBLIC ${LLVM_INCLUDE_DIRS})
