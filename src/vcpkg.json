@@ -1,0 +1,19 @@
+{
+    "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+    "name": "includeguardian",
+    "dependencies": [
+        {
+            "name": "llvm",
+            "default-features": false,
+            "features": ["clang", "tools", "target-x86", "enable-rtti"]
+        },
+        "boost-graph",
+        "boost-predef",
+        "boost-serialization",
+        "boost-scope-exit",
+        "boost-units",
+        "gtest",
+        "benchmark",
+        "termcolor"
+    ]
+}

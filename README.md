@@ -21,30 +21,14 @@
 
 ### Windows
 
-  1. Install Microsoft Visual Studio 2019
+  1. Install Microsoft Visual Studio 2022
   2. Install Python 3
   3. `pip install conan`
   4. Install [ninja](https://ninja-build.org/) and add to PATH
   5. Install [CMake](https://cmake.org/download/) and add to PATH
   6. Install [vcpkg](https://vcpkg.io/en/getting-started.html)
-  7. Open `cmd` as admin
-  8. vcpkg
-    * `vcpkg install llvm[core,clang,tools,target-x86,enable-rtti]:x64-windows`
-    * `vcpkg install termcolor:x64-windows`
-    * `vcpkg install boost:x64-windows` (I think it's this and not `vcpkg install boost:x64-windows-static`)
-    * `vcpkg install gtest`
-    * `vcpkg install benchmark`
-  9. `vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
-  10. Open CMake GUI
-  11. Add a `CMAKE_TOOLCHAIN_FILE` variable
-
-  9. Open CMake GUI to `src`, set build directory to be `../out` and set the `LLVM_DIR`/`Clang_DIR` `${VCPKG_DIR}/installed/x64-windows/share/clang`/`llvm`
-  10. Set `ZLIB_ROOT` to the `C:/Users/Elliot/.conan/data/zlib/1.2.12/_/_/package/3fb49604f9c2f729b85ba3115852006824e72cab` (use the conan output path)
-  11. vcpkg install benchmark:x64-windows
-  12. Add `benchmark_DIR` as `C:\Program Files\vcpkg\installed\x64-windows\share\benchmark` (search for `benchmarkConfig.cmake`) when configuring in CMake
-  13. Add `termcolor_DIR` as `C:\Program Files\vcpkg\installed\x64-windows\share\termcolor` (search for `termcolorConfig.cmake`) when configuring in CMake
-  14. Select the Visual Studio 2019 generator
-  15. Click generate
+  7. `vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
+  10. `cmake -S src -B build -G "Visual Studio 17 2022" -A x64 "-DCMAKE_TOOLCHAIN_FILE=C:\Program Files\vcpkg\scripts\buildsystems\vcpkg.cmake" "-DVCPKG_TARGET_TRIPLET=x64-windows-static"` (Fixing the `CMAKE_TOOLCHAIN_FILE` variable)
 
 ### Linux (Ubuntu)
 If you don't have a GCC version supporting C++20 then follow https://askubuntu.com/a/1163021
