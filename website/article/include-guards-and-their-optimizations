@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Include Guards and their Optimizations - IncludeGuardian</title>
+    <meta content="#0772014" name="theme-color">
+    <meta content="width=device-width,initial-scale=1" name="viewport">
+    <meta content="Include Guards and their Optimizations" name="description">
+    <link rel="stylesheet" type="text/css" href="/style.css">
+    <!-- sendinblue -->
+    <style>
+        @font-face {
+            font-display: block;
+            font-family: Roboto;
+            src: url(https://assets.sendinblue.com/font/Roboto/Latin/normal/normal/7529907e9eaf8ebb5220c5f9850e3811.woff2) format("woff2"), url(https://assets.sendinblue.com/font/Roboto/Latin/normal/normal/25c678feafdc175a70922a116c9be3e7.woff) format("woff")
+        }
+
+        @font-face {
+            font-display: fallback;
+            font-family: Roboto;
+            font-weight: 600;
+            src: url(https://assets.sendinblue.com/font/Roboto/Latin/medium/normal/6e9caeeafb1f3491be3e32744bc30440.woff2) format("woff2"), url(https://assets.sendinblue.com/font/Roboto/Latin/medium/normal/71501f0d8d5aa95960f6475d5487d4c2.woff) format("woff")
+        }
+
+        @font-face {
+            font-display: fallback;
+            font-family: Roboto;
+            font-weight: 700;
+            src: url(https://assets.sendinblue.com/font/Roboto/Latin/bold/normal/3ef7cf158f310cf752d5ad08cd0e7e60.woff2) format("woff2"), url(https://assets.sendinblue.com/font/Roboto/Latin/bold/normal/ece3a1d82f18b60bcce0211725c476aa.woff) format("woff")
+        }
+
+        #sib-container input:-ms-input-placeholder {
+            text-align: left;
+            font-family: "Helvetica", sans-serif;
+            color: #c0ccda;
+        }
+
+        #sib-container input::placeholder {
+            text-align: left;
+            font-family: "Helvetica", sans-serif;
+            color: #c0ccda;
+        }
+
+        #sib-container textarea::placeholder {
+            text-align: left;
+            font-family: "Helvetica", sans-serif;
+            color: #c0ccda;
+        }
+    </style>
+    <link rel="stylesheet" href="https://sibforms.com/forms/end-form/build/sib-styles.css">
+    <!--  END - We recommend to place the above code in head tag of your website html -->
+    <!-- end sendinblue -->
+</head>
+
+<body>
+    <main>
+        <nav>
+            <a id="logo" href="/">IncludeGuardian</a>
+            <ul>
+                <li><a href="/articles">Articles</a></li>
+                <li><a href="/instructions">Instructions</a></li>
+                <li><a href="/ci">CI</a></li>
+                <li><a href="/about">About</a></li>
+            </ul>
+        </nav>
+        <article>
+            <h1>Include Guards and their Optimizations</h1>
+            <p>This article discusses the purpose and importance of include guards in C/C++
+                projects. It also explores the optimizations that compilers have surrounding include
+                guards to improve build times, and the how easy it is to <strong>unintentionally
+                    disable these optimizations!</strong></p>
+            <section>
+                <h2>The Preprocessor</h2>
+                <p>One of the initial phases of C/C++ compilation is the preprocessor. This phase
+                    involves running the preprocessor against a source file, typically identified by
+                    the file extensions .c or .cpp. The preprocessor handles all preprocessing
+                    directives, which start with the <code>#</code> symbol, such as
+                    <code>#include</code> and <code>#define</code>. At this stage, the preprocessor
+                    recursively replaces all <code>#include</code> directives with the contents of
+                    the pointed file. The output is a single file called a <strong>translation unit
+                        (TU)</strong> that is then passed to the C/C++ compiler to be compiled into
+                    an object file.</p>
+                <p>The preprocessor only focuses on preprocessing directives and ignores all other
+                    code as it lacks understanding of C/C++ language. Therefore, it is feasible to
+                    add preprocessing directives into any file, and the preprocessor can still
+                    process them without any issue.</p>
+                <p>For an example of what the preprocessor does, we will look the 2 files below</p>
+                <ol class="code">
+                    <li><code>// zero.h</code></li>
+                    <li><code>#define ZERO 0</code></li>
+                    <li><code></code></li>
+                    <li><code>int zero() { return ZERO; }</code></li>
+                </ol>
+                <ol class="code">
+                    <li><code>// main.cpp</code></li>
+                    <li><code>#include "zero.h"</code></li>
+                    <li><code></code></li>
+                    <li><code>int main() { return zero(); }</code></li>
+                </ol>
+                <p>If we run "main.cpp" through the preprocessor (which can be done with <code>gcc
+                        -E main.cpp</code>) we end up with the following file with all preprocessing
+                    directives applied</p>
+                <ol class="code">
+                    <li><code>int zero() { return 0; }</code></li>
+                    <li><code></code></li>
+                    <li><code>int main() { return zero(); }</code></li>
+                </ol>
+                <p>If you include the header file "zero.h", it is not going to add much text to your
+                    translation unit since it is small. However, if you add <code>#include
+                        &lt;vector&gt;</code>, it will add around 1MB of text even if you never use
+                    <code>std::vector</code> in your code.</p>
+                <p>Normally, the preprocessor does not remember what has been included before and
+                    will add the content of a file each time it is included. Although this may be
+                    helpful in some cases, it is often unwanted.</p>
+                <p>For example, if we were to add a new file "one.h" and reference this in
+                    "main.cpp" </p>
+                <ol class="code">
+                    <li><code>// one.h</code></li>
+                    <li><code>#include "zero.h"</code></li>
+                    <li><code></code></li>
+                    <li><code>int one() { return zero() + 1; }</code></li>
+                </ol>
+                <ol class="code">
+                    <li><code>// main.cpp</code></li>
+                    <li><code>#include "zero.h"</code></li>
+                    <li><code>#include "one.h"</code></li>
+                    <li><code></code></li>
+                    <li><code>int main(int argc, const char** argv) {</code></li>
+                    <li><code>&nbsp;&nbsp;return argc == 0 ? zero() : one();</code></li>
+                    <li><code>}</code></li>
+                </ol>
+                <p>After preprocessing we would have the <code>zero</code> function defined twice.
+                    Once from the <code>#include "zero.h"</code> in "main.cpp", and the other from
+                    the <code>#include "zero.h"</code> in "one.h" that it itself includes "zero.h"
+                </p>
+                <ol class="code">
+                    <li><code>int zero() { return 0; }</code></li>
+                    <li><code>int zero() { return 0; }</code></li>
+                    <li><code>int one() { return zero() + 1; }</code></li>
+                    <li><code></code></li>
+                    <li><code>int main(int argc, const char** argv) {</code></li>
+                    <li><code>&nbsp;&nbsp;return argc == 0 ? zero() : one();</code></li>
+                    <li><code>}</code></li>
+                </ol>
+                <p>The <a
+                        href="https://en.cppreference.com/w/cpp/language/definition#One_Definition_Rule">One
+                        Definition Rule</a> (ODR) in C/C++ prevents us from defining the same
+                    non-inline function in a translation unit. Therefore, the code mentioned above
+                    would not compile.</p>
+                <p>To solve this issue, we can either make these functions inline or avoid defining
+                    functions within header files. Instead, we can separate "zero.h" into "zero.h"
+                    and "zero.cpp".</p>
+                <ol class="code">
+                    <li><code>// zero.h</code></li>
+                    <li><code>int zero();</code></li>
+                </ol>
+                <ol class="code">
+                    <li><code>// zero.cpp</code></li>
+                    <li><code>#include "zero.h"</code></li>
+                    <li><code>int zero() { return 0; }</code></li>
+                </ol>
+                <p>Which would give us the following translation unit,</p>
+                <ol class="code">
+                    <li><code>int zero();</code></li>
+                    <li><code>int zero();</code></li>
+                    <li><code>int one() { return zero() + 1; }</code></li>
+                    <li><code></code></li>
+                    <li><code>int main(int argc, const char** argv) {</code></li>
+                    <li><code>&nbsp;&nbsp;return argc == 0 ? zero() : one();</code></li>
+                    <li><code>}</code></li>
+                </ol>
+                <p>It is allowed to declare (but not define) the same function multiple times within
+                    a translation unit. This means that the translation unit would compile without
+                    any problems and function correctly.</p>
+            </section>
+            <section>
+                <h2>Include Guards</h2>
+                <p>This method becomes too limiting due to the One Definition Rule, which prohibits
+                    multiple definitions of classes and structs. This means that we could only
+                    forward declare types and use them as opaque pointers, which unnecessarily
+                    restricts us to a smaller set of C/C++ features and performance.</p>
+                <p>To solve this issue, a common approach is to use preprocessor directives to
+                    prevent the inclusion of a file multiple times and introduce state into the
+                    preprocessor.</p>
+                <ol class="code">
+                    <li><code>// zero.h</code></li>
+                    <li><code>#ifndef INCLUDED_ZERO_H</code></li>
+                    <li><code>#define INCLUDED_ZERO_H</code></li>
+                    <li><code>int zero();</code></li>
+                    <li><code>#endif</code></li>
+                </ol>
+                <p>When the preprocessor processes a source file and encounters the first instance
+                    of <code>#include "zero.h"</code>, the macro <code>INCLUDED_ZERO_H</code> is not
+                    yet defined, so the <code>#ifndef</code> condition passes. We then define the
+                    macro and add the rest of the file before ending it with <code>#endif</code>. If
+                    "zero.h" is included again, <code>INCLUDED_ZERO_H</code> is already defined, so
+                    the preprocessor will skip the contents of the file until it reaches the
+                    <code>#endif</code> at the end.</p>
+                <p>This is called the <strong>include guard idiom</strong> and is commonly used to
+                    prevent multiple inclusions of header files. To avoid macro collisions with
+                    other projects, it is recommended to include your project name along with the
+                    file name. Alternatively, you can generate a new GUID for your macro, such as
+                    <code>INCLUDED_60B80A74_3952_4DAE_BB89_36D93CBDC5C6</code>, which is unlikely to
+                    collide with other macros and won't require modification if the header file is
+                    renamed.</p>
+            </section>
+            <section>
+                <h2>External Include Guards</h2>
+                <p>The use of include guards can cause a performance issue because the preprocessor
+                    needs to open the file and scan the entire content to locate the closing
+                    <code>#endif</code> for every include directive. Modern preprocessors skip over
+                    approximately 100-300MB/s to find a matching <code>#endif</code>, which is
+                    relatively efficient.</p>
+                <p>To improve performance, one suggestion is to use an additional
+                    <code>#ifndef</code> guard to wrap any include directives itself, in addition to
+                    the standard include guard. This can help the preprocessor to skip unnecessary
+                    processing of previously included headers, improving the overall compilation
+                    time.</p>
+                <ol class="code">
+                    <li><code>// main.cpp</code></li>
+                    <li><code>#ifndef INCLUDED_ZERO_H</code></li>
+                    <li><code>#include "zero.h"</code></li>
+                    <li><code>#endif</code></li>
+                    <li><code></code></li>
+                    <li><code>#ifndef INCLUDED_ONE_H</code></li>
+                    <li><code>#include "one.h"</code></li>
+                    <li><code>#endif</code></li>
+                    <li><code></code></li>
+                    <li><code>#ifndef INCLUDED_STD_IOSTREAM</code></li>
+                    <li><code>#define INCLUDED_STD_IOSTREAM</code></li>
+                    <li><code>#include &lt;iostream&gt;</code></li>
+                    <li><code>#endif</code></li>
+                    <li><code></code></li>
+                    <li><code>int main(int argc, const char** argc) {</code></li>
+                    <li><code>&nbsp;&nbsp; return argc == 0 ? zero() : one();</code></li>
+                    <li><code>}</code></li>
+                </ol>
+                <p>To save time preprocessing a file, external include guards can be used to avoid
+                    encountering the include directives entirely if they have already been included.
+                    However, this solution can be verbose and requires keeping the guarding macro
+                    name in sync with any dependencies. Additionally, different standard library
+                    includes do not agree on guard macros and this would need to be addressed by
+                    creating a properly guarded wrapper header or defining a macro before the
+                    include statement as shown previously.</p>
+            </section>
+            <section>
+                <h2>#pragma once</h2>
+                <p>A widely-supported, but non-standard, alternative to include guards is
+                    <code>#pragma once</code> (equivalently <code>_Pragma("once")</code>). If
+                    <code>#pragma once</code> appears in a file, the compiler will flag it and avoid
+                    preprocessing it for all subsequent includes in that source file. This method
+                    saves performance time compared to include guards, which require finding a
+                    matching <code>#endif</code> statement.</p>
+            </section>
+            <section>
+                <h2>Multiple-Inclusion Optimization</h2>
+                <p>Most major compilers now implement the <strong>multiple-inclusion
+                        optimization</strong> that avoids opening a guarded file after the first
+                    time it's encountered, regardless of whether it's guarded with <code>#pragma
+                        once</code> or include guards. This brings both techniques to the same level
+                    of performance.</p>
+                <p>However, what is considered a valid include guard <strong>differs between
+                        compilers</strong>. Ignoring these hidden rules may negatively impact
+                    compilation time. </p>
+                <p>The depth and quality of documentation on each compiler's specific rules varies,
+                    <ul>
+                        <li><a href="https://gcc.gnu.org/onlinedocs/cppinternals/Guard-Macros.html">GCC
+                                Guard Macros</a></li>
+                        <li><a
+                                href="https://clang.llvm.org/docs/InternalsManual.html#the-multipleincludeopt-class">Clang
+                                Internals Manual</a></li>
+                        <li><a href="https://learn.microsoft.com/en-us/cpp/preprocessor/once">Microsoft
+                                Visual Studio <code>#pragma once</code></a></li>
+                    </ul>
+                </p>
+                <p>To guarantee the multiple-include optimization on Clang, GCC, and MSVC,
+                    <strong>ensure your headers follow the format</strong>: <ul>
+                        <li>Comments and whitespace only</li>
+                        <li><code>#ifndef MACRO_NAME</code></li>
+                        <li>Your code</li>
+                        <li><code>#endif</code></li>
+                        <li>Comments and whitespace only</li>
+                    </ul> and any subsequent includes for this file will be skipped if they are
+                    encountered while <code>MACRO_NAME</code> is defined.</p>
+                <p>Note that the position of your <code>#define MACRO_NAME</code> within the
+                    <code>#ifndef</code>/<code>#endif</code> pair doesn't matter - it can appear
+                    anywhere or not at all. However, to avoid compilation errors, it's recommended
+                    to define the macro immediately after the <code>#ifndef</code> check. If you
+                    have a circular include dependency, where a file <code>#include</code>s itself,
+                    make sure the #define appears before any includes to prevent an infinite cycle.
+                </p>
+                <p>Alternatively, make sure your header contains: <ul>
+                        <li><code>#pragma once</code> or <code>_Pragma("once")</code> anywhere in
+                            the file</li>
+                    </ul> and it will be properly guarded. Note that the preprocessor actually has
+                    to process the <code>#pragma once</code> directive. If the pragma is inside
+                    <code>#if FOO</code>/<code>#endif</code> the file will only be marked for this
+                    optimization after it is preprocessed while <code>FOO</code> is defined.</p>
+                <p>You can see the results of these experiments at <a
+                        href="https://github.com/IncludeGuardian/multiple-inclusion-optimization-tests">multiple-inclusion-optimization-tests</a>.
+                </p>
+            </section>
+            <section>
+                <h2>Real-world Problems</h2>
+                <p>These rules are simple, but <strong>it's easy to make mistakes</strong>. Even in
+                    the <a href="https://www.boost.org/">Boost library</a>, many libraries take
+                    longer to compile than they should.</p>
+                <section>
+                    <h3>Boost Preprocessor</h3>
+                    <p>MSVC and GCC permit the <em>null directive</em> to be placed outside of the
+                        <code>#ifndef</code>/<code>#endif</code> pair without disrupting the
+                        multiple-inclusion optimization. The null directive is a single
+                        <code>#</code> symbol with optional comments on the same line, and it has no
+                        impact on the preprocessor output. However, Clang does not flag any file for
+                        the multiple-inclusion optimization if it detects a null directive outside
+                        the guard. This <strong>prevents Clang from enabling all Boost Preprocessor
+                            headers for this optimization</strong>, as all of its header files use
+                        the null directive liberally for alignment:</p>
+                    <ol class="code">
+                        <li><code>// example.hpp</code></li>
+                        <li><code># /* Copyright (C) 2023</code></li>
+                        <li><code># * FakeCompany"</code></li>
+                        <li><code># * https://www.example.com</code></li>
+                        <li><code># */</code></li>
+                        <li><code>#</code></li>
+                        <li><code># /* See https://www.example.com/docs for documentation. */</code>
+                        </li>
+                        <li><code>#</code></li>
+                        <li><code># ifndef INCLUDED_ONE_H</code></li>
+                        <li><code># define INCLUDED_ONE_H</code></li>
+                        <li><code>#</code></li>
+                        <li><code># /* code goes here */</code></li>
+                        <li><code>#</code></li>
+                        <li><code># endif</code></li>
+                    </ol>
+                    <p>Luckily this is fixed by <a
+                            href="https://reviews.llvm.org/D147928">D147928</a> for future versions
+                        of Clang.</p>
+                </section>
+                <section>
+                    <h3>Boost Fusion</h3>
+                    <p>The Clang and GCC compilers can optimize include guards that use the syntax
+                        <code>#if !defined(MACRO_NAME)</code>, but this is not optimized by MSVC.
+                        So, if you're using MSVC, it's better to use <code>#ifndef</code> or
+                        <code>#pragma once</code> instead of <code>#if !defined</code>. Even though
+                        the <a
+                            href="https://learn.microsoft.com/en-us/cpp/preprocessor/once">documentation
+                            for MSVC</a> might say that <code>#if !defined HEADER_H_</code> is
+                        equivalent to <code>#ifndef HEADER_H_</code>, it's not really the case.</p>
+                    <p>To improve compilation speed with MSVC, a <a
+                            href="https://github.com/boostorg/fusion/pull/271">pull request</a> has
+                        been made to change the include guards in Fusion from using <code>#if
+                            !defined</code> to <code>#ifndef</code>.</p>
+                </section>
+                <section>
+                    <h3><code>BOOST_PP_IS_ITERATING</code></h3>
+                    <p>Boost preprocessor has a tool that allows for code generation through
+                        self-including a header file, which is explained in the documentation's <a
+                            href="https://www.boost.org/doc/libs/1_81_0/libs/preprocessor/doc/AppendixA-AnIntroductiontoPreprocessorMetaprogramming.html">Self-Iteration
+                            section</a>. However, this method requires an include guard that is
+                        nested inside a preprocesor conditional (<code>#ifndef
+                            BOOST_PP_IS_ITERATING</code>/<code>#else</code>/<code>#endif</code>), as
+                        demonstrated by this example that creates specialized code for
+                        <code>IsSmallInt&lt;N&gt;</code> for values 1 to 5.</p>
+                    <ol class="code">
+                        <li><code>// is_small_int.h</code></li>
+                        <li><code>#if !BOOST_PP_IS_ITERATING</code></li>
+                        <li><code>&nbsp;&nbsp;#ifndef INCLUDED_IS_SMALL_INT</code></li>
+                        <li><code>&nbsp;&nbsp;#define INCLUDED_IS_SMALL_INT</code></li>
+                        <li><code></code></li>
+                        <li><code>&nbsp;&nbsp;#include
+                                &lt;boost/preprocessor/iteration/iterate.hpp&gt;</code>
+                        </li>
+                        <li><code></code></li>
+                        <li><code>&nbsp;&nbsp;template&lt;int N&gt;</code></li>
+                        <li><code>&nbsp;&nbsp;struct IsSmallInt : {</code></li>
+                        <li><code>&nbsp;&nbsp;&nbsp;&nbsp;static const bool value = false;</code>
+                        </li>
+                        <li><code>&nbsp;&nbsp;}</code></li>
+                        <li><code></code></li>
+                        <li><code>&nbsp;&nbsp;#define BOOST_PP_ITERATION_LIMITS (1, 5)</code></li>
+                        <li><code>&nbsp;&nbsp;#define BOOST_PP_FILENAME_1 "is_small_int.h"</code>
+                        </li>
+                        <li><code>&nbsp;&nbsp;??=include BOOST_PP_ITERATE()</code></li>
+                        <li><code></code></li>
+                        <li><code>&nbsp;&nbsp;#endif // INCLUDED_SELF_ITERATION</code></li>
+                        <li><code>#else</code></li>
+                        <li><code>&nbsp;&nbsp;template&lt;&gt;</code></li>
+                        <li><code>&nbsp;&nbsp;struct IsSmallInt&lt;BOOST_PP_ITERATION()&gt; {</code>
+                        </li>
+                        <li><code>&nbsp;&nbsp;&nbsp;&nbsp;static const bool value = true;</code>
+                        </li>
+                        <li><code>&nbsp;&nbsp;};</code></li>
+                        <li><code>#endif</code></li>
+                    </ol>
+                    <p><code>BOOST_PP_IS_ITERATING</code> is used around 170 times in Boost
+                        libraries. Most of these uses are in private header files and are unlikely
+                        to be included more than once. However, some public header files, like <a
+                            href="https://github.com/boostorg/mpl/blob/db09fb1dce010e172072a1ba62858b2155285444/include/boost/mpl/bind.hpp">mpl/bind.hpp</a>,
+                        also use it.</p>
+                    <p>A <a href="https://github.com/boostorg/preprocessor/pull/51">pull request</a>
+                        has been made to improve the documentation for Boost Preprocessor, but there
+                        are still many Boost headers that use <code>BOOST_PP_IS_ITERATING</code> and
+                        don't benefit from the multiple-include optimization.</p>
+                </section>
+                <section>
+                    <h2>Avoiding Mistakes</h2>
+                    <p>The issues above were found using the <a href="/instructions">IncludeGuardian tool</a> on Boost Graph and looking through the <a href="https://gist.github.com/IncludeGuardian/0837719e0d1162d5b50e4c8fed4d3c0d#file-boost_graph-yaml-L345-L749"><code>unguarded files</code> section in the results</a>. To prevent these mistakes in your own codebase, you can <a href="/instructions">download IncludeGuardian for free</a> and <strong>keep your C/C++ builds fast!</strong></p>
+                    <p>If you find or fix any include guard issues in your own or other projects, you can let us know on Twitter by tagging them with <a href="https://twitter.com/includeguardian">@includeguardian</a>.</p>
+                </section>
+            </section>
+            <!-- sign up button -->
+            <div class="sib-form" style="text-align: center;
+         background-color: transparent;                                 ">
+                <div id="sib-form-container" class="sib-form-container">
+                    <div id="error-message" class="sib-form-message-panel"
+                        style="font-size:16px; text-align:left; font-family:&quot;Helvetica&quot;, sans-serif; color:#661d1d; background-color:#ffeded; border-radius:3px; border-color:#ff4949;max-width:540px;">
+                        <div
+                            class="sib-form-message-panel__text sib-form-message-panel__text--center">
+                            <svg viewBox="0 0 512 512" class="sib-icon sib-notification__icon">
+                                <path
+                                    d="M256 40c118.621 0 216 96.075 216 216 0 119.291-96.61 216-216 216-119.244 0-216-96.562-216-216 0-119.203 96.602-216 216-216m0-32C119.043 8 8 119.083 8 256c0 136.997 111.043 248 248 248s248-111.003 248-248C504 119.083 392.957 8 256 8zm-11.49 120h22.979c6.823 0 12.274 5.682 11.99 12.5l-7 168c-.268 6.428-5.556 11.5-11.99 11.5h-8.979c-6.433 0-11.722-5.073-11.99-11.5l-7-168c-.283-6.818 5.167-12.5 11.99-12.5zM256 340c-15.464 0-28 12.536-28 28s12.536 28 28 28 28-12.536 28-28-12.536-28-28-28z" />
+                            </svg>
+                            <span class="sib-form-message-panel__inner-text"> Your subscription
+                                could not be saved. Please try again. </span>
+                        </div>
+                    </div>
+                    <div></div>
+                    <div id="success-message" class="sib-form-message-panel"
+                        style="font-size:16px; text-align:left; font-family:&quot;Helvetica&quot;, sans-serif; color:#085229; background-color:#e7faf0; border-radius:3px; border-color:#13ce66;max-width:540px;">
+                        <div
+                            class="sib-form-message-panel__text sib-form-message-panel__text--center">
+                            <svg viewBox="0 0 512 512" class="sib-icon sib-notification__icon">
+                                <path
+                                    d="M256 8C119.033 8 8 119.033 8 256s111.033 248 248 248 248-111.033 248-248S392.967 8 256 8zm0 464c-118.664 0-216-96.055-216-216 0-118.663 96.055-216 216-216 118.664 0 216 96.055 216 216 0 118.663-96.055 216-216 216zm141.63-274.961L217.15 376.071c-4.705 4.667-12.303 4.637-16.97-.068l-85.878-86.572c-4.667-4.705-4.637-12.303.068-16.97l8.52-8.451c4.705-4.667 12.303-4.637 16.97.068l68.976 69.533 163.441-162.13c4.705-4.667 12.303-4.637 16.97.068l8.451 8.52c4.668 4.705 4.637 12.303-.068 16.97z" />
+                            </svg>
+                            <span class="sib-form-message-panel__inner-text"> Your subscription has
+                                been successful. </span>
+                        </div>
+                    </div>
+                    <div></div>
+                    <div id="sib-container" class="sib-container--large sib-container--vertical"
+                        style="text-align:center; background-color:rgba(255,255,255,1); max-width:540px; border-radius:3px; border-width:1px; border-color:#C0CCD9; border-style:solid; direction:ltr">
+                        <form id="sib-form" method="POST"
+                            action="https://5ee4e40f.sibforms.com/serve/MUIEAB9VEGzVEbJiuZ6MIw9rXkAo18GvQhV30KJ0b7LFC2JLqxCJWzqbTF_kjwND0U95KBA5IJiwFyv6_-5S7KcLbUV2oeU360jtoC_gQFK378qVlmvNIgg7d0ISQ6X_amN8Nez4h8lKUrwmtOGSDqIo4bKbgV9hWCYYDiUUJbqRGaLxT1mKk0pX0eBTS7n_ZRvznQX1rNnDMmna"
+                            data-type="subscription">
+                            <div style="padding: 8px 0;">
+                                <div class="sib-form-block"
+                                    style="font-size:32px; text-align:left; font-weight:700; font-family:&quot;Helvetica&quot;, sans-serif; color:#3C4858; background-color:transparent; text-align:left">
+                                    <p>Don't miss the next article!</p>
+                                </div>
+                            </div>
+                            <div style="padding: 8px 0;">
+                                <div class="sib-form-block"
+                                    style="font-size:16px; text-align:left; font-family:&quot;Helvetica&quot;, sans-serif; color:#3C4858; background-color:transparent; text-align:left">
+                                    <div class="sib-text-form-block">
+                                        <p>Subscribe to IncludeGuardian updates for more future content and
+                                            ways to improve your C/C++ build times! We will use your
+                                            email address to send you information on IncludeGuardian
+                                            only and you are free to unsubscribe at any time.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="padding: 8px 0;">
+                                <div class="sib-input sib-form-block">
+                                    <div class="form__entry entry_block">
+                                        <div class="form__label-row ">
+                                            <div class="entry__field">
+                                                <input class="input " type="text" id="EMAIL"
+                                                    name="EMAIL" autocomplete="off"
+                                                    placeholder="EMAIL" data-required="true"
+                                                    required />
+                                            </div>
+                                        </div>
+                                        <label class="entry__error entry__error--primary"
+                                            style="font-size:16px; text-align:left; font-family:&quot;Helvetica&quot;, sans-serif; color:#661d1d; background-color:#ffeded; border-radius:3px; border-color:#ff4949;">
+                                        </label>
+                                        <label class="entry__specification"
+                                            style="font-size:12px; text-align:left; font-family:&quot;Helvetica&quot;, sans-serif; color:#8390A4; text-align:left">
+                                            Provide your email address to subscribe. For e.g
+                                            abc@xyz.com </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="padding: 8px 0;">
+                                <div class="sib-captcha sib-form-block">
+                                    <div class="form__entry entry_block">
+                                        <div class="form__label-row ">
+                                            <script>
+                                                function handleCaptchaResponse() {
+                                                    var event = new Event('captchaChange');
+                                                    document.getElementById('sib-captcha')
+                                                        .dispatchEvent(event);
+                                                }
+                                            </script>
+                                            <div class="g-recaptcha sib-visible-recaptcha"
+                                                id="sib-captcha"
+                                                data-sitekey="6LfBDkMkAAAAAFPcTEzped2kTC4V5fTgeqAKzKxU"
+                                                data-callback="handleCaptchaResponse"
+                                                style="direction:ltr"></div>
+                                        </div>
+                                        <label class="entry__error entry__error--primary"
+                                            style="font-size:16px; text-align:left; font-family:&quot;Helvetica&quot;, sans-serif; color:#661d1d; background-color:#ffeded; border-radius:3px; border-color:#ff4949;">
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="padding: 8px 0;">
+                                <div class="sib-form-block" style="text-align: center">
+                                    <button
+                                        class="sib-form-block__button sib-form-block__button-with-loader"
+                                        style="font-size:16px; text-align:center; font-weight:700; font-family:&quot;Helvetica&quot;, sans-serif; color:#FFFFFF; background-color:#3E4857; border-radius:3px; border-width:0px;"
+                                        form="sib-form" type="submit">
+                                        <svg class="icon clickable__icon progress-indicator__icon sib-hide-loader-icon"
+                                            viewBox="0 0 512 512">
+                                            <path
+                                                d="M460.116 373.846l-20.823-12.022c-5.541-3.199-7.54-10.159-4.663-15.874 30.137-59.886 28.343-131.652-5.386-189.946-33.641-58.394-94.896-95.833-161.827-99.676C261.028 55.961 256 50.751 256 44.352V20.309c0-6.904 5.808-12.337 12.703-11.982 83.556 4.306 160.163 50.864 202.11 123.677 42.063 72.696 44.079 162.316 6.031 236.832-3.14 6.148-10.75 8.461-16.728 5.01z" />
+                                        </svg> SUBSCRIBE </button>
+                                </div>
+                            </div>
+                            <input type="text" name="email_address_check" value=""
+                                class="input--hidden">
+                            <input type="hidden" name="locale" value="en">
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <!-- end of sign up button -->
+            <hr />
+            <footer>
+                <p>© 2023 IncludeGuardian<p>
+                        <p><a href="/privacy-policy">Privacy Policy</a> | <a
+                                href="mailto:hello@includeguardian.io">Email Us</a> | <a
+                                href="https://github.com/includeguardian">GitHub</a> | <a
+                                href="https://twitter.com/includeguardian">Twitter</a></p>
+            </footer>
+        </article>
+        <script>
+            window.REQUIRED_CODE_ERROR_MESSAGE = 'Please choose a country code';
+            window.LOCALE = 'en';
+            window.EMAIL_INVALID_MESSAGE = window.SMS_INVALID_MESSAGE =
+                "The information provided is invalid. Please review the field format and try again.";
+            window.REQUIRED_ERROR_MESSAGE = "This field cannot be left blank. ";
+            window.GENERIC_INVALID_MESSAGE =
+                "The information provided is invalid. Please review the field format and try again.";
+            window.translation = {
+                common: {
+                    selectedList: '{quantity} list selected',
+                    selectedLists: '{quantity} lists selected'
+                }
+            };
+            var AUTOHIDE = Boolean(0);
+        </script>
+        <script defer src="https://sibforms.com/forms/end-form/build/main.js"></script>
+        <script src="https://www.google.com/recaptcha/api.js?hl=en"></script>
+    </main>
+</body>
+
+</html>

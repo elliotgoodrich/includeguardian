@@ -9,7 +9,7 @@
     <meta
         content="IncludeGuardian CI, a continuous integration GitHub solution to keep C and C++ projects building fast"
         name="description">
-    <link rel="stylesheet" type="text/css" href="./style.css">
+    <link rel="stylesheet" type="text/css" href="/style.css">
     <style>
         article img {
             display: block;
@@ -67,11 +67,12 @@
 <body>
     <main>
         <nav>
-            <a id="logo" href="./">IncludeGuardian</a>
+            <a id="logo" href="/">IncludeGuardian</a>
             <ul>
-                <li><a href="./instructions">Instructions</a></li>
-                <li><a href="./ci">CI</a></li>
-                <li><a href="./about">About</a></li>
+                <li><a href="/articles">Articles</a></li>
+                <li><a href="/instructions">Instructions</a></li>
+                <li><a href="/ci">CI</a></li>
+                <li><a href="/about">About</a></li>
             </ul>
         </nav>
         <article>

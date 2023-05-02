@@ -8,17 +8,18 @@
     <meta content="width=device-width,initial-scale=1" name="viewport">
     <meta content="Privacy Policy for the data collected on the IncludeGuardian website"
         name="description">
-    <link rel="stylesheet" type="text/css" href="./style.css">
+    <link rel="stylesheet" type="text/css" href="/style.css">
 </head>
 
 <body>
     <main>
         <nav>
-            <a id="logo" href="./">IncludeGuardian</a>
+            <a id="logo" href="/">IncludeGuardian</a>
             <ul>
-                <li><a href="./instructions">Instructions</a></li>
-                <li><a href="./ci">CI</a></li>
-                <li><a href="./about">About</a></li>
+                <li><a href="/articles">Articles</a></li>
+                <li><a href="/instructions">Instructions</a></li>
+                <li><a href="/ci">CI</a></li>
+                <li><a href="/about">About</a></li>
             </ul>
         </nav>
         <article>
