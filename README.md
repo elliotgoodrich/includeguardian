@@ -71,6 +71,12 @@ If you don't have a GCC version supporting C++20 then follow https://askubuntu.c
     * `dot-graph` to create a DOT graph of include files
     * `most-expensive` to list the include directives ordered by the file size saved if they were removed individually
 
+## Running the Website
+
+  1. `npm install -g local-web-server`
+  2. `cd website`
+  3. `ws`
+
 ## People to thank
   * https://reversed.top/2015-04-23/detecting-wrong-first-include/
     * For helping with the proper behaviour of `ExecuteAction` to avoid "PP is null" assertions
