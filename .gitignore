@@ -1,0 +1,7 @@
+.gitignore
+src/.vs
+src/compile_commands.json
+out
+out2
+build
+
