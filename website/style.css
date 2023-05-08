@@ -6,8 +6,8 @@ html {
 }
 
 body {
-    width: 40rem;
     margin:0;
+    max-width:40rem;
 }
 
 nav {
@@ -31,7 +31,7 @@ nav li a, #logo {
     display: block;
     text-decoration: none;
     text-align:left;
-    padding:.5rem;
+    padding:.2rem;
     color:#FEEFDD;
 }
 
@@ -58,6 +58,7 @@ a {
 
 code {
     background-color: #ffd8d3;
+    word-break: break-all;
 }
 
 footer {
@@ -68,4 +69,9 @@ footer {
     margin: 1em 2em;
     padding-left: 0;
     background-color: #ffd8d3;
+}
+
+.sib-form {
+    overflow: hidden;
+    max-width:80vw;
 }

@@ -20,7 +20,7 @@
 <body>
     <main>
         <nav>
-            <a id="logo" href="/">IncludeGuardian</a>
+            <a id="logo" href="/">Home</a>
             <ul>
                 <li><a href="/articles">Articles</a></li>
                 <li><a href="/instructions">Instructions</a></li>
