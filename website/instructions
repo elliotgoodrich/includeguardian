@@ -86,6 +86,10 @@
                         <p>A file is properly guarded if it includes <code>#pragma once</code> or an
                             include guard that wraps all <strong>non-comment,
                                 non-whitespace</strong> text within the file.</p>
+                        <p>For more detail on include guards, <code>#pragma once</code>, and the
+                            <em>multiple-include optimization</em> see the article <a
+                                href="/article/include-guards-and-their-optimizations">Include
+                                Guards and their Optimzations</a>.</p>
                         <h3><code>unreferenced components</code></h3>
                         <p>This section lists source files that have a corresponding header that is
                             not included by any other file. These files may be candidates for
