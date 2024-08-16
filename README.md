@@ -1,11 +1,11 @@
 # IncludeGuardian
 
-## TODO
-  * For another analysis, see if we can look if a set of includes have the
-    exact same set of includers, and figure out the benefit of combining these
-    components.
-  * For another analysis, see if there is a component that is included by
-    only one other file and suggest inlining it as a private component.
+IncludeGuardian is a tool to improve C/C++ compilation times by highlighting which
+include directives are expensive so that you can attempt to remove them by using
+techniques such as forward declarations and the pimpl idiom.
+
+See `https://includeguardian.io` for more information and instructions on how
+to install and use this tool.
 
 ## Initial Setup
 
@@ -141,6 +141,14 @@ Although creating the initial list may be expensive, IncludeGuard should
 strive to have a quick response on new pull requests.
 
 ## Alternative Ideas
+
+## TODO
+  * For another analysis, see if we can look if a set of includes have the
+    exact same set of includers, and figure out the benefit of combining these
+    components.
+  * For another analysis, see if there is a component that is included by
+    only one other file and suggest inlining it as a private component.
+
 
 ### `find_unused_components`
 
