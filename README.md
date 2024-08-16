@@ -18,10 +18,10 @@ to install and use this tool.
   5. Install [CMake](https://cmake.org/download/) and add to PATH
   6. Install [vcpkg](https://vcpkg.io/en/getting-started.html)
   7. `vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
-  10. `cmake -S src -B build -G "Visual Studio 17 2022" -A x64 "-DCMAKE_TOOLCHAIN_FILE=C:\Program Files\vcpkg\scripts\buildsystems\vcpkg.cmake" "-DVCPKG_TARGET_TRIPLET=x64-windows-static"` (Fixing the `CMAKE_TOOLCHAIN_FILE` variable)
+  8. `cmake -S src -B build -G "Visual Studio 17 2022" -A x64 "-DCMAKE_TOOLCHAIN_FILE=C:\Program Files\vcpkg\scripts\buildsystems\vcpkg.cmake" "-DVCPKG_TARGET_TRIPLET=x64-windows-static"` (Fixing the `CMAKE_TOOLCHAIN_FILE` variable)
 
 ### Linux (Ubuntu)
-If you don't have a GCC version supporting C++20 then follow https://askubuntu.com/a/1163021
+If you don't have a GCC version supporting C++20 then first follow https://askubuntu.com/a/1163021
   1. `sudo add-apt-repository ppa:ubuntu-toolchain-r/test`
   2. `sudo apt-get update`
   3. `sudo apt-get install gcc-9 g++-9`
@@ -29,27 +29,28 @@ If you don't have a GCC version supporting C++20 then follow https://askubuntu.c
   5. `sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9`
   6. `sudo apt install libtbb-dev` (may not be necessary)
 
-  0. `sudo apt update && sudo apt upgrade`
-  1. `sudo apt install clang`
-  1. `sudo update-alternatives --config cc` (choose clang)+ (not needed for Ubuntu 18)
-  2. `sudo apt install python3`
-  2. `sudo apt install python3-pip`
-  3. `pip install conan`
-  3. `sudo apt install cmake`
-  3. `sudo apt install pkg-config`
-  3. `sudo apt install curl zip unzip tar`
-  7. `git clone https://github.com/Microsoft/vcpkg.git`
-  8. `./vcpkg/bootstrap-vcpkg.sh`
-  8. `cd vcpkg`
+Otherwise/then follow:
+  1. `sudo apt update && sudo apt upgrade`
+  2. `sudo apt install clang`
+  3. `sudo update-alternatives --config cc` (choose clang)+ (not needed for Ubuntu 18)
+  4. `sudo apt install python3`
+  5. `sudo apt install python3-pip`
+  6. `pip install conan`
+  7. `sudo apt install cmake`
+  8. `sudo apt install pkg-config`
+  9. `sudo apt install curl zip unzip tar`
+  10. `git clone https://github.com/Microsoft/vcpkg.git`
+  11. `./vcpkg/bootstrap-vcpkg.sh`
+  12. `cd vcpkg`
     * `./vcpkg install llvm[core,clang,tools,target-x86,enable-rtti]`+
     * `./vcpkg install termcolor`
     * `./vcpkg install boost`
     * `./vcpkg install gtest`
     * `./vcpkg install benchmark`
-  9. `./vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
-  10. `cmake -S src -B release "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Release"` or `cmake -S src -B debug "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Debug`
-  11. `cd` into the correct directory
-  12. `make -j`
+  13. `./vcpkg integrate install` (you'll get a message about a `-DCMAKE_TOOLCHAIN_FILE` variable)
+  14. `cmake -S src -B release "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Release"` or `cmake -S src -B debug "-DCMAKE_TOOLCHAIN_FILE=[fill in]/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Debug`
+  15. `cd` into the correct directory
+  16. `make -j`
 
 ## Building
 
